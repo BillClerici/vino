@@ -1,5 +1,5 @@
 """
-Multi-LLM initialization utilities for VinoVoyage.
+Multi-LLM initialization utilities for Vino Trip.
 
 - Claude 3.5 Sonnet (via ChatAnthropic): general reasoning, palate analysis,
   sentiment analysis, invitation text, itinerary planning.

@@ -1,4 +1,4 @@
-# VinoVoyage
+# Vino Trip
 
 A social wine trip planning and tasting journal built with Django. Plan wine trips with friends, check in at wineries in real time, rate your experience, log every wine you taste, and build a personal wine history over time.
 

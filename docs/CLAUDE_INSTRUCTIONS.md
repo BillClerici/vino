@@ -1,4 +1,4 @@
-# Project: VinoVoyage - Agentic Wine & Winery Companion
+# Project: Vino Trip - Agentic Wine & Winery Companion
 ## Technical Stack Overview
 - **Backend/Web:** Django (REST Framework for Mobile API)
 - **Mobile:** Flutter

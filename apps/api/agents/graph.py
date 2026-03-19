@@ -1,5 +1,5 @@
 """
-LangGraph state machine for VinoVoyage AI agents.
+LangGraph state machine for Vino Trip AI agents.
 
 The graph orchestrates multi-step AI workflows:
 - Palate analysis (Claude analyzes tasting notes → structured profile)

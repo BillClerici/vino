@@ -1,4 +1,4 @@
-# VinoVoyage Feature Roadmap
+# Vino Trip Feature Roadmap
 
 ## Phase 1: The Digital Sommelier (Logging & Memory)
 - [ ] **Vision Intake:** Capture wine label via Flutter, process via **Gemini 1.5 Pro**.

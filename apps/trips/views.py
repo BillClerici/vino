@@ -320,7 +320,7 @@ class TripInviteView(LoginRequiredMixin, View):
         # Send invitation email
         inviter = request.user.full_name or request.user.email
         greeting = first_name or "there"
-        subject = f"You're invited to {trip.name} — VinoVoyage"
+        subject = f"You're invited to {trip.name} — Vino Trip"
         body_text = (
             f"Hi {greeting},\n\n"
             f"{inviter} has invited you to join a wine trip!\n\n"
@@ -333,8 +333,8 @@ class TripInviteView(LoginRequiredMixin, View):
         if message:
             body_text += f"\nPersonal message:\n{message}\n"
         body_text += (
-            "\nLog in to VinoVoyage to view the trip and RSVP.\n\n"
-            "Cheers!\nThe VinoVoyage Team"
+            "\nLog in to Vino Trip to view the trip and RSVP.\n\n"
+            "Cheers!\nThe Vino Trip Team"
         )
 
         try:

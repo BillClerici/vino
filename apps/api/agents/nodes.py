@@ -1,5 +1,5 @@
 """
-Individual node implementations for the VinoVoyage LangGraph.
+Individual node implementations for the Vino Trip LangGraph.
 
 Each function receives the full VinoState and returns a partial dict
 of state updates. Nodes are registered in graph.py.
