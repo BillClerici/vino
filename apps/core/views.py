@@ -22,7 +22,9 @@ class LandingPageView(TemplateView):
         ctx["visit_count"] = my_visits.count()
         ctx["unique_wineries"] = my_visits.values("winery").distinct().count()
         ctx["avg_rating"] = my_visits.aggregate(avg=Avg("rating_overall"))["avg"]
-        ctx["total_wineries"] = Winery.objects.count()
+        ctx["trips_completed"] = Trip.objects.filter(
+            members=user, is_active=True, status="completed"
+        ).count()
 
         # Recent visits
         ctx["recent_visits"] = (

@@ -95,12 +95,17 @@ class TripDetailView(LoginRequiredMixin, View):
             trip.trip_wineries.values_list("winery_id", flat=True)
         )
 
+        stops = list(trip.trip_wineries.select_related("winery").order_by("order"))
+        # Mark stops that have cached wines
+        for stop in stops:
+            stop.has_cached_wines = stop.winery.wines.exists()
+
         return render(request, "trips/detail.html", {
             "trip": trip,
             "is_member": is_member,
             "is_organizer": is_organizer,
             "members": trip.trip_members.select_related("user").order_by("role"),
-            "stops": trip.trip_wineries.select_related("winery").order_by("order"),
+            "stops": stops,
             "favorites": favorites,
             "visited": visited,
             "stop_winery_ids": stop_winery_ids,
@@ -252,10 +257,19 @@ class TripRemoveStopView(LoginRequiredMixin, View):
         stop.save(update_fields=["is_active", "updated_at"])
 
         # Re-sequence remaining stops
-        for idx, tw in enumerate(trip.trip_wineries.order_by("order"), start=1):
+        remaining = list(trip.trip_wineries.order_by("order"))
+        for idx, tw in enumerate(remaining, start=1):
             if tw.order != idx:
                 tw.order = idx
                 tw.save(update_fields=["order", "updated_at"])
+
+        # Fix current_stop_index if it's now out of bounds
+        meta = trip.metadata or {}
+        current = meta.get("current_stop_index", 0)
+        if current >= len(remaining) and len(remaining) > 0:
+            meta["current_stop_index"] = len(remaining) - 1
+            trip.metadata = meta
+            trip.save(update_fields=["metadata", "updated_at"])
 
         return JsonResponse({"ok": True})
 
@@ -406,10 +420,17 @@ class TripUpdateMemberView(LoginRequiredMixin, View):
             tm.invite_message = body["invite_message"]
             update_fields.append("invite_message")
 
-        # Role (cannot change organizer)
-        if "role" in body and tm.role != TripMember.Role.ORGANIZER:
+        # Role — allow promoting to organizer, prevent demoting the last organizer
+        if "role" in body:
             new_role = body["role"]
             if new_role in dict(TripMember.Role.choices):
+                if tm.role == TripMember.Role.ORGANIZER and new_role != TripMember.Role.ORGANIZER:
+                    # Demoting an organizer — only allow if there's another organizer
+                    other_organizers = trip.trip_members.filter(
+                        role=TripMember.Role.ORGANIZER
+                    ).exclude(pk=tm.pk).count()
+                    if other_organizers == 0:
+                        return JsonResponse({"error": "Cannot demote the last organizer"}, status=400)
                 tm.role = new_role
                 update_fields.append("role")
 
@@ -432,7 +453,11 @@ class TripRemoveMemberView(LoginRequiredMixin, View):
         trip = get_object_or_404(Trip, pk=pk)
         tm = get_object_or_404(TripMember, pk=member_pk, trip=trip)
         if tm.role == TripMember.Role.ORGANIZER:
-            return JsonResponse({"error": "Cannot remove the organizer"}, status=400)
+            other_organizers = trip.trip_members.filter(
+                role=TripMember.Role.ORGANIZER
+            ).exclude(pk=tm.pk).count()
+            if other_organizers == 0:
+                return JsonResponse({"error": "Cannot remove the last organizer"}, status=400)
         tm.is_active = False
         tm.save(update_fields=["is_active", "updated_at"])
         return JsonResponse({"ok": True})
@@ -583,6 +608,26 @@ class LiveTripView(LoginRequiredMixin, View):
                     "wines": wines_logged,
                 }
 
+        # Compute per-winery stats: past visit count and favorite/top wine count
+        from apps.visits.models import VisitWine
+        from django.db.models import Count, Q
+        winery_stats = {}
+        for stop in stops:
+            winery_id = stop.winery_id
+            if winery_id not in winery_stats:
+                past_visits = VisitLog.objects.filter(
+                    user=user, winery_id=winery_id
+                ).exclude(visited_at__date=today).count()
+                fav_wines = VisitWine.objects.filter(
+                    visit__user=user, visit__winery_id=winery_id
+                ).filter(Q(is_favorite=True) | Q(rating__gte=4)).count()
+                winery_stats[winery_id] = {
+                    "past_visits": past_visits,
+                    "fav_wines": fav_wines,
+                }
+            stop.past_visits = winery_stats[winery_id]["past_visits"]
+            stop.fav_wines = winery_stats[winery_id]["fav_wines"]
+
         import json
         return render(request, "trips/live.html", {
             "trip": trip,
@@ -712,6 +757,7 @@ class LiveTripWineView(LoginRequiredMixin, View):
             "serving_type": vw.serving_type,
             "quantity": vw.quantity,
             "rating": vw.rating,
+            "tasting_notes": vw.tasting_notes,
             "is_favorite": vw.is_favorite,
             "purchased": vw.purchased,
             "purchased_quantity": vw.purchased_quantity,
@@ -777,3 +823,39 @@ class LiveTripCompleteView(LoginRequiredMixin, View):
         trip.metadata = meta
         trip.save(update_fields=["status", "metadata", "updated_at"])
         return JsonResponse({"ok": True})
+
+
+class LiveTripWineMenuView(LoginRequiredMixin, View):
+    """AJAX: fetch known wines for a winery (scrapes website if needed)."""
+
+    def get(self, request, pk, winery_pk):
+        from apps.wineries.models import Winery as WineryModel
+        from apps.wineries.scraper import scrape_and_cache_wines
+
+        trip = get_object_or_404(Trip, pk=pk)  # noqa: F841
+        winery = get_object_or_404(WineryModel, pk=winery_pk)
+
+        if request.GET.get("refresh"):
+            winery.wine_menu_last_scraped = None
+            winery.save(update_fields=["wine_menu_last_scraped", "updated_at"])
+
+        wines = scrape_and_cache_wines(winery)
+
+        return JsonResponse({
+            "ok": True,
+            "wines": [
+                {
+                    "wine_id": str(w.pk),
+                    "name": w.name,
+                    "varietal": w.varietal,
+                    "vintage": w.vintage,
+                    "description": w.description or "",
+                    "wine_type": (w.metadata or {}).get("wine_type", ""),
+                    "price": float(w.price) if w.price else None,
+                    "image_url": w.image_url or "",
+                }
+                for w in wines
+            ],
+            "has_website": bool(winery.website),
+            "winery_name": winery.name,
+        })

@@ -7,20 +7,27 @@
     .progress-bar { display: flex; align-items: center; justify-content: center; padding: 16px 0; gap: 0; flex-wrap: nowrap; overflow-x: auto; }
     .progress-step { display: flex; align-items: center; flex-shrink: 0; }
     .progress-dot {
-        width: 32px; height: 32px; border-radius: 50%;
+        padding: 4px 12px; border-radius: 14px;
         display: flex; align-items: center; justify-content: center;
-        font-weight: 700; font-size: 0.8rem; cursor: pointer;
+        font-weight: 700; font-size: 0.68rem; cursor: pointer; white-space: nowrap;
         transition: all 0.2s; border: 2px solid #e0e0e0; background: #fff; color: #9e9e9e;
     }
     .progress-dot.completed { background: #43a047; border-color: #43a047; color: #fff; }
     .progress-dot.current { background: #7e57c2; border-color: #7e57c2; color: #fff; }
     .progress-dot.upcoming { background: #f5f5f5; border-color: #e0e0e0; color: #bdbdbd; }
-    .progress-dot.active-stop { transform: scale(1.2); box-shadow: 0 3px 10px rgba(0,0,0,0.3); }
+    .progress-dot.active-stop { transform: scale(1.2); box-shadow: 0 3px 10px rgba(126,87,194,0.4); background: #7e57c2 !important; border-color: #7e57c2 !important; color: #fff !important; }
     .progress-line { width: 28px; height: 2px; background: #e0e0e0; flex-shrink: 0; }
     .progress-line.completed { background: #43a047; }
 
     .live-stop-card { border-radius: 10px; background: #fff; box-shadow: 0 2px 12px rgba(0,0,0,0.08); overflow: hidden; margin-bottom: 16px; }
-    .stop-hero { display: flex; gap: 16px; padding: 20px; align-items: center; }
+    .stop-hero { display: flex; gap: 16px; padding: 20px; align-items: center; position: relative; }
+    .stop-badges { position: absolute; top: 12px; right: 12px; display: flex; gap: 6px; }
+    .stop-badge {
+        display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px;
+        border-radius: 12px; font-size: 0.72rem; font-weight: 700;
+    }
+    .stop-badge.visits { background: #ede7f6; color: #7e57c2; }
+    .stop-badge.favs { background: #fff3e0; color: #ff8f00; }
     .stop-hero-img { width: 80px; height: 80px; border-radius: 10px; object-fit: cover; flex-shrink: 0; }
     .stop-hero-placeholder { width: 80px; height: 80px; border-radius: 10px; background: #ede7f6; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
     .stop-hero-info h5 { margin: 0 0 4px; font-size: 1.2rem; font-weight: 700; color: #333; }
@@ -63,7 +70,7 @@
         border: 1px solid #f0f0f0; border-radius: 10px; padding: 14px; margin-bottom: 10px;
         background: #fff; transition: box-shadow 0.15s;
     }
-    .wine-log-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    .wine-log-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); cursor: pointer; }
     .wine-log-header { display: flex; align-items: center; gap: 10px; }
     .wine-color-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
     .wine-color-dot.wine-red { background: #b71c1c; }
@@ -124,6 +131,23 @@
     .type-opt.sparkling { color: #ff8f00; } .type-opt.sparkling.selected { background: #fff8e1; }
     .type-opt.other { color: #546e7a; } .type-opt.other.selected { background: #eceff1; }
 
+    /* Wine menu from website */
+    .wine-menu-cards { display: flex; overflow-x: auto; gap: 8px; padding-bottom: 8px; -webkit-overflow-scrolling: touch; }
+    .wine-menu-cards::-webkit-scrollbar { height: 10px; }
+    .wine-menu-cards::-webkit-scrollbar-track { background: #f5f5f5; border-radius: 5px; }
+    .wine-menu-cards::-webkit-scrollbar-thumb { background: #bdbdbd; border-radius: 5px; }
+    .wine-menu-cards::-webkit-scrollbar-thumb:hover { background: #9e9e9e; }
+    .wine-menu-card {
+        min-width: 150px; max-width: 180px; padding: 10px 12px; border: 1.5px solid #e0e0e0;
+        border-radius: 10px; background: #fff; cursor: pointer; flex-shrink: 0;
+        transition: all 0.15s;
+    }
+    .wine-menu-card:hover { border-color: #bdbdbd; box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
+    .wine-menu-card.selected { border-color: #7e57c2; background: #f3e5f5; }
+    .wine-menu-card .wmc-name { font-weight: 600; font-size: 0.82rem; color: #333; margin-bottom: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .wine-menu-card .wmc-detail { font-size: 0.72rem; color: #9e9e9e; }
+    .wine-menu-card .wmc-desc { font-size: 0.7rem; color: #bdbdbd; margin-top: 4px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+
     /* Nav */
     .live-nav { display: flex; gap: 12px; padding: 16px 0 30px; }
     .live-nav button { flex: 1; padding: 14px; border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: none; transition: all 0.15s; }
@@ -138,7 +162,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="container" style="margin-top: 12px; padding-bottom: 30px; max-width: 640px;">
+<div class="container" style="margin-top: 12px; padding-bottom: 30px; max-width: 95%;">
 
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
         <a href="{% url 'trip_detail' pk=trip.pk %}" style="display: inline-flex; align-items: center; gap: 5px; background: #546e7a; border-radius: 18px; padding: 6px 16px; text-decoration: none; font-size: 0.82rem; font-weight: 600; color: #fff; line-height: 1.4;">
@@ -154,7 +178,7 @@
             {% if not forloop.first %}<div class="progress-line {% if forloop.counter0 <= current_index %}completed{% endif %}"></div>{% endif %}
             <div class="progress-dot {% if forloop.counter0 < current_index %}completed{% elif forloop.counter0 == current_index %}current{% else %}upcoming{% endif %}{% if forloop.counter0 == current_index %} active-stop{% endif %}"
                  data-index="{{ forloop.counter0 }}" onclick="goToStop({{ forloop.counter0 }})" title="{{ stop.winery.name }}">
-                {% if forloop.counter0 < current_index %}<i class="material-icons" style="font-size: 1rem;">check</i>{% else %}{{ forloop.counter }}{% endif %}
+                Stop {{ forloop.counter }}
             </div>
         </div>
         {% endfor %}
@@ -167,6 +191,14 @@
              style="{% if forloop.counter0 != current_index %}display:none;{% endif %}">
 
             <div class="stop-hero">
+                <div class="stop-badges">
+                    {% if stop.past_visits %}
+                    <span class="stop-badge visits"><i class="material-icons" style="font-size: 0.8rem;">history</i> {{ stop.past_visits }} visit{{ stop.past_visits|pluralize }}</span>
+                    {% endif %}
+                    {% if stop.fav_wines %}
+                    <span class="stop-badge favs"><i class="material-icons" style="font-size: 0.8rem;">star</i> {{ stop.fav_wines }} fav{{ stop.fav_wines|pluralize }}</span>
+                    {% endif %}
+                </div>
                 {% if stop.winery.image_url %}
                 <img src="{{ stop.winery.image_url }}" alt="{{ stop.winery.name }}" class="stop-hero-img">
                 {% else %}
@@ -174,7 +206,14 @@
                 {% endif %}
                 <div class="stop-hero-info">
                     <h5>{{ stop.winery.name }}</h5>
-                    {% if stop.winery.city %}<div class="location"><i class="material-icons tiny">place</i> {{ stop.winery.city }}{% if stop.winery.state %}, {{ stop.winery.state }}{% endif %}</div>{% endif %}
+                    {% if stop.winery.address %}
+                    <div class="location"><i class="material-icons tiny">place</i> {{ stop.winery.address }}</div>
+                    {% elif stop.winery.city %}
+                    <div class="location"><i class="material-icons tiny">place</i> {{ stop.winery.city }}{% if stop.winery.state %}, {{ stop.winery.state }}{% endif %}</div>
+                    {% endif %}
+                    {% if stop.winery.website %}
+                    <div style="font-size: 0.82rem; margin-top: 4px;"><a href="{{ stop.winery.website }}" target="_blank" rel="noopener" style="color: #7e57c2; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 3px;"><i class="material-icons" style="font-size: 0.85rem;">language</i> Website</a></div>
+                    {% endif %}
                     {% if stop.arrival_time %}<div class="timing"><i class="material-icons tiny">schedule</i> {{ stop.arrival_time|date:"g:i A" }}{% if stop.duration_minutes %} · {{ stop.duration_minutes }} min{% endif %}</div>{% endif %}
                 </div>
             </div>
@@ -202,6 +241,24 @@
 
                 <!-- Wines Tab -->
                 <div class="live-tab-content active" id="tab-wines-{{ forloop.counter0 }}">
+                    <!-- Wine Menu from Website -->
+                    <div id="wine-menu-{{ forloop.counter0 }}" style="display:none; margin-bottom: 12px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                            <span style="font-size:0.82rem;font-weight:600;color:#757575;display:inline-flex;align-items:center;gap:4px;">
+                                <i class="material-icons" style="font-size:1rem;">menu_book</i> Wine Menu
+                            </span>
+                            <button onclick="loadWineMenu({{ forloop.counter0 }}, true)" style="border:none;background:none;color:#7e57c2;font-size:0.78rem;cursor:pointer;display:inline-flex;align-items:center;gap:2px;">
+                                <i class="material-icons" style="font-size:0.85rem;">refresh</i> Refresh
+                            </button>
+                        </div>
+                        <div id="wine-menu-cards-{{ forloop.counter0 }}" class="wine-menu-cards">
+                            <div style="padding:16px;color:#9e9e9e;font-size:0.82rem;display:flex;align-items:center;gap:6px;">
+                                <div class="preloader-wrapper small active" style="width:18px;height:18px;"><div class="spinner-layer spinner-purple-only"><div class="circle-clipper left"><div class="circle"></div></div></div></div>
+                                Loading wine menu. This may take a few minutes...
+                            </div>
+                        </div>
+                    </div>
+
                     <div id="wine-list-{{ forloop.counter0 }}">
                         <!-- Logged wines appear here -->
                     </div>
@@ -404,7 +461,112 @@ function showPostCheckin(stopIndex, wineryName, timeStr) {
     badge.style.display = 'flex';
     document.getElementById('post-checkin-' + stopIndex).style.display = 'block';
     var dot = document.querySelector('.progress-dot[data-index="' + stopIndex + '"]');
-    if (dot) { dot.classList.add('completed'); dot.innerHTML = '<i class="material-icons" style="font-size:1rem;">check</i>'; }
+    if (dot) { dot.classList.add('completed'); dot.textContent = 'Stop ' + (parseInt(dot.dataset.index) + 1); }
+    // Auto-load wine menu
+    loadWineMenu(stopIndex);
+}
+
+// ── Wine Menu from Website ──
+var wineryMenus = {};
+
+function loadWineMenu(stopIndex, forceRefresh) {
+    var card = document.getElementById('stop-card-' + stopIndex);
+    var wineryPk = card.dataset.wineryPk;
+    var menuSection = document.getElementById('wine-menu-' + stopIndex);
+    var cardsContainer = document.getElementById('wine-menu-cards-' + stopIndex);
+
+    // Show loading
+    menuSection.style.display = 'block';
+    cardsContainer.innerHTML = '<div style="padding:16px;color:#9e9e9e;font-size:0.82rem;display:flex;align-items:center;gap:6px;"><div class="preloader-wrapper small active" style="width:18px;height:18px;"><div class="spinner-layer spinner-purple-only"><div class="circle-clipper left"><div class="circle"></div></div></div></div> Loading wine menu. This may take a few minutes...</div>';
+
+    var url = '/trips/' + tripId + '/live/wine-menu/' + wineryPk + '/';
+    if (forceRefresh) url += '?refresh=1';
+
+    fetch(url, { headers: { 'X-CSRFToken': csrfToken } })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (!data.ok || !data.wines || data.wines.length === 0) {
+            if (!data.has_website) {
+                menuSection.style.display = 'none';
+            } else {
+                cardsContainer.innerHTML = '<div style="padding:12px;color:#bdbdbd;font-size:0.8rem;text-align:center;">No wines found on their website. Add wines manually below.</div>';
+            }
+            return;
+        }
+        wineryMenus[stopIndex] = data.wines;
+        renderWineMenuCards(stopIndex, data.wines);
+    })
+    .catch(function() {
+        cardsContainer.innerHTML = '<div style="padding:12px;color:#ef9a9a;font-size:0.8rem;text-align:center;">Couldn\'t load wine menu. <a href="javascript:void(0)" onclick="loadWineMenu(' + stopIndex + ', true)" style="color:#7e57c2;">Retry</a></div>';
+    });
+}
+
+function renderWineMenuCards(stopIndex, wines) {
+    var container = document.getElementById('wine-menu-cards-' + stopIndex);
+    container.innerHTML = '';
+    wines.forEach(function(wine, idx) {
+        var typeClass = getTypeClass(wine.wine_type || wine.varietal);
+        var card = document.createElement('div');
+        card.className = 'wine-menu-card';
+        card.dataset.menuIndex = idx;
+        card.onclick = function() { prefillFromMenu(stopIndex, idx); };
+        var menuName = wine.name;
+        if (wine.vintage) menuName = menuName.replace(new RegExp('\\b' + wine.vintage + '\\b'), '').trim();
+        var vintage = wine.vintage ? ' ' + wine.vintage : '';
+        var detail = wine.varietal || wine.wine_type || '';
+        var imgHtml = wine.image_url
+            ? '<img src="' + wine.image_url + '" style="width:100%;height:70px;object-fit:contain;border-radius:6px;margin-bottom:6px;background:#fafafa;" onerror="this.style.display=\'none\'">'
+            : '';
+        card.innerHTML =
+            imgHtml +
+            '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">' +
+            '<div class="wine-color-dot ' + typeClass + '"></div>' +
+            '<div class="wmc-name">' + menuName + vintage + '</div>' +
+            '</div>' +
+            (detail ? '<div class="wmc-detail">' + detail + (wine.price ? ' · $' + parseFloat(wine.price).toFixed(2) : '') + '</div>' : '') +
+            (wine.description ? '<div class="wmc-desc">' + wine.description + '</div>' : '');
+        container.appendChild(card);
+    });
+}
+
+function prefillFromMenu(stopIndex, menuIndex) {
+    var wine = wineryMenus[stopIndex][menuIndex];
+    if (!wine) return;
+
+    // Highlight selected card
+    var container = document.getElementById('wine-menu-cards-' + stopIndex);
+    container.querySelectorAll('.wine-menu-card').forEach(function(c) { c.classList.remove('selected'); });
+    container.querySelector('[data-menu-index="' + menuIndex + '"]').classList.add('selected');
+
+    // Open wine form and prefill
+    showWineForm(stopIndex);
+    var state = ensureFormState(stopIndex);
+    state.wine_id = wine.wine_id;
+
+    var wineName = wine.name;
+    if (wine.vintage) {
+        // Strip the vintage year from the name if present
+        wineName = wineName.replace(new RegExp('\\b' + wine.vintage + '\\b'), '').trim();
+        document.getElementById('wf-vintage-' + stopIndex).value = wine.vintage;
+    }
+    document.getElementById('wf-name-' + stopIndex).value = wineName;
+
+    // Auto-select wine type
+    var wineType = wine.wine_type || '';
+    if (!wineType && wine.varietal) {
+        var v = wine.varietal.toLowerCase();
+        if (v.indexOf('cabernet') >= 0 || v.indexOf('merlot') >= 0 || v.indexOf('pinot noir') >= 0 || v.indexOf('syrah') >= 0 || v.indexOf('malbec') >= 0 || v.indexOf('red') >= 0 || v.indexOf('zinfandel') >= 0 || v.indexOf('sangiovese') >= 0 || v.indexOf('tempranillo') >= 0) wineType = 'Red';
+        else if (v.indexOf('chardonnay') >= 0 || v.indexOf('sauvignon blanc') >= 0 || v.indexOf('riesling') >= 0 || v.indexOf('pinot grigio') >= 0 || v.indexOf('white') >= 0 || v.indexOf('viognier') >= 0 || v.indexOf('moscato') >= 0) wineType = 'White';
+        else if (v.indexOf('ros') >= 0) wineType = 'Rosé';
+        else if (v.indexOf('spark') >= 0 || v.indexOf('champagne') >= 0 || v.indexOf('prosecco') >= 0 || v.indexOf('brut') >= 0) wineType = 'Sparkling';
+    }
+    if (wineType) {
+        var typeOpts = document.getElementById('wf-type-' + stopIndex);
+        typeOpts.querySelectorAll('.type-opt').forEach(function(o) {
+            o.classList.toggle('selected', o.dataset.val === wineType);
+        });
+        state.type = wineType;
+    }
 }
 
 // ── Ratings ──
@@ -465,6 +627,9 @@ function resetWineForm(stopIndex) {
     document.getElementById('wf-pqty-' + stopIndex).value = '1';
     var pprice = document.getElementById('wf-pprice-' + stopIndex); if (pprice) pprice.value = '';
     var pnotes = document.getElementById('wf-pnotes-' + stopIndex); if (pnotes) pnotes.value = '';
+    // Deselect menu cards
+    var menuCards = document.getElementById('wine-menu-cards-' + stopIndex);
+    if (menuCards) menuCards.querySelectorAll('.wine-menu-card').forEach(function(c) { c.classList.remove('selected'); });
     formState[stopIndex] = { type: '', serving: 'tasting', rating: 0, qty: 1, fav: false, purchased: false };
 }
 
@@ -535,6 +700,7 @@ function saveWine(stopIndex) {
         wine_name: name,
         wine_vintage: vintage || null,
         wine_type: state.type || '',
+        wine_id: state.wine_id || null,
         serving_type: state.serving || 'tasting',
         quantity: state.qty || 1,
         rating: state.rating || null,
@@ -573,11 +739,28 @@ function addWineCard(stopIndex, data) {
     var card = document.createElement('div');
     card.className = 'wine-log-card';
     card.id = 'vw-' + data.visit_wine_id;
-    var starsHtml = '';
-    for (var i = 1; i <= 5; i++) {
-        starsHtml += '<i class="material-icons ' + (i <= (data.rating || 0) ? 'filled' : 'empty') + '" data-val="' + i + '" onclick="updateWineRating(\'' + data.visit_wine_id + '\', ' + stopIndex + ', ' + i + ')" style="font-size:1rem;">star</i>';
+    card.dataset.stopIndex = stopIndex;
+    card.dataset.vwId = data.visit_wine_id;
+    // Store data on the element for editing
+    card.dataset.wineName = data.wine_name || '';
+    card.dataset.wineVintage = data.wine_vintage || '';
+    card.dataset.wineType = data.wine_type || '';
+    card.dataset.servingType = data.serving_type || 'tasting';
+    card.dataset.quantity = data.quantity || 1;
+    card.dataset.rating = data.rating || 0;
+    card.dataset.isFavorite = data.is_favorite ? '1' : '0';
+    card.dataset.tastingNotes = data.tasting_notes || '';
+    card.dataset.purchased = data.purchased ? '1' : '0';
+    card.dataset.purchasedQuantity = data.purchased_quantity || '';
+    card.dataset.purchasedPrice = data.purchased_price || '';
+    card.dataset.purchasedNotes = data.purchased_notes || '';
+
+    var displayName = data.wine_name;
+    var vintageStr = '';
+    if (data.wine_vintage) {
+        displayName = displayName.replace(new RegExp('\\b' + data.wine_vintage + '\\b'), '').trim();
+        vintageStr = ' ' + data.wine_vintage;
     }
-    var vintageStr = data.wine_vintage ? ' ' + data.wine_vintage : '';
     var detailParts = [];
     if (data.wine_type) detailParts.push('<span style="font-size:0.75rem;color:#9e9e9e;">' + data.wine_type + '</span>');
     detailParts.push('<span class="serving-chip">' + getServingLabel(data.serving_type) + '</span>');
@@ -587,26 +770,162 @@ function addWineCard(stopIndex, data) {
         if (data.purchased_price) purchLabel += ' @ $' + parseFloat(data.purchased_price).toFixed(2);
         detailParts.push('<span class="serving-chip" style="background:#e8f5e9;color:#2e7d32;"><i class="material-icons" style="font-size:0.65rem;vertical-align:middle;">shopping_bag</i> ' + purchLabel + '</span>');
     }
+    if (data.tasting_notes) detailParts.push('<span style="font-size:0.72rem;color:#bdbdbd;font-style:italic;" class="vw-notes-preview">' + data.tasting_notes.substring(0, 40) + (data.tasting_notes.length > 40 ? '...' : '') + '</span>');
 
     var favIcon = data.is_favorite ? 'favorite' : 'favorite_border';
     var favColor = data.is_favorite ? '#c62828' : '#e0e0e0';
 
+    // Stars display (non-interactive in collapsed state)
+    var starsDisplayHtml = '';
+    for (var i = 1; i <= 5; i++) {
+        starsDisplayHtml += '<i class="material-icons ' + (i <= (data.rating || 0) ? 'filled' : 'empty') + '" style="font-size:1rem;">star</i>';
+    }
+
     card.innerHTML =
-        '<div class="wine-log-header">' +
+        '<div class="wine-log-header" onclick="toggleWineEdit(\'' + data.visit_wine_id + '\')">' +
         '<div class="wine-color-dot ' + getTypeClass(data.wine_type) + '"></div>' +
         '<div style="flex:1;min-width:0;">' +
         '<div style="display:flex;align-items:center;gap:6px;">' +
-        '<span style="font-weight:600;font-size:0.9rem;">' + data.wine_name + vintageStr + '</span>' +
-        '<i class="material-icons wine-fav-btn" onclick="toggleWineFav(\'' + data.visit_wine_id + '\', ' + stopIndex + ', this)" style="font-size:1rem;cursor:pointer;color:' + favColor + ';transition:color 0.15s;" title="Favorite">' + favIcon + '</i>' +
+        '<span class="vw-display-name" style="font-weight:600;font-size:0.9rem;">' + displayName + vintageStr + '</span>' +
+        '<i class="material-icons wine-fav-btn" onclick="event.stopPropagation();toggleWineFav(\'' + data.visit_wine_id + '\', ' + stopIndex + ', this)" style="font-size:1rem;cursor:pointer;color:' + favColor + ';transition:color 0.15s;" title="Favorite">' + favIcon + '</i>' +
         '</div>' +
-        '<div style="display:flex;align-items:center;gap:6px;margin-top:3px;flex-wrap:wrap;">' +
+        '<div class="vw-detail-chips" style="display:flex;align-items:center;gap:6px;margin-top:3px;flex-wrap:wrap;">' +
         detailParts.join('') +
         '</div>' +
         '</div>' +
-        '<div class="wine-mini-stars" data-vw-id="' + data.visit_wine_id + '">' + starsHtml + '</div>' +
-        '<button onclick="removeWine(\'' + data.visit_wine_id + '\')" style="border:none;background:none;cursor:pointer;color:#e0e0e0;padding:2px;" title="Remove"><i class="material-icons" style="font-size:1rem;">close</i></button>' +
-        '</div>';
+        '<div class="wine-mini-stars" style="pointer-events:none;">' + starsDisplayHtml + '</div>' +
+        '<i class="material-icons" style="font-size:1.2rem;color:#bdbdbd;flex-shrink:0;">chevron_right</i>' +
+        '</div>' +
+        '<div class="vw-edit-panel" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid #f5f5f5;"></div>';
     list.appendChild(card);
+}
+
+function toggleWineEdit(vwId) {
+    var card = document.getElementById('vw-' + vwId);
+    var panel = card.querySelector('.vw-edit-panel');
+    if (panel.style.display === 'block') { panel.style.display = 'none'; return; }
+
+    var stopIndex = card.dataset.stopIndex;
+    var d = card.dataset;
+    var servings = ['tasting','glass','flight','bottle'];
+    var types = [{v:'Red',c:'wine-red'},{v:'White',c:'white'},{v:'Rosé',c:'rose'},{v:'Sparkling',c:'sparkling'},{v:'Other',c:'other'}];
+
+    var servHtml = servings.map(function(s) {
+        return '<span class="serving-opt' + (d.servingType === s ? ' selected' : '') + '" data-val="' + s + '" onclick="editSelectServing(this)">' + getServingLabel(s) + '</span>';
+    }).join('');
+
+    var typeHtml = types.map(function(t) {
+        return '<span class="type-opt ' + t.c + (d.wineType === t.v ? ' selected' : '') + '" data-val="' + t.v + '" onclick="editSelectType(this)">' + t.v + '</span>';
+    }).join('');
+
+    var starsHtml = '';
+    for (var i = 1; i <= 5; i++) {
+        starsHtml += '<i class="material-icons ' + (i <= parseInt(d.rating) ? 'filled' : 'empty') + '" data-val="' + i + '" onclick="editSelectRating(this)" style="font-size:1.4rem;">star</i>';
+    }
+
+    panel.innerHTML =
+        '<div style="display:flex;gap:10px;margin-bottom:8px;">' +
+        '<div style="flex:1;"><label style="font-size:0.78rem;color:#9e9e9e;font-weight:600;">WINE NAME</label><input type="text" class="ve-name" value="' + (d.wineName || '').replace(/"/g,'&quot;') + '" style="width:100%;border:1px solid #e0e0e0;border-radius:6px;padding:6px 8px;font-size:0.85rem;box-sizing:border-box;margin-top:3px;"></div>' +
+        '<div style="width:75px;"><label style="font-size:0.78rem;color:#9e9e9e;font-weight:600;">VINTAGE</label><input type="number" class="ve-vintage" value="' + (d.wineVintage || '') + '" min="1900" max="2099" style="width:100%;border:1px solid #e0e0e0;border-radius:6px;padding:6px 8px;font-size:0.85rem;box-sizing:border-box;margin-top:3px;"></div>' +
+        '</div>' +
+        '<div style="margin-bottom:8px;"><label style="font-size:0.78rem;color:#9e9e9e;font-weight:600;">TYPE</label><div class="type-options ve-type" style="margin-top:3px;">' + typeHtml + '</div></div>' +
+        '<div style="display:flex;gap:10px;margin-bottom:8px;align-items:flex-start;">' +
+        '<div style="flex:1;"><label style="font-size:0.78rem;color:#9e9e9e;font-weight:600;">SERVING</label><div class="serving-options ve-serving" style="margin-top:3px;">' + servHtml + '</div></div>' +
+        '<div style="width:75px;"><label style="font-size:0.78rem;color:#9e9e9e;font-weight:600;">QTY</label><input type="number" class="ve-qty" value="' + (d.quantity || 1) + '" min="1" style="width:100%;border:1px solid #e0e0e0;border-radius:6px;padding:6px 8px;font-size:0.85rem;box-sizing:border-box;margin-top:3px;text-align:center;"></div>' +
+        '</div>' +
+        '<div style="margin-bottom:8px;"><label style="font-size:0.78rem;color:#9e9e9e;font-weight:600;">RATING</label><div class="wine-mini-stars ve-rating" style="margin-top:3px;">' + starsHtml + '</div></div>' +
+        '<div style="margin-bottom:8px;"><label style="font-size:0.78rem;color:#9e9e9e;font-weight:600;">TASTING NOTES</label><textarea class="ve-notes" style="width:100%;border:1px solid #e0e0e0;border-radius:6px;padding:6px 8px;font-size:0.85rem;font-family:inherit;min-height:50px;box-sizing:border-box;resize:vertical;margin-top:3px;" placeholder="Fruity, oaky, dry, sweet...">' + (d.tastingNotes || '') + '</textarea></div>' +
+        '<div style="margin-bottom:8px;">' +
+        '<div style="margin-top:3px;">' +
+        '<button type="button" class="ve-purchased-btn" data-active="' + (d.purchased === '1' ? '1' : '0') + '" onclick="toggleEditPurchase(this)" style="display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:16px;border:1.5px solid ' + (d.purchased === '1' ? '#43a047' : '#e0e0e0') + ';background:' + (d.purchased === '1' ? '#e8f5e9' : '#fff') + ';color:' + (d.purchased === '1' ? '#2e7d32' : '#616161') + ';font-size:0.8rem;font-weight:600;cursor:pointer;transition:all 0.15s;">' +
+        '<i class="material-icons" style="font-size:0.9rem;">shopping_bag</i> Bought a Bottle?' +
+        '</button>' +
+        '</div>' +
+        '<div class="ve-purch-details" style="display:' + (d.purchased === '1' ? 'flex' : 'none') + ';gap:10px;margin-top:6px;">' +
+        '<div style="width:75px;"><label style="font-size:0.72rem;color:#9e9e9e;">Bottles</label><input type="number" class="ve-pqty" value="' + (d.purchasedQuantity || 1) + '" min="1" style="width:100%;border:1px solid #e0e0e0;border-radius:6px;padding:5px;font-size:0.82rem;box-sizing:border-box;text-align:center;"></div>' +
+        '<div style="flex:1;"><label style="font-size:0.72rem;color:#9e9e9e;">Price/bottle</label><input type="number" class="ve-pprice" value="' + (d.purchasedPrice || '') + '" step="0.01" min="0" placeholder="29.99" style="width:100%;border:1px solid #e0e0e0;border-radius:6px;padding:5px;font-size:0.82rem;box-sizing:border-box;"></div>' +
+        '</div>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;margin-top:10px;">' +
+        '<div style="display:flex;gap:8px;">' +
+        '<button onclick="saveWineEdit(\'' + vwId + '\')" style="padding:6px 16px;border-radius:8px;border:none;background:#7e57c2;color:#fff;font-size:0.82rem;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:4px;"><i class="material-icons" style="font-size:0.95rem;">save</i> Save</button>' +
+        '<button onclick="cancelWineEdit(\'' + vwId + '\')" style="padding:6px 16px;border-radius:8px;border:1px solid #e0e0e0;background:#fff;color:#757575;font-size:0.82rem;cursor:pointer;display:inline-flex;align-items:center;gap:4px;"><i class="material-icons" style="font-size:0.95rem;">close</i> Cancel</button>' +
+        '</div>' +
+        '<button onclick="removeWine(\'' + vwId + '\')" style="margin-left:auto;padding:6px 16px;border-radius:8px;border:1px solid #e0e0e0;background:#fff;color:#c62828;font-size:0.82rem;cursor:pointer;display:inline-flex;align-items:center;gap:4px;" onmouseover="this.style.background=\'#fce4ec\'" onmouseout="this.style.background=\'#fff\'"><i class="material-icons" style="font-size:0.95rem;">delete</i> Delete</button>' +
+        '</div>';
+
+    panel.style.display = 'block';
+}
+
+function toggleEditPurchase(btn) {
+    var isActive = btn.dataset.active === '1';
+    var newState = !isActive;
+    btn.dataset.active = newState ? '1' : '0';
+    btn.style.borderColor = newState ? '#43a047' : '#e0e0e0';
+    btn.style.background = newState ? '#e8f5e9' : '#fff';
+    btn.style.color = newState ? '#2e7d32' : '#616161';
+    var panel = btn.closest('.vw-edit-panel');
+    panel.querySelector('.ve-purch-details').style.display = newState ? 'flex' : 'none';
+}
+
+function editSelectServing(el) {
+    el.closest('.serving-options').querySelectorAll('.serving-opt').forEach(function(o) { o.classList.remove('selected'); });
+    el.classList.add('selected');
+}
+function editSelectType(el) {
+    el.closest('.type-options').querySelectorAll('.type-opt').forEach(function(o) { o.classList.remove('selected'); });
+    el.classList.add('selected');
+}
+function editSelectRating(el) {
+    var val = parseInt(el.dataset.val);
+    el.closest('.wine-mini-stars').querySelectorAll('i').forEach(function(s) {
+        s.className = 'material-icons ' + (parseInt(s.dataset.val) <= val ? 'filled' : 'empty');
+    });
+}
+
+function cancelWineEdit(vwId) {
+    var card = document.getElementById('vw-' + vwId);
+    card.querySelector('.vw-edit-panel').style.display = 'none';
+}
+
+function saveWineEdit(vwId) {
+    var card = document.getElementById('vw-' + vwId);
+    var panel = card.querySelector('.vw-edit-panel');
+    var stopIndex = parseInt(card.dataset.stopIndex);
+    var visitId = visitIds[stopIndex];
+    if (!visitId) return;
+
+    var selServing = panel.querySelector('.ve-serving .serving-opt.selected');
+    var selType = panel.querySelector('.ve-type .type-opt.selected');
+    var ratingEl = panel.querySelector('.ve-rating .filled:last-of-type');
+    var rating = 0;
+    panel.querySelectorAll('.ve-rating i.filled').forEach(function(s) { rating = Math.max(rating, parseInt(s.dataset.val)); });
+
+    var payload = {
+        visit_id: visitId,
+        visit_wine_id: vwId,
+        wine_name: panel.querySelector('.ve-name').value.trim(),
+        wine_vintage: panel.querySelector('.ve-vintage').value || null,
+        wine_type: selType ? selType.dataset.val : '',
+        serving_type: selServing ? selServing.dataset.val : 'tasting',
+        quantity: parseInt(panel.querySelector('.ve-qty').value) || 1,
+        rating: rating || null,
+        tasting_notes: panel.querySelector('.ve-notes').value,
+        purchased: panel.querySelector('.ve-purchased-btn').dataset.active === '1',
+    };
+    if (payload.purchased) {
+        payload.purchased_quantity = panel.querySelector('.ve-pqty').value || 1;
+        payload.purchased_price = panel.querySelector('.ve-pprice').value || null;
+    }
+
+    api('/trips/' + tripId + '/live/wine/', payload).then(function(data) {
+        if (data.ok) {
+            // Remove old card and re-add with updated data
+            var stopIdx = card.dataset.stopIndex;
+            card.remove();
+            addWineCard(parseInt(stopIdx), data);
+        }
+    });
 }
 
 function toggleWineFav(vwId, stopIndex, el) {
@@ -614,11 +933,15 @@ function toggleWineFav(vwId, stopIndex, el) {
     var newFav = !isFav;
     el.textContent = newFav ? 'favorite' : 'favorite_border';
     el.style.color = newFav ? '#c62828' : '#e0e0e0';
+    var card = document.getElementById('vw-' + vwId);
+    if (card) card.dataset.isFavorite = newFav ? '1' : '0';
     var visitId = visitIds[stopIndex];
     api('/trips/' + tripId + '/live/wine/', { visit_id: visitId, visit_wine_id: vwId, is_favorite: newFav });
 }
 
 function updateWineRating(vwId, stopIndex, rating) {
+    var card = document.getElementById('vw-' + vwId);
+    if (card) card.dataset.rating = rating;
     var container = document.querySelector('[data-vw-id="' + vwId + '"]');
     if (container) {
         container.querySelectorAll('i').forEach(function(s) {
@@ -653,13 +976,13 @@ function showStop(index) {
         dot.classList.remove('current', 'completed', 'upcoming', 'active-stop');
         if (visitIds[di]) {
             dot.classList.add('completed');
-            dot.innerHTML = '<i class="material-icons" style="font-size:1rem;">check</i>';
+            dot.textContent = 'Stop ' + (parseInt(dot.dataset.index) + 1);
         } else if (di === index) {
             dot.classList.add('current');
-            dot.textContent = di + 1;
+            dot.textContent = 'Stop ' + (di + 1);
         } else {
             dot.classList.add('upcoming');
-            dot.textContent = di + 1;
+            dot.textContent = 'Stop ' + (di + 1);
         }
         // Always highlight the stop you're viewing
         if (di === index) dot.classList.add('active-stop');

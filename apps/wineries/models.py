@@ -20,6 +20,7 @@ class Winery(BaseModel):
     website = models.URLField(blank=True)
     phone = models.CharField(max_length=30, blank=True)
     image_url = models.URLField(max_length=1000, blank=True)
+    wine_menu_last_scraped = models.DateTimeField(null=True, blank=True)
     metadata = models.JSONField(default=dict, blank=True)
 
     class Meta:
@@ -37,6 +38,8 @@ class Wine(BaseModel):
     varietal = models.CharField(max_length=100, db_index=True)
     vintage = models.PositiveIntegerField(null=True, blank=True)
     description = models.TextField(blank=True)
+    price = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    image_url = models.URLField(max_length=1000, blank=True)
     pinecone_vector_id = models.CharField(max_length=255, blank=True, db_index=True)
     metadata = models.JSONField(default=dict, blank=True)
 

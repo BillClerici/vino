@@ -133,8 +133,8 @@
         <div class="row">
             <div class="col s6 m3">
                 <div class="card-panel stat-card hoverable">
-                    <div class="stat-number deep-purple-text text-darken-1">{{ visit_count }}</div>
-                    <div class="stat-label grey-text">Check-ins</div>
+                    <div class="stat-number blue-grey-text">{{ trips_completed }}</div>
+                    <div class="stat-label grey-text">Trips Completed</div>
                 </div>
             </div>
             <div class="col s6 m3">
@@ -145,14 +145,14 @@
             </div>
             <div class="col s6 m3">
                 <div class="card-panel stat-card hoverable">
-                    <div class="stat-number amber-text text-darken-2">{% if avg_rating %}{{ avg_rating|floatformat:1 }}{% else %}&mdash;{% endif %}</div>
-                    <div class="stat-label grey-text">Avg Rating</div>
+                    <div class="stat-number deep-purple-text text-darken-1">{{ visit_count }}</div>
+                    <div class="stat-label grey-text">Check-ins</div>
                 </div>
             </div>
             <div class="col s6 m3">
                 <div class="card-panel stat-card hoverable">
-                    <div class="stat-number blue-grey-text">{{ total_wineries }}</div>
-                    <div class="stat-label grey-text">Total Wineries</div>
+                    <div class="stat-number amber-text text-darken-2">{% if avg_rating %}{{ avg_rating|floatformat:1 }}{% else %}&mdash;{% endif %}</div>
+                    <div class="stat-label grey-text">Avg Rating</div>
                 </div>
             </div>
         </div>
