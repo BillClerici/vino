@@ -4,7 +4,7 @@ from django.db import models
 from apps.core.models import BaseModel
 
 
-class Winery(BaseModel):
+class Place(BaseModel):
     class PlaceType(models.TextChoices):
         WINERY = "winery", "Winery"
         BREWERY = "brewery", "Brewery"
@@ -31,16 +31,16 @@ class Winery(BaseModel):
     metadata = models.JSONField(default=dict, blank=True)
 
     class Meta:
-        db_table = "wineries_winery"
-        verbose_name_plural = "wineries"
+        db_table = "places_place"
+        verbose_name_plural = "places"
         ordering = ["name"]
 
     def __str__(self):
         return self.name
 
 
-class Wine(BaseModel):
-    winery = models.ForeignKey(Winery, on_delete=models.CASCADE, related_name="wines")
+class MenuItem(BaseModel):
+    place = models.ForeignKey(Place, on_delete=models.CASCADE, related_name="menu_items")
     name = models.CharField(max_length=255)
     varietal = models.CharField(max_length=100, db_index=True)
     vintage = models.PositiveIntegerField(null=True, blank=True)
@@ -51,24 +51,24 @@ class Wine(BaseModel):
     metadata = models.JSONField(default=dict, blank=True)
 
     class Meta:
-        db_table = "wineries_wine"
+        db_table = "places_menuitem"
         ordering = ["name", "-vintage"]
 
     def __str__(self):
         vintage = f" ({self.vintage})" if self.vintage else ""
-        return f"{self.name}{vintage} — {self.winery.name}"
+        return f"{self.name}{vintage} — {self.place.name}"
 
 
-class FavoriteWinery(BaseModel):
-    """Tracks which wineries a user has favorited."""
+class FavoritePlace(BaseModel):
+    """Tracks which places a user has favorited."""
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="favorite_wineries"
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="favorite_places"
     )
-    winery = models.ForeignKey(Winery, on_delete=models.CASCADE, related_name="favorited_by")
+    place = models.ForeignKey(Place, on_delete=models.CASCADE, related_name="favorited_by")
 
     class Meta:
-        db_table = "wineries_favoritewinery"
-        unique_together = [("user", "winery")]
+        db_table = "places_favoriteplace"
+        unique_together = [("user", "place")]
 
     def __str__(self):
-        return f"{self.user} ♥ {self.winery}"
+        return f"{self.user} ♥ {self.place}"

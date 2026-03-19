@@ -9,8 +9,8 @@ class VisitLog(BaseModel):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="visits"
     )
-    winery = models.ForeignKey(
-        "wineries.Winery", on_delete=models.CASCADE, related_name="visits"
+    place = models.ForeignKey(
+        "wineries.Place", on_delete=models.CASCADE, related_name="visits"
     )
     visited_at = models.DateTimeField()
     notes = models.TextField(blank=True)
@@ -40,7 +40,7 @@ class VisitLog(BaseModel):
         ordering = ["-visited_at"]
 
     def __str__(self):
-        return f"{self.user} @ {self.winery} ({self.visited_at:%Y-%m-%d})"
+        return f"{self.user} @ {self.place} ({self.visited_at:%Y-%m-%d})"
 
 
 class VisitWine(BaseModel):
@@ -54,8 +54,8 @@ class VisitWine(BaseModel):
         SPLIT = "split", "Split"
 
     visit = models.ForeignKey(VisitLog, on_delete=models.CASCADE, related_name="wines_tasted")
-    wine = models.ForeignKey(
-        "wineries.Wine", on_delete=models.CASCADE, related_name="visit_records",
+    menu_item = models.ForeignKey(
+        "wineries.MenuItem", on_delete=models.CASCADE, related_name="visit_records",
         null=True, blank=True,
     )
 
@@ -86,8 +86,8 @@ class VisitWine(BaseModel):
 
     @property
     def display_name(self):
-        if self.wine:
-            return self.wine.name
+        if self.menu_item:
+            return self.menu_item.name
         return self.wine_name or "Unknown wine"
 
     def __str__(self):

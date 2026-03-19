@@ -177,7 +177,7 @@
         <div class="progress-step">
             {% if not forloop.first %}<div class="progress-line {% if forloop.counter0 <= current_index %}completed{% endif %}"></div>{% endif %}
             <div class="progress-dot {% if forloop.counter0 < current_index %}completed{% elif forloop.counter0 == current_index %}current{% else %}upcoming{% endif %}{% if forloop.counter0 == current_index %} active-stop{% endif %}"
-                 data-index="{{ forloop.counter0 }}" onclick="goToStop({{ forloop.counter0 }})" title="{{ stop.winery.name }}">
+                 data-index="{{ forloop.counter0 }}" onclick="goToStop({{ forloop.counter0 }})" title="{{ stop.place.name }}">
                 Stop {{ forloop.counter }}
             </div>
         </div>
@@ -187,7 +187,7 @@
     <!-- Stop Cards -->
     <div id="stops-container">
         {% for stop in stops %}
-        <div class="live-stop-card" id="stop-card-{{ forloop.counter0 }}" data-stop-pk="{{ stop.pk }}" data-winery-pk="{{ stop.winery.pk }}" data-place-type="{{ stop.winery.place_type }}"
+        <div class="live-stop-card" id="stop-card-{{ forloop.counter0 }}" data-stop-pk="{{ stop.pk }}" data-place-pk="{{ stop.place.pk }}" data-place-type="{{ stop.place.place_type }}"
              style="{% if forloop.counter0 != current_index %}display:none;{% endif %}">
 
             <div class="stop-hero">
@@ -202,20 +202,20 @@
                         <i class="material-icons" style="font-size: 0.8rem;">undo</i> Undo Check-in
                     </button>
                 </div>
-                {% if stop.winery.image_url %}
-                <img src="{{ stop.winery.image_url }}" alt="{{ stop.winery.name }}" class="stop-hero-img">
+                {% if stop.place.image_url %}
+                <img src="{{ stop.place.image_url }}" alt="{{ stop.place.name }}" class="stop-hero-img">
                 {% else %}
                 <div class="stop-hero-placeholder"><i class="material-icons" style="color: #7e57c2; font-size: 2rem;">local_bar</i></div>
                 {% endif %}
                 <div class="stop-hero-info">
-                    <h5>{{ stop.winery.name }}</h5>
-                    {% if stop.winery.address %}
-                    <div class="location"><i class="material-icons tiny">place</i> {{ stop.winery.address }}</div>
-                    {% elif stop.winery.city %}
-                    <div class="location"><i class="material-icons tiny">place</i> {{ stop.winery.city }}{% if stop.winery.state %}, {{ stop.winery.state }}{% endif %}</div>
+                    <h5>{{ stop.place.name }}</h5>
+                    {% if stop.place.address %}
+                    <div class="location"><i class="material-icons tiny">place</i> {{ stop.place.address }}</div>
+                    {% elif stop.place.city %}
+                    <div class="location"><i class="material-icons tiny">place</i> {{ stop.place.city }}{% if stop.place.state %}, {{ stop.place.state }}{% endif %}</div>
                     {% endif %}
-                    {% if stop.winery.website %}
-                    <div style="font-size: 0.82rem; margin-top: 4px;"><a href="{{ stop.winery.website }}" target="_blank" rel="noopener" style="color: #7e57c2; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 3px;"><i class="material-icons" style="font-size: 0.85rem;">language</i> Website</a></div>
+                    {% if stop.place.website %}
+                    <div style="font-size: 0.82rem; margin-top: 4px;"><a href="{{ stop.place.website }}" target="_blank" rel="noopener" style="color: #7e57c2; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 3px;"><i class="material-icons" style="font-size: 0.85rem;">language</i> Website</a></div>
                     {% endif %}
                     {% if stop.arrival_time %}<div class="timing"><i class="material-icons tiny">schedule</i> {{ stop.arrival_time|date:"g:i A" }}{% if stop.duration_minutes %} · {{ stop.duration_minutes }} min{% endif %}</div>{% endif %}
                 </div>
@@ -234,28 +234,28 @@
             <!-- Post-Checkin Content (tabs) -->
             <div id="post-checkin-{{ forloop.counter0 }}" style="display:none;">
                 <div class="live-tabs">
-                    {% if stop.winery.place_type == 'winery' %}
+                    {% if stop.place.place_type == 'winery' %}
                     <div class="live-tab active" data-tab="wines" data-stop="{{ forloop.counter0 }}" onclick="switchTab({{ forloop.counter0 }}, 'wines')">
                         <i class="material-icons tiny" style="vertical-align: middle;">wine_bar</i> Wines
                     </div>
-                    {% elif stop.winery.place_type == 'brewery' %}
+                    {% elif stop.place.place_type == 'brewery' %}
                     <div class="live-tab active" data-tab="wines" data-stop="{{ forloop.counter0 }}" onclick="switchTab({{ forloop.counter0 }}, 'wines')">
                         <i class="material-icons tiny" style="vertical-align: middle;">sports_bar</i> Beers
                     </div>
                     {% endif %}
-                    <div class="live-tab {% if stop.winery.place_type == 'restaurant' or stop.winery.place_type == 'other' %}active{% endif %}" data-tab="rating" data-stop="{{ forloop.counter0 }}" onclick="switchTab({{ forloop.counter0 }}, 'rating')">
+                    <div class="live-tab {% if stop.place.place_type == 'restaurant' or stop.place.place_type == 'other' %}active{% endif %}" data-tab="rating" data-stop="{{ forloop.counter0 }}" onclick="switchTab({{ forloop.counter0 }}, 'rating')">
                         <i class="material-icons tiny" style="vertical-align: middle;">star</i> Experience
                     </div>
                 </div>
 
-                {% if stop.winery.place_type == 'winery' or stop.winery.place_type == 'brewery' %}
+                {% if stop.place.place_type == 'winery' or stop.place.place_type == 'brewery' %}
                 <!-- Drinks Tab -->
                 <div class="live-tab-content active" id="tab-wines-{{ forloop.counter0 }}">
                     <!-- Menu from Website -->
                     <div id="wine-menu-{{ forloop.counter0 }}" style="display:none; margin-bottom: 12px;">
                         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
                             <span style="font-size:0.82rem;font-weight:600;color:#757575;display:inline-flex;align-items:center;gap:4px;">
-                                <i class="material-icons" style="font-size:1rem;">menu_book</i> {% if stop.winery.place_type == 'brewery' %}Beer Menu{% else %}Wine Menu{% endif %}
+                                <i class="material-icons" style="font-size:1rem;">menu_book</i> {% if stop.place.place_type == 'brewery' %}Beer Menu{% else %}Wine Menu{% endif %}
                             </span>
                             <button onclick="loadWineMenu({{ forloop.counter0 }}, true)" style="border:none;background:none;color:#7e57c2;font-size:0.78rem;cursor:pointer;display:inline-flex;align-items:center;gap:2px;">
                                 <i class="material-icons" style="font-size:0.85rem;">refresh</i> Refresh
@@ -273,23 +273,23 @@
                         <!-- Logged drinks appear here -->
                     </div>
                     <button class="add-wine-btn" onclick="showWineForm({{ forloop.counter0 }})">
-                        <i class="material-icons">add_circle_outline</i> {% if stop.winery.place_type == 'brewery' %}Add a Beer{% else %}Add a Wine{% endif %}
+                        <i class="material-icons">add_circle_outline</i> {% if stop.place.place_type == 'brewery' %}Add a Beer{% else %}Add a Wine{% endif %}
                     </button>
                     <div class="wine-form" id="wine-form-{{ forloop.counter0 }}" style="display:none;">
                         <div style="display: flex; gap: 10px; margin-bottom: 10px;">
                             <div style="flex: 1;">
-                                <label>{% if stop.winery.place_type == 'brewery' %}Beer Name{% else %}Wine Name{% endif %}</label>
-                                <input type="text" id="wf-name-{{ forloop.counter0 }}" placeholder="{% if stop.winery.place_type == 'brewery' %}e.g. Hazy IPA{% else %}e.g. Estate Chardonnay{% endif %}">
+                                <label>{% if stop.place.place_type == 'brewery' %}Beer Name{% else %}Wine Name{% endif %}</label>
+                                <input type="text" id="wf-name-{{ forloop.counter0 }}" placeholder="{% if stop.place.place_type == 'brewery' %}e.g. Hazy IPA{% else %}e.g. Estate Chardonnay{% endif %}">
                             </div>
                             <div style="width: 80px;">
-                                <label>{% if stop.winery.place_type == 'brewery' %}Year{% else %}Vintage{% endif %}</label>
+                                <label>{% if stop.place.place_type == 'brewery' %}Year{% else %}Vintage{% endif %}</label>
                                 <input type="number" id="wf-vintage-{{ forloop.counter0 }}" placeholder="2024" min="1900" max="2099">
                             </div>
                         </div>
                         <div style="margin-bottom: 10px;">
-                            <label>{% if stop.winery.place_type == 'brewery' %}Beer Style{% else %}Wine Type{% endif %}</label>
+                            <label>{% if stop.place.place_type == 'brewery' %}Beer Style{% else %}Wine Type{% endif %}</label>
                             <div class="type-options" id="wf-type-{{ forloop.counter0 }}">
-                                {% if stop.winery.place_type == 'brewery' %}
+                                {% if stop.place.place_type == 'brewery' %}
                                 <span class="type-opt" style="color:#f57c00;border-color:currentColor;" data-val="IPA" onclick="selectType({{ forloop.counter0 }}, this)">IPA</span>
                                 <span class="type-opt" style="color:#5d4037;border-color:currentColor;" data-val="Stout" onclick="selectType({{ forloop.counter0 }}, this)">Stout</span>
                                 <span class="type-opt" style="color:#fbc02d;border-color:currentColor;" data-val="Lager" onclick="selectType({{ forloop.counter0 }}, this)">Lager</span>
@@ -310,9 +310,9 @@
                                 <label>How Did You Have It?</label>
                                 <div class="serving-options" id="wf-serving-{{ forloop.counter0 }}">
                                     <span class="serving-opt selected" data-val="tasting" onclick="selectServing({{ forloop.counter0 }}, this)"><i class="material-icons" style="font-size:0.85rem;">local_bar</i> Tasting</span>
-                                    <span class="serving-opt" data-val="glass" onclick="selectServing({{ forloop.counter0 }}, this)"><i class="material-icons" style="font-size:0.85rem;">{% if stop.winery.place_type == 'brewery' %}sports_bar{% else %}wine_bar{% endif %}</i> {% if stop.winery.place_type == 'brewery' %}Pint{% else %}Glass{% endif %}</span>
+                                    <span class="serving-opt" data-val="glass" onclick="selectServing({{ forloop.counter0 }}, this)"><i class="material-icons" style="font-size:0.85rem;">{% if stop.place.place_type == 'brewery' %}sports_bar{% else %}wine_bar{% endif %}</i> {% if stop.place.place_type == 'brewery' %}Pint{% else %}Glass{% endif %}</span>
                                     <span class="serving-opt" data-val="flight" onclick="selectServing({{ forloop.counter0 }}, this)"><i class="material-icons" style="font-size:0.85rem;">view_column</i> Flight</span>
-                                    <span class="serving-opt" data-val="bottle" onclick="selectServing({{ forloop.counter0 }}, this)"><i class="material-icons" style="font-size:0.85rem;">liquor</i> {% if stop.winery.place_type == 'brewery' %}Can/Bottle{% else %}Bottle{% endif %}</span>
+                                    <span class="serving-opt" data-val="bottle" onclick="selectServing({{ forloop.counter0 }}, this)"><i class="material-icons" style="font-size:0.85rem;">liquor</i> {% if stop.place.place_type == 'brewery' %}Can/Bottle{% else %}Bottle{% endif %}</span>
                                 </div>
                             </div>
                             <div style="width: 80px;">
@@ -346,7 +346,7 @@
                         </div>
                         <div style="margin-bottom: 10px;">
                             <label>Tasting Notes</label>
-                            <textarea id="wf-notes-{{ forloop.counter0 }}" placeholder="{% if stop.winery.place_type == 'brewery' %}Hoppy, malty, citrus, smooth... what did you think?{% else %}Fruity, oaky, dry, sweet... what did you think?{% endif %}"></textarea>
+                            <textarea id="wf-notes-{{ forloop.counter0 }}" placeholder="{% if stop.place.place_type == 'brewery' %}Hoppy, malty, citrus, smooth... what did you think?{% else %}Fruity, oaky, dry, sweet... what did you think?{% endif %}"></textarea>
                         </div>
                         <div style="margin-bottom: 12px;">
                             <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
@@ -373,7 +373,7 @@
                         </div>
                         <div style="display: flex; gap: 8px;">
                             <button onclick="saveWine({{ forloop.counter0 }})" style="flex:1;padding:10px;border:none;border-radius:8px;background:#7e57c2;color:#fff;font-size:0.88rem;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:4px;">
-                                <i class="material-icons" style="font-size:0.95rem;">add</i> {% if stop.winery.place_type == 'brewery' %}Log Beer{% else %}Log Wine{% endif %}
+                                <i class="material-icons" style="font-size:0.95rem;">add</i> {% if stop.place.place_type == 'brewery' %}Log Beer{% else %}Log Wine{% endif %}
                             </button>
                             <button onclick="hideWineForm({{ forloop.counter0 }})" style="padding:10px 16px;border:1px solid #e0e0e0;border-radius:8px;background:#fff;color:#757575;font-size:0.88rem;cursor:pointer;">
                                 Cancel
@@ -385,7 +385,7 @@
                 {% endif %}
 
                 <!-- Experience Tab -->
-                <div class="live-tab-content {% if stop.winery.place_type == 'restaurant' or stop.winery.place_type == 'other' %}active{% endif %}" id="tab-rating-{{ forloop.counter0 }}">
+                <div class="live-tab-content {% if stop.place.place_type == 'restaurant' or stop.place.place_type == 'other' %}active{% endif %}" id="tab-rating-{{ forloop.counter0 }}">
                     <div class="rating-group">
                         <div class="rating-label">Overall Experience</div>
                         <div class="star-rating" data-stop="{{ forloop.counter0 }}" data-field="rating_overall">
@@ -470,7 +470,7 @@ function checkin(stopIndex, stopPk) {
     api('/trips/' + tripId + '/live/checkin/' + stopPk + '/').then(function(data) {
         if (data.ok) {
             visitIds[stopIndex] = data.visit_id;
-            showPostCheckin(stopIndex, data.winery_name, data.checked_in_at);
+            showPostCheckin(stopIndex, data.place_name, data.checked_in_at);
         }
     });
 }
@@ -501,10 +501,10 @@ function undoCheckin(stopIndex, stopPk) {
     });
 }
 
-function showPostCheckin(stopIndex, wineryName, timeStr) {
+function showPostCheckin(stopIndex, placeName, timeStr) {
     document.getElementById('checkin-btn-' + stopIndex).style.display = 'none';
     var badge = document.getElementById('checked-badge-' + stopIndex);
-    badge.querySelector('span').textContent = 'Checked in at ' + wineryName + (timeStr ? ' · ' + timeStr : '');
+    badge.querySelector('span').textContent = 'Checked in at ' + placeName + (timeStr ? ' · ' + timeStr : '');
     badge.style.display = 'flex';
     document.getElementById('post-checkin-' + stopIndex).style.display = 'block';
     var dot = document.querySelector('.progress-dot[data-index="' + stopIndex + '"]');
@@ -517,11 +517,11 @@ function showPostCheckin(stopIndex, wineryName, timeStr) {
 }
 
 // ── Wine Menu from Website ──
-var wineryMenus = {};
+var placeMenus = {};
 
 function loadWineMenu(stopIndex, forceRefresh) {
     var card = document.getElementById('stop-card-' + stopIndex);
-    var wineryPk = card.dataset.wineryPk;
+    var placePk = card.dataset.placePk;
     var menuSection = document.getElementById('wine-menu-' + stopIndex);
     var cardsContainer = document.getElementById('wine-menu-cards-' + stopIndex);
 
@@ -532,7 +532,7 @@ function loadWineMenu(stopIndex, forceRefresh) {
     menuSection.style.display = 'block';
     cardsContainer.innerHTML = '<div style="padding:16px;color:#9e9e9e;font-size:0.82rem;display:flex;align-items:center;gap:6px;"><div class="preloader-wrapper small active" style="width:18px;height:18px;"><div class="spinner-layer spinner-purple-only"><div class="circle-clipper left"><div class="circle"></div></div></div></div> Loading menu... This may take a few minutes...</div>';
 
-    var url = '/trips/' + tripId + '/live/wine-menu/' + wineryPk + '/';
+    var url = '/trips/' + tripId + '/live/wine-menu/' + placePk + '/';
     if (forceRefresh) url += '?refresh=1';
 
     fetch(url, { headers: { 'X-CSRFToken': csrfToken } })
@@ -546,7 +546,7 @@ function loadWineMenu(stopIndex, forceRefresh) {
             }
             return;
         }
-        wineryMenus[stopIndex] = data.wines;
+        placeMenus[stopIndex] = data.wines;
         renderWineMenuCards(stopIndex, data.wines);
     })
     .catch(function() {
@@ -583,7 +583,7 @@ function renderWineMenuCards(stopIndex, wines) {
 }
 
 function prefillFromMenu(stopIndex, menuIndex) {
-    var wine = wineryMenus[stopIndex][menuIndex];
+    var wine = placeMenus[stopIndex][menuIndex];
     if (!wine) return;
 
     // Highlight selected card
@@ -1099,7 +1099,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var idx = parseInt(idxStr);
         var v = existingVisits[idxStr];
         visitIds[idx] = v.visit_id;
-        showPostCheckin(idx, v.winery_name, null);
+        showPostCheckin(idx, v.place_name, null);
 
         // Restore ratings
         if (v.ratings) {

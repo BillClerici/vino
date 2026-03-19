@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Visit — {{ visit.winery.name }} — Vino Trip{% endblock %}
+{% block title %}Visit — {{ visit.place.name }} — Vino Trip{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -33,14 +33,14 @@
                         </div>
                         <div>
                             <h5 style="margin: 0 0 4px; font-weight: 700;">
-                                <a href="{% url 'winery_detail' pk=visit.winery.pk %}" style="color: #333;">{{ visit.winery.name }}</a>
+                                <a href="{% url 'place_detail' pk=visit.place.pk %}" style="color: #333;">{{ visit.place.name }}</a>
                             </h5>
                             <div style="font-size: 0.9rem; color: #9e9e9e;">
                                 <i class="material-icons tiny">event</i> {{ visit.visited_at|date:"l, F j, Y \a\t g:i A" }}
                             </div>
-                            {% if visit.winery.city %}
+                            {% if visit.place.city %}
                             <div style="font-size: 0.85rem; color: #9e9e9e; margin-top: 2px;">
-                                <i class="material-icons tiny">place</i> {{ visit.winery.city }}{% if visit.winery.state %}, {{ visit.winery.state }}{% endif %}
+                                <i class="material-icons tiny">place</i> {{ visit.place.city }}{% if visit.place.state %}, {{ visit.place.state }}{% endif %}
                             </div>
                             {% endif %}
                         </div>

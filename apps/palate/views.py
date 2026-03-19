@@ -26,7 +26,7 @@ class PalateView(LoginRequiredMixin, View):
         from apps.visits.models import VisitWine
         top_varietals = (
             VisitWine.objects.filter(visit__user=request.user, is_active=True)
-            .values("wine__varietal")
+            .values("menu_item__varietal")
             .annotate(count=Count("id"), avg_rating=Avg("rating"))
             .order_by("-count")[:5]
         )
@@ -34,7 +34,7 @@ class PalateView(LoginRequiredMixin, View):
         # Recent visits
         recent_visits = (
             VisitLog.objects.filter(user=request.user, is_active=True)
-            .select_related("winery")
+            .select_related("place")
             .order_by("-visited_at")[:5]
         )
 

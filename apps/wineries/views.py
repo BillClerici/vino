@@ -11,21 +11,21 @@ from django.views import View
 from django.views.generic import CreateView, ListView, UpdateView
 
 from apps.visits.models import VisitLog
-from apps.wineries.forms import PlaceAdminForm, WineForm, WineryForm
-from apps.wineries.models import FavoriteWinery, Winery
+from apps.wineries.forms import MenuItemForm, PlaceAdminForm, PlaceForm
+from apps.wineries.models import FavoritePlace, Place
 
 
-class WineryListView(LoginRequiredMixin, ListView):
-    model = Winery
+class PlaceListView(LoginRequiredMixin, ListView):
+    model = Place
     template_name = "wineries/list.html"
     context_object_name = "wineries"
     paginate_by = 12
 
     def get_queryset(self):
-        qs = Winery.objects.annotate(
+        qs = Place.objects.annotate(
             visit_count=Count("visits", filter=Q(visits__is_active=True)),
             avg_rating=Avg("visits__rating_overall", filter=Q(visits__is_active=True)),
-            wine_count=Count("wines", filter=Q(wines__is_active=True)),
+            wine_count=Count("menu_items", filter=Q(menu_items__is_active=True)),
         )
         q = self.request.GET.get("q", "").strip()
         if q:
@@ -36,7 +36,7 @@ class WineryListView(LoginRequiredMixin, ListView):
         ctx = super().get_context_data(**kwargs)
         user = self.request.user
         ctx["search_query"] = self.request.GET.get("q", "")
-        ctx["total_wineries"] = Winery.objects.count()
+        ctx["total_places"] = Place.objects.count()
         ctx["google_maps_api_key"] = settings.GOOGLE_MAPS_API_KEY
 
         # Trip mode: when adding stops from the trip detail page
@@ -44,19 +44,19 @@ class WineryListView(LoginRequiredMixin, ListView):
         if trip_id:
             from apps.trips.models import Trip
             try:
-                trip = Trip.objects.prefetch_related("trip_wineries__winery").get(pk=trip_id)
+                trip = Trip.objects.prefetch_related("trip_stops__place").get(pk=trip_id)
                 ctx["adding_to_trip"] = trip
                 ctx["trip_id"] = str(trip.pk)
-                ctx["trip_stops"] = trip.trip_wineries.select_related("winery").order_by("order")
+                ctx["trip_stops"] = trip.trip_stops.select_related("place").order_by("order")
             except Trip.DoesNotExist:
                 pass
 
-        # DB wineries with coordinates for map
+        # DB places with coordinates for map
         full_qs = self.get_queryset()
-        map_wineries = full_qs.filter(
+        map_places = full_qs.filter(
             latitude__isnull=False, longitude__isnull=False
         ).values("id", "name", "city", "state", "address", "website", "latitude", "longitude")
-        ctx["map_wineries_json"] = json.dumps([
+        ctx["map_places_json"] = json.dumps([
             {
                 "id": str(w["id"]),
                 "name": w["name"],
@@ -67,29 +67,29 @@ class WineryListView(LoginRequiredMixin, ListView):
                 "lat": float(w["latitude"]),
                 "lng": float(w["longitude"]),
             }
-            for w in map_wineries
+            for w in map_places
         ])
 
-        # User's favorites (set of winery IDs)
+        # User's favorites (set of place IDs)
         favorite_ids = set(
-            FavoriteWinery.objects.filter(user=user, is_active=True)
-            .values_list("winery_id", flat=True)
+            FavoritePlace.objects.filter(user=user, is_active=True)
+            .values_list("place_id", flat=True)
         )
         ctx["favorite_ids"] = favorite_ids
         ctx["favorite_ids_json"] = json.dumps([str(pk) for pk in favorite_ids])
 
-        # User's visited wineries with last visit date
+        # User's visited places with last visit date
         visited_data = (
             VisitLog.objects.filter(user=user, is_active=True)
-            .values("winery_id")
+            .values("place_id")
             .annotate(last_visited=Max("visited_at"), visit_count=Count("id"))
         )
-        visited_map = {str(v["winery_id"]): v for v in visited_data}
+        visited_map = {str(v["place_id"]): v for v in visited_data}
         ctx["visited_ids_json"] = json.dumps(list(visited_map.keys()))
 
         # Favorites table data
-        fav_wineries = (
-            Winery.objects.filter(pk__in=favorite_ids)
+        fav_places = (
+            Place.objects.filter(pk__in=favorite_ids)
             .annotate(
                 last_visited=Max(
                     "visits__visited_at",
@@ -103,12 +103,12 @@ class WineryListView(LoginRequiredMixin, ListView):
             )
             .order_by("name")
         )
-        ctx["favorites_list"] = fav_wineries
+        ctx["favorites_list"] = fav_places
 
         # Visited table data
-        visited_winery_ids = [v["winery_id"] for v in visited_data]
-        visited_wineries = (
-            Winery.objects.filter(pk__in=visited_winery_ids)
+        visited_place_ids = [v["place_id"] for v in visited_data]
+        visited_places = (
+            Place.objects.filter(pk__in=visited_place_ids)
             .annotate(
                 last_visited=Max(
                     "visits__visited_at",
@@ -122,18 +122,18 @@ class WineryListView(LoginRequiredMixin, ListView):
             )
             .order_by("-last_visited")
         )
-        ctx["visited_list"] = visited_wineries
+        ctx["visited_list"] = visited_places
 
         return ctx
 
 
 class ToggleFavoriteView(LoginRequiredMixin, View):
-    """AJAX endpoint to toggle a winery as favorite."""
+    """AJAX endpoint to toggle a place as favorite."""
 
     def post(self, request, pk):
-        winery = get_object_or_404(Winery, pk=pk)
-        fav, created = FavoriteWinery.all_objects.get_or_create(
-            user=request.user, winery=winery,
+        place = get_object_or_404(Place, pk=pk)
+        fav, created = FavoritePlace.all_objects.get_or_create(
+            user=request.user, place=place,
             defaults={"is_active": True},
         )
         if not created:
@@ -142,15 +142,15 @@ class ToggleFavoriteView(LoginRequiredMixin, View):
 
         return JsonResponse({
             "favorited": fav.is_active,
-            "winery_id": str(pk),
-            "name": winery.name,
-            "city": winery.city,
-            "state": winery.state,
+            "place_id": str(pk),
+            "name": place.name,
+            "city": place.city,
+            "state": place.state,
         })
 
 
 class FavoritePlaceView(LoginRequiredMixin, View):
-    """AJAX endpoint: find-or-create a winery from Google Places data, then toggle favorite."""
+    """AJAX endpoint: find-or-create a place from Google Places data, then toggle favorite."""
 
     def post(self, request):
         import json as _json
@@ -169,13 +169,13 @@ class FavoritePlaceView(LoginRequiredMixin, View):
         website = body.get("website", "")
         photo_url = body.get("photo_url", "")
 
-        # Try to find existing winery by name + coordinates (within ~100m)
-        winery = None
+        # Try to find existing place by name + coordinates (within ~100m)
+        place = None
         if lat and lng:
             from decimal import Decimal
             lat_d, lng_d = Decimal(str(lat)), Decimal(str(lng))
-            winery = (
-                Winery.objects.filter(
+            place = (
+                Place.objects.filter(
                     name__iexact=name,
                     latitude__range=(lat_d - Decimal("0.001"), lat_d + Decimal("0.001")),
                     longitude__range=(lng_d - Decimal("0.001"), lng_d + Decimal("0.001")),
@@ -183,7 +183,7 @@ class FavoritePlaceView(LoginRequiredMixin, View):
                 .first()
             )
 
-        if not winery:
+        if not place:
             # Parse city/state from address (last parts before zip)
             city, state = "", ""
             if addr:
@@ -196,9 +196,9 @@ class FavoritePlaceView(LoginRequiredMixin, View):
                     city = parts[0]
 
             place_type = body.get("place_type", "winery")
-            if place_type not in dict(Winery.PlaceType.choices):
+            if place_type not in dict(Place.PlaceType.choices):
                 place_type = "winery"
-            winery = Winery.objects.create(
+            place = Place.objects.create(
                 name=name,
                 address=addr,
                 city=city,
@@ -214,21 +214,21 @@ class FavoritePlaceView(LoginRequiredMixin, View):
         else:
             # Update existing place with any missing data
             changed = []
-            if photo_url and not winery.image_url:
-                winery.image_url = photo_url
+            if photo_url and not place.image_url:
+                place.image_url = photo_url
                 changed.append("image_url")
-            if body.get("phone") and not winery.phone:
-                winery.phone = body["phone"]
+            if body.get("phone") and not place.phone:
+                place.phone = body["phone"]
                 changed.append("phone")
-            if body.get("description") and not winery.description:
-                winery.description = body["description"]
+            if body.get("description") and not place.description:
+                place.description = body["description"]
                 changed.append("description")
             if changed:
-                winery.save(update_fields=changed + ["updated_at"])
+                place.save(update_fields=changed + ["updated_at"])
 
         # Toggle favorite
-        fav, created = FavoriteWinery.all_objects.get_or_create(
-            user=request.user, winery=winery,
+        fav, created = FavoritePlace.all_objects.get_or_create(
+            user=request.user, place=place,
             defaults={"is_active": True},
         )
         if not created:
@@ -237,35 +237,35 @@ class FavoritePlaceView(LoginRequiredMixin, View):
 
         return JsonResponse({
             "favorited": fav.is_active,
-            "winery_id": str(winery.pk),
-            "name": winery.name,
-            "city": winery.city,
-            "state": winery.state,
+            "place_id": str(place.pk),
+            "name": place.name,
+            "city": place.city,
+            "state": place.state,
         })
 
 
-class WineryDetailView(LoginRequiredMixin, View):
+class PlaceDetailView(LoginRequiredMixin, View):
     def get(self, request, pk):
-        winery = get_object_or_404(Winery, pk=pk)
-        wines = winery.wines.filter(is_active=True).order_by("name")
+        place = get_object_or_404(Place, pk=pk)
+        menu_items = place.menu_items.filter(is_active=True).order_by("name")
         visits = (
-            VisitLog.objects.filter(winery=winery, is_active=True)
+            VisitLog.objects.filter(place=place, is_active=True)
             .select_related("user")
             .order_by("-visited_at")[:10]
         )
-        my_visits = VisitLog.objects.filter(winery=winery, user=request.user, is_active=True).order_by("-visited_at")
-        avg_ratings = VisitLog.objects.filter(winery=winery, is_active=True).aggregate(
+        my_visits = VisitLog.objects.filter(place=place, user=request.user, is_active=True).order_by("-visited_at")
+        avg_ratings = VisitLog.objects.filter(place=place, is_active=True).aggregate(
             staff=Avg("rating_staff"),
             ambience=Avg("rating_ambience"),
             food=Avg("rating_food"),
             overall=Avg("rating_overall"),
         )
-        is_favorite = FavoriteWinery.objects.filter(
-            user=request.user, winery=winery, is_active=True
+        is_favorite = FavoritePlace.objects.filter(
+            user=request.user, place=place, is_active=True
         ).exists()
         return render(request, "wineries/detail.html", {
-            "winery": winery,
-            "wines": wines,
+            "winery": place,
+            "wines": menu_items,
             "visits": visits,
             "my_visits": my_visits,
             "avg_ratings": avg_ratings,
@@ -273,70 +273,70 @@ class WineryDetailView(LoginRequiredMixin, View):
         })
 
 
-class WineryCreateView(LoginRequiredMixin, View):
+class PlaceCreateView(LoginRequiredMixin, View):
     def get(self, request):
         return render(request, "wineries/form.html", {
-            "form": WineryForm(),
-            "page_title": "Add Winery",
+            "form": PlaceForm(),
+            "page_title": "Add Place",
             "icon": "add_business",
         })
 
     def post(self, request):
-        form = WineryForm(request.POST)
+        form = PlaceForm(request.POST)
         if form.is_valid():
-            winery = form.save()
-            messages.success(request, f"{winery.name} added!")
-            return redirect("winery_detail", pk=winery.pk)
+            place = form.save()
+            messages.success(request, f"{place.name} added!")
+            return redirect("place_detail", pk=place.pk)
         return render(request, "wineries/form.html", {
             "form": form,
-            "page_title": "Add Winery",
+            "page_title": "Add Place",
             "icon": "add_business",
         })
 
 
-class WineryEditView(LoginRequiredMixin, View):
+class PlaceEditView(LoginRequiredMixin, View):
     def get(self, request, pk):
-        winery = get_object_or_404(Winery, pk=pk)
+        place = get_object_or_404(Place, pk=pk)
         return render(request, "wineries/form.html", {
-            "form": WineryForm(instance=winery),
-            "page_title": f"Edit {winery.name}",
+            "form": PlaceForm(instance=place),
+            "page_title": f"Edit {place.name}",
             "icon": "edit",
         })
 
     def post(self, request, pk):
-        winery = get_object_or_404(Winery, pk=pk)
-        form = WineryForm(request.POST, instance=winery)
+        place = get_object_or_404(Place, pk=pk)
+        form = PlaceForm(request.POST, instance=place)
         if form.is_valid():
             form.save()
-            messages.success(request, f"{winery.name} updated.")
-            return redirect("winery_detail", pk=winery.pk)
+            messages.success(request, f"{place.name} updated.")
+            return redirect("place_detail", pk=place.pk)
         return render(request, "wineries/form.html", {
             "form": form,
-            "page_title": f"Edit {winery.name}",
+            "page_title": f"Edit {place.name}",
             "icon": "edit",
         })
 
 
-class WineCreateView(LoginRequiredMixin, View):
-    def get(self, request, winery_pk):
-        winery = get_object_or_404(Winery, pk=winery_pk)
+class MenuItemCreateView(LoginRequiredMixin, View):
+    def get(self, request, place_pk):
+        place = get_object_or_404(Place, pk=place_pk)
         return render(request, "wineries/wine_form.html", {
-            "form": WineForm(),
-            "winery": winery,
+            "form": MenuItemForm(),
+            "winery": place,
         })
 
-    def post(self, request, winery_pk):
-        winery = get_object_or_404(Winery, pk=winery_pk)
-        form = WineForm(request.POST)
+    def post(self, request, place_pk):
+        place = get_object_or_404(Place, pk=place_pk)
+        form = MenuItemForm(request.POST)
         if form.is_valid():
-            wine = form.save(commit=False)
-            wine.winery = winery
-            wine.save()
-            messages.success(request, f"{wine.name} added to {winery.name}!")
-            return redirect("winery_detail", pk=winery.pk)
+            menu_item = form.save(commit=False)
+            menu_item.place = place
+            menu_item.save()
+            messages.success(request, f"{menu_item.name} added to {place.name}!")
+            return redirect("place_detail", pk=place.pk)
         return render(request, "wineries/wine_form.html", {
             "form": form,
-            "winery": winery,
+            "winery": place,
         })
 
 
@@ -348,11 +348,11 @@ class AppAdminRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
 
 
 class PlaceAdminListView(AppAdminRequiredMixin, ListView):
-    model = Winery
+    model = Place
     template_name = "admin/list.html"
 
     def get_queryset(self):
-        return Winery.all_objects.all().order_by("name")
+        return Place.all_objects.all().order_by("name")
 
     def get_context_data(self, **kwargs):
         from django.utils.safestring import mark_safe
@@ -387,7 +387,7 @@ class PlaceAdminListView(AppAdminRequiredMixin, ListView):
 
 
 class PlaceAdminCreateView(AppAdminRequiredMixin, CreateView):
-    model = Winery
+    model = Place
     form_class = PlaceAdminForm
     template_name = "admin/form.html"
     success_url = reverse_lazy("admin_places_list")
@@ -406,13 +406,13 @@ class PlaceAdminCreateView(AppAdminRequiredMixin, CreateView):
 
 
 class PlaceAdminEditView(AppAdminRequiredMixin, UpdateView):
-    model = Winery
+    model = Place
     form_class = PlaceAdminForm
     template_name = "admin/place_edit.html"
     success_url = reverse_lazy("admin_places_list")
 
     def get_queryset(self):
-        return Winery.all_objects.all()
+        return Place.all_objects.all()
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -428,7 +428,7 @@ class PlaceAdminEditView(AppAdminRequiredMixin, UpdateView):
         ctx["visit_count"] = place.visits.filter(is_active=True).count()
         avg = place.visits.filter(is_active=True).aggregate(avg=Avg("rating_overall"))["avg"]
         ctx["avg_rating"] = round(avg, 1) if avg else None
-        ctx["wine_count"] = place.wines.count()
+        ctx["wine_count"] = place.menu_items.count()
         ctx["has_menu"] = place.place_type in ("winery", "brewery")
 
         return ctx
@@ -446,17 +446,17 @@ class PlaceAdminFetchGoogleView(AppAdminRequiredMixin, View):
         import httpx
         from django.conf import settings as django_settings
 
-        winery = get_object_or_404(Winery.all_objects, pk=pk)
+        place = get_object_or_404(Place.all_objects, pk=pk)
         api_key = django_settings.GOOGLE_MAPS_API_KEY
         if not api_key:
             return JsonResponse({"error": "Google Maps API key not configured"}, status=400)
 
         # Build search query
-        search_query = winery.name
-        if winery.city:
-            search_query += f" {winery.city}"
-        if winery.state:
-            search_query += f" {winery.state}"
+        search_query = place.name
+        if place.city:
+            search_query += f" {place.city}"
+        if place.state:
+            search_query += f" {place.state}"
 
         try:
             # Use Places API (New) — Text Search
@@ -477,26 +477,26 @@ class PlaceAdminFetchGoogleView(AppAdminRequiredMixin, View):
             if not places:
                 return JsonResponse({"error": "Place not found on Google"}, status=404)
 
-            place = places[0]
+            google_place = places[0]
             result = {
                 "ok": True,
-                "name": place.get("displayName", {}).get("text", ""),
-                "address": place.get("formattedAddress", ""),
-                "phone": place.get("nationalPhoneNumber", ""),
-                "website": place.get("websiteUri", ""),
-                "description": place.get("editorialSummary", {}).get("text", "") if place.get("editorialSummary") else "",
+                "name": google_place.get("displayName", {}).get("text", ""),
+                "address": google_place.get("formattedAddress", ""),
+                "phone": google_place.get("nationalPhoneNumber", ""),
+                "website": google_place.get("websiteUri", ""),
+                "description": google_place.get("editorialSummary", {}).get("text", "") if google_place.get("editorialSummary") else "",
                 "image_url": "",
             }
 
             # Get photo URL if available
-            photos = place.get("photos", [])
+            photos = google_place.get("photos", [])
             if photos and api_key:
                 photo_name = photos[0].get("name", "")
                 if photo_name:
                     result["image_url"] = f"https://places.googleapis.com/v1/{photo_name}/media?maxWidthPx=400&key={api_key}"
 
             # Get lat/lng
-            location = place.get("location", {})
+            location = google_place.get("location", {})
             result["latitude"] = location.get("latitude")
             result["longitude"] = location.get("longitude")
 
@@ -507,18 +507,18 @@ class PlaceAdminFetchGoogleView(AppAdminRequiredMixin, View):
 
 
 class PlaceAdminMenuView(AppAdminRequiredMixin, View):
-    """AJAX: fetch/scrape wine or beer menu for a place (admin)."""
+    """AJAX: fetch/scrape menu items for a place (admin)."""
 
     def get(self, request, pk):
-        from apps.wineries.scraper import scrape_and_cache_wines
+        from apps.wineries.scraper import scrape_and_cache_menu_items
 
-        winery = get_object_or_404(Winery.all_objects, pk=pk)
+        place = get_object_or_404(Place.all_objects, pk=pk)
 
         if request.GET.get("refresh"):
-            winery.wine_menu_last_scraped = None
-            winery.save(update_fields=["wine_menu_last_scraped", "updated_at"])
+            place.wine_menu_last_scraped = None
+            place.save(update_fields=["wine_menu_last_scraped", "updated_at"])
 
-        wines = scrape_and_cache_wines(winery)
+        menu_items = scrape_and_cache_menu_items(place)
 
         from django.http import JsonResponse
         return JsonResponse({
@@ -534,21 +534,21 @@ class PlaceAdminMenuView(AppAdminRequiredMixin, View):
                     "price": float(w.price) if w.price else None,
                     "image_url": w.image_url or "",
                 }
-                for w in wines
+                for w in menu_items
             ],
         })
 
 
 class PlaceAdminDeleteView(AppAdminRequiredMixin, View):
     def post(self, request, pk):
-        place = get_object_or_404(Winery.all_objects, pk=pk)
+        place = get_object_or_404(Place.all_objects, pk=pk)
         place.is_active = False
         place.save(update_fields=["is_active", "updated_at"])
         messages.success(request, f'Place "{place.name}" deactivated.')
         return redirect("admin_places_list")
 
     def get(self, request, pk):
-        place = get_object_or_404(Winery.all_objects, pk=pk)
+        place = get_object_or_404(Place.all_objects, pk=pk)
         return render(request, "admin/delete.html", {
             "object_name": place.name,
             "cancel_url": reverse("admin_places_list"),

@@ -1,6 +1,6 @@
 """
-Wine menu scraper — fetches a winery's website, discovers wine-specific pages,
-and uses Claude to extract their wine list into structured data.
+Menu item scraper — fetches a place's website, discovers menu-specific pages,
+and uses Claude to extract their wine/beer list into structured data.
 """
 
 import json
@@ -104,17 +104,17 @@ def discover_wine_pages(base_url: str, homepage_html: str) -> list[str]:
             return 2
         return 3
 
-    # Third-party shops come first (most reliable for JS-rendered winery sites)
+    # Third-party shops come first (most reliable for JS-rendered sites)
     result = sorted(third_party_shops)
     result.extend(sorted(wine_urls, key=priority))
     return result
 
 
-def extract_wines_from_html(html: str, winery_name: str) -> list[dict]:
+def extract_wines_from_html(html: str, place_name: str) -> list[dict]:
     """Use Claude to extract a structured wine list from HTML."""
     from apps.api.ai_utils import get_claude
 
-    prompt = f"""You are extracting drinks/beverages from the website of "{winery_name}".
+    prompt = f"""You are extracting drinks/beverages from the website of "{place_name}".
 
 Analyze the HTML below and find every wine or beer mentioned. For each item, extract:
 - "name": string (the drink's name, e.g. "Reserve Chardonnay" or "Hazy IPA")
@@ -147,44 +147,44 @@ HTML:
             return []
         return wines
     except Exception as e:
-        logger.warning("Claude wine extraction failed for %s: %s", winery_name, e)
+        logger.warning("Claude menu extraction failed for %s: %s", place_name, e)
         return []
 
 
-def scrape_and_cache_wines(winery) -> list:
+def scrape_and_cache_menu_items(place) -> list:
     """
-    Main entry point: scrape winery website, discover wine pages,
-    extract wines, cache as Wine records.
+    Main entry point: scrape place website, discover menu pages,
+    extract menu items, cache as MenuItem records.
     """
-    from apps.wineries.models import Wine
+    from apps.wineries.models import MenuItem
 
-    if not winery.website:
-        return list(Wine.objects.filter(winery=winery))
+    if not place.website:
+        return list(MenuItem.objects.filter(place=place))
 
     # Return cached if scraped recently
     if (
-        winery.wine_menu_last_scraped
-        and winery.wine_menu_last_scraped > timezone.now() - timedelta(days=CACHE_DAYS)
-        and Wine.objects.filter(winery=winery).exists()
+        place.wine_menu_last_scraped
+        and place.wine_menu_last_scraped > timezone.now() - timedelta(days=CACHE_DAYS)
+        and MenuItem.objects.filter(place=place).exists()
     ):
-        return list(Wine.objects.filter(winery=winery))
+        return list(MenuItem.objects.filter(place=place))
 
     try:
         # Fetch homepage
-        homepage_html = fetch_wine_page(winery.website)
+        homepage_html = fetch_wine_page(place.website)
         if not homepage_html:
-            return list(Wine.objects.filter(winery=winery))
+            return list(MenuItem.objects.filter(place=place))
 
         # Discover wine-specific pages from links
-        wine_page_urls = discover_wine_pages(winery.website, homepage_html)
+        wine_page_urls = discover_wine_pages(place.website, homepage_html)
 
         # If no wine pages discovered, try common subpaths
         if not wine_page_urls:
-            base = winery.website.rstrip("/")
+            base = place.website.rstrip("/")
             for path in COMMON_WINE_PATHS:
                 wine_page_urls.append(base + path)
 
-        logger.info("Trying %d wine pages for %s: %s", len(wine_page_urls), winery.name, wine_page_urls[:5])
+        logger.info("Trying %d menu pages for %s: %s", len(wine_page_urls), place.name, wine_page_urls[:5])
 
         # Separate third-party shops from same-domain pages
         third_party = [u for u in wine_page_urls if "vinoshipper.com" in u or ".myshopify.com" in u]
@@ -206,8 +206,10 @@ def scrape_and_cache_wines(winery) -> list:
                 all_html += f"\n<!-- PAGE: {wp_url} -->\n{page_html}"
                 pages_fetched += 1
 
-        # Combine all known third-party URLs
+        # Combine all known third-party URLs, prioritize Vinoshipper (server-rendered)
         all_third_party = list(set(third_party + discovered_third_party))
+        # Sort: vinoshipper first (most reliable), then others
+        all_third_party.sort(key=lambda u: 0 if "vinoshipper.com" in u else 1)
         if all_third_party:
             logger.info("Found third-party shops: %s", all_third_party)
 
@@ -229,17 +231,17 @@ def scrape_and_cache_wines(winery) -> list:
         if len(all_html) > 80_000:
             all_html = all_html[:80_000]
 
-        extracted = extract_wines_from_html(all_html, winery.name)
-        logger.info("Extracted %d wines for %s (from %d subpages)", len(extracted), winery.name, pages_fetched)
+        extracted = extract_wines_from_html(all_html, place.name)
+        logger.info("Extracted %d menu items for %s (from %d subpages)", len(extracted), place.name, pages_fetched)
 
         if not extracted:
-            winery.wine_menu_last_scraped = timezone.now()
-            winery.save(update_fields=["wine_menu_last_scraped", "updated_at"])
-            return list(Wine.objects.filter(winery=winery))
+            place.wine_menu_last_scraped = timezone.now()
+            place.save(update_fields=["wine_menu_last_scraped", "updated_at"])
+            return list(MenuItem.objects.filter(place=place))
 
         # Deduplicate by name+vintage
         seen = set()
-        wines = []
+        menu_items = []
         for item in extracted:
             name = item.get("name", "").strip()
             if not name:
@@ -257,8 +259,8 @@ def scrape_and_cache_wines(winery) -> list:
                 except (ValueError, TypeError):
                     price = None
 
-            wine, created = Wine.objects.get_or_create(
-                winery=winery,
+            menu_item, created = MenuItem.objects.get_or_create(
+                place=place,
                 name=name,
                 vintage=item.get("vintage"),
                 defaults={
@@ -271,27 +273,27 @@ def scrape_and_cache_wines(winery) -> list:
             )
             if not created:
                 changed = []
-                if not wine.varietal and item.get("varietal"):
-                    wine.varietal = item["varietal"]
+                if not menu_item.varietal and item.get("varietal"):
+                    menu_item.varietal = item["varietal"]
                     changed.append("varietal")
-                if not wine.description and item.get("description"):
-                    wine.description = item["description"]
+                if not menu_item.description and item.get("description"):
+                    menu_item.description = item["description"]
                     changed.append("description")
-                if price and wine.price != price:
-                    wine.price = price
+                if price and menu_item.price != price:
+                    menu_item.price = price
                     changed.append("price")
-                if image_url and wine.image_url != image_url:
-                    wine.image_url = image_url
+                if image_url and menu_item.image_url != image_url:
+                    menu_item.image_url = image_url
                     changed.append("image_url")
                 if changed:
-                    wine.save(update_fields=changed + ["updated_at"])
-            wines.append(wine)
+                    menu_item.save(update_fields=changed + ["updated_at"])
+            menu_items.append(menu_item)
 
-        winery.wine_menu_last_scraped = timezone.now()
-        winery.save(update_fields=["wine_menu_last_scraped", "updated_at"])
-        # Return all wines for this winery (including previously scraped ones)
-        return list(Wine.objects.filter(winery=winery))
+        place.wine_menu_last_scraped = timezone.now()
+        place.save(update_fields=["wine_menu_last_scraped", "updated_at"])
+        # Return all menu items for this place (including previously scraped ones)
+        return list(MenuItem.objects.filter(place=place))
 
     except Exception as e:
-        logger.exception("Wine scraping failed for %s: %s", winery.name, e)
-        return list(Wine.objects.filter(winery=winery))
+        logger.exception("Menu scraping failed for %s: %s", place.name, e)
+        return list(MenuItem.objects.filter(place=place))

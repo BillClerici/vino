@@ -2,18 +2,18 @@ from django import forms
 from django.utils import timezone
 
 from apps.visits.models import VisitLog
-from apps.wineries.models import Winery
+from apps.wineries.models import Place
 
 
 class VisitLogForm(forms.ModelForm):
-    winery = forms.ModelChoiceField(
-        queryset=Winery.objects.all(),
+    place = forms.ModelChoiceField(
+        queryset=Place.objects.all(),
         widget=forms.Select(),
     )
 
     class Meta:
         model = VisitLog
-        fields = ["winery", "visited_at", "notes", "rating_staff", "rating_ambience", "rating_food", "rating_overall"]
+        fields = ["place", "visited_at", "notes", "rating_staff", "rating_ambience", "rating_food", "rating_overall"]
         widgets = {
             "visited_at": forms.DateTimeInput(attrs={"type": "datetime-local"}),
             "notes": forms.Textarea(attrs={"class": "materialize-textarea", "rows": 3}),

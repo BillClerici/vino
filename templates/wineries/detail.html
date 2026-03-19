@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ winery.name }} — Vino Trip{% endblock %}
+{% block title %}{{ place.name }} — Vino Trip{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -26,7 +26,7 @@
 <div class="container" style="margin-top: 20px; padding-bottom: 30px;">
     <!-- Breadcrumb -->
     <div style="margin-bottom: 16px;">
-        <a href="{% url 'winery_list' %}" class="grey-text" style="font-size: 0.85rem;">
+        <a href="{% url 'place_list' %}" class="grey-text" style="font-size: 0.85rem;">
             <i class="material-icons tiny">arrow_back</i> All Places
         </a>
     </div>
@@ -38,40 +38,40 @@
                 <div class="card-content">
                     <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                         <div>
-                            <h4 style="margin: 0 0 4px 0; font-weight: 700; color: #333;">{{ winery.name }}</h4>
-                            {% if winery.city %}
+                            <h4 style="margin: 0 0 4px 0; font-weight: 700; color: #333;">{{ place.name }}</h4>
+                            {% if place.city %}
                             <div style="font-size: 0.95rem; color: #9e9e9e; display: flex; align-items: center; gap: 4px;">
                                 <i class="material-icons tiny">place</i>
-                                {{ winery.city }}{% if winery.state %}, {{ winery.state }}{% endif %}{% if winery.country != "US" %}, {{ winery.country }}{% endif %}
+                                {{ place.city }}{% if place.state %}, {{ place.state }}{% endif %}{% if place.country != "US" %}, {{ place.country }}{% endif %}
                             </div>
                             {% endif %}
                         </div>
-                        <a href="{% url 'winery_edit' pk=winery.pk %}" class="btn-flat waves-effect">
+                        <a href="{% url 'place_edit' pk=place.pk %}" class="btn-flat waves-effect">
                             <i class="material-icons">edit</i>
                         </a>
                     </div>
 
-                    {% if winery.description %}
-                    <p style="margin-top: 16px; color: #616161; line-height: 1.6;">{{ winery.description }}</p>
+                    {% if place.description %}
+                    <p style="margin-top: 16px; color: #616161; line-height: 1.6;">{{ place.description }}</p>
                     {% endif %}
 
                     <div style="margin-top: 16px;">
-                        {% if winery.address %}
-                        <div class="info-row"><i class="material-icons">location_on</i> {{ winery.address }}</div>
+                        {% if place.address %}
+                        <div class="info-row"><i class="material-icons">location_on</i> {{ place.address }}</div>
                         {% endif %}
-                        {% if winery.website %}
-                        <div class="info-row"><i class="material-icons">language</i> <a href="{{ winery.website }}" target="_blank">{{ winery.website }}</a></div>
+                        {% if place.website %}
+                        <div class="info-row"><i class="material-icons">language</i> <a href="{{ place.website }}" target="_blank">{{ place.website }}</a></div>
                         {% endif %}
-                        {% if winery.phone %}
-                        <div class="info-row"><i class="material-icons">phone</i> {{ winery.phone }}</div>
+                        {% if place.phone %}
+                        <div class="info-row"><i class="material-icons">phone</i> {{ place.phone }}</div>
                         {% endif %}
                     </div>
                 </div>
                 <div class="card-action">
-                    <a href="{% url 'checkin' %}?winery={{ winery.pk }}" class="btn deep-purple lighten-1 waves-effect waves-light">
+                    <a href="{% url 'checkin' %}?place={{ place.pk }}" class="btn deep-purple lighten-1 waves-effect waves-light">
                         <i class="material-icons left">add_location</i>Check In Here
                     </a>
-                    <a href="{% url 'wine_create' winery_pk=winery.pk %}" class="btn-flat waves-effect">
+                    <a href="{% url 'menuitem_create' place_pk=place.pk %}" class="btn-flat waves-effect">
                         <i class="material-icons left">add</i>Add Wine
                     </a>
                 </div>
@@ -90,7 +90,7 @@
                             <span style="color: #9e9e9e;">&middot; {{ wine.varietal }}{% if wine.vintage %} {{ wine.vintage }}{% endif %}</span>
                         </div>
                         {% empty %}
-                        <p class="grey-text">No wines listed yet. <a href="{% url 'wine_create' winery_pk=winery.pk %}">Add one</a></p>
+                        <p class="grey-text">No wines listed yet. <a href="{% url 'menuitem_create' place_pk=place.pk %}">Add one</a></p>
                         {% endfor %}
                     </div>
                 </div>

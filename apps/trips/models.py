@@ -96,11 +96,11 @@ class TripMember(BaseModel):
         return f"{self.display_name} — {self.trip.name} ({self.get_role_display()})"
 
 
-class TripWinery(BaseModel):
-    """Wineries on the trip itinerary with ordering."""
-    trip = models.ForeignKey(Trip, on_delete=models.CASCADE, related_name="trip_wineries")
-    winery = models.ForeignKey(
-        "wineries.Winery", on_delete=models.CASCADE, related_name="trip_stops"
+class TripStop(BaseModel):
+    """Stops on the trip itinerary with ordering."""
+    trip = models.ForeignKey(Trip, on_delete=models.CASCADE, related_name="trip_stops")
+    place = models.ForeignKey(
+        "wineries.Place", on_delete=models.CASCADE, related_name="trip_stops"
     )
     order = models.PositiveIntegerField(default=0)
     arrival_time = models.DateTimeField(null=True, blank=True)
@@ -111,9 +111,9 @@ class TripWinery(BaseModel):
     travel_details = models.TextField(blank=True)
 
     class Meta:
-        db_table = "trips_tripwinery"
+        db_table = "trips_tripstop"
         ordering = ["order"]
-        unique_together = [("trip", "winery")]
+        unique_together = [("trip", "place")]
 
     def __str__(self):
-        return f"Stop #{self.order}: {self.winery.name}"
+        return f"Stop #{self.order}: {self.place.name}"

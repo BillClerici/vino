@@ -41,9 +41,9 @@ docker-compose exec web pytest -k "test_health" -v
 - **lookup** — `LookupValue` universal reference data table with parent-child self-FK hierarchy. Single table for all reference data types
 - **rbac** — `ControlPointGroup` → `ControlPoint` → `Role` → User. All admin CRUD views live here (superuser-only). Handles Users, Roles, Control Points, Groups, and Lookup Items
 - **api** — `health_check` endpoint, `auth_callback` for JWT issuance, `agents/` (LangGraph state machine), `ai_utils.py` (multi-LLM init)
-- **wineries** — `Winery` (name, location, geo coords, metadata) and `Wine` (varietal, vintage, Pinecone vector ID)
-- **visits** — `VisitLog` (user→winery with multi-factor ratings: staff/ambience/food/overall) and `VisitWine` (wines tasted per visit with notes)
-- **trips** — `Trip` (M2M users via `TripMember`, itinerary JSON, status workflow), `TripWinery` (ordered stops)
+- **wineries** — `Place` (name, place_type, location, geo coords, metadata) and `MenuItem` (varietal, vintage, price, Pinecone vector ID)
+- **visits** — `VisitLog` (user→place with multi-factor ratings: staff/ambience/food/overall) and `VisitWine` (items tasted per visit with notes)
+- **trips** — `Trip` (M2M users via `TripMember`, itinerary JSON, status workflow), `TripStop` (ordered stops)
 - **palate** — `PalateProfile` (one-to-one with User, structured preferences JSON, Pinecone vector ID)
 
 ### Settings

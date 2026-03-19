@@ -4,7 +4,7 @@ from django.views.generic import TemplateView
 
 from apps.trips.models import Trip
 from apps.visits.models import VisitLog
-from apps.wineries.models import Winery
+from apps.wineries.models import Place
 
 
 class LandingPageView(TemplateView):
@@ -20,7 +20,7 @@ class LandingPageView(TemplateView):
         # Personal stats
         my_visits = VisitLog.objects.filter(user=user, is_active=True)
         ctx["visit_count"] = my_visits.count()
-        ctx["unique_wineries"] = my_visits.values("winery").distinct().count()
+        ctx["unique_places"] = my_visits.values("place").distinct().count()
         ctx["avg_rating"] = my_visits.aggregate(avg=Avg("rating_overall"))["avg"]
         ctx["trips_completed"] = Trip.objects.filter(
             members=user, is_active=True, status="completed"
@@ -28,7 +28,7 @@ class LandingPageView(TemplateView):
 
         # Recent visits
         ctx["recent_visits"] = (
-            my_visits.select_related("winery").order_by("-visited_at")[:5]
+            my_visits.select_related("place").order_by("-visited_at")[:5]
         )
 
         # Active trips
@@ -36,7 +36,7 @@ class LandingPageView(TemplateView):
         active_trips = list(
             Trip.objects.filter(members=user, is_active=True)
             .exclude(status__in=["completed", "cancelled"])
-            .prefetch_related("trip_members__user", "trip_wineries__winery")
+            .prefetch_related("trip_members__user", "trip_stops__place")
             .order_by("-created_at")[:3]
         )
         today = date.today()
@@ -48,18 +48,18 @@ class LandingPageView(TemplateView):
             trip.is_today = (trip.scheduled_date == today) if trip.scheduled_date else False
         ctx["active_trips"] = active_trips
 
-        # Top-rated wineries (from user's visits, only those with ratings)
-        ctx["top_wineries"] = (
+        # Top-rated places (from user's visits, only those with ratings)
+        ctx["top_places"] = (
             my_visits.filter(rating_overall__isnull=False)
-            .values("winery__id", "winery__name", "winery__city", "winery__state")
+            .values("place__id", "place__name", "place__city", "place__state")
             .annotate(avg_overall=Avg("rating_overall"), times_visited=Count("id"))
             .order_by("-avg_overall")[:5]
         )
 
-        # Discover — wineries the user hasn't visited yet
-        visited_ids = my_visits.values_list("winery_id", flat=True)
+        # Discover — places the user hasn't visited yet
+        visited_ids = my_visits.values_list("place_id", flat=True)
         ctx["discover"] = (
-            Winery.objects.exclude(pk__in=visited_ids)
+            Place.objects.exclude(pk__in=visited_ids)
             .annotate(
                 avg_rating=Avg("visits__rating_overall", default=0),
                 visit_count=Count("visits"),

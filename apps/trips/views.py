@@ -11,9 +11,9 @@ from django.views import View
 from django.views.generic import ListView
 
 from apps.trips.forms import TripForm
-from apps.trips.models import Trip, TripMember, TripWinery
+from apps.trips.models import Trip, TripMember, TripStop
 from apps.visits.models import VisitLog
-from apps.wineries.models import FavoriteWinery, Winery
+from apps.wineries.models import FavoritePlace, Place
 
 User = get_user_model()
 
@@ -27,7 +27,7 @@ class TripListView(LoginRequiredMixin, ListView):
     def get_queryset(self):
         return (
             Trip.objects.filter(members=self.request.user)
-            .prefetch_related("trip_members__user", "trip_wineries__winery")
+            .prefetch_related("trip_members__user", "trip_stops__place")
             .distinct()
             .order_by("-created_at")
         )
@@ -75,7 +75,7 @@ class TripDetailView(LoginRequiredMixin, View):
     def get(self, request, pk):
         trip = get_object_or_404(
             Trip.objects.prefetch_related(
-                "trip_members__user", "trip_wineries__winery"
+                "trip_members__user", "trip_stops__place"
             ),
             pk=pk,
         )
@@ -84,32 +84,32 @@ class TripDetailView(LoginRequiredMixin, View):
         is_organizer = trip.trip_members.filter(user=user, role=TripMember.Role.ORGANIZER).exists()
 
         # Favorites for "Add from Favorites" picker
-        fav_winery_ids = FavoriteWinery.objects.filter(
+        fav_place_ids = FavoritePlace.objects.filter(
             user=user, is_active=True
-        ).values_list("winery_id", flat=True)
-        favorites = Winery.objects.filter(pk__in=fav_winery_ids).order_by("name")
+        ).values_list("place_id", flat=True)
+        favorites = Place.objects.filter(pk__in=fav_place_ids).order_by("name")
 
-        # Visited wineries for "Add from Visited" picker
-        visited_winery_ids = (
+        # Visited places for "Add from Visited" picker
+        visited_place_ids = (
             VisitLog.objects.filter(user=user, is_active=True)
-            .values_list("winery_id", flat=True)
+            .values_list("place_id", flat=True)
             .distinct()
         )
         visited = (
-            Winery.objects.filter(pk__in=visited_winery_ids)
+            Place.objects.filter(pk__in=visited_place_ids)
             .annotate(last_visited=Max("visits__visited_at", filter=Q(visits__user=user, visits__is_active=True)))
             .order_by("name")
         )
 
-        # Existing stop winery IDs (to mark already-added)
-        stop_winery_ids = set(
-            trip.trip_wineries.values_list("winery_id", flat=True)
+        # Existing stop place IDs (to mark already-added)
+        stop_place_ids = set(
+            trip.trip_stops.values_list("place_id", flat=True)
         )
 
-        stops = list(trip.trip_wineries.select_related("winery").order_by("order"))
-        # Mark stops that have cached wines
+        stops = list(trip.trip_stops.select_related("place").order_by("order"))
+        # Mark stops that have cached menu items
         for stop in stops:
-            stop.has_cached_wines = stop.winery.wines.exists()
+            stop.has_cached_wines = stop.place.menu_items.exists()
 
         from datetime import date
         today = date.today()
@@ -128,7 +128,7 @@ class TripDetailView(LoginRequiredMixin, View):
             "stops": stops,
             "favorites": favorites,
             "visited": visited,
-            "stop_winery_ids": stop_winery_ids,
+            "stop_place_ids": stop_place_ids,
             "show_start_button": show_start_button,
         })
 
@@ -181,7 +181,7 @@ class TripDeleteView(LoginRequiredMixin, View):
 
 
 class TripAddStopView(LoginRequiredMixin, View):
-    """AJAX: add a winery stop to a trip."""
+    """AJAX: add a place stop to a trip."""
 
     def post(self, request, pk):
         trip = get_object_or_404(Trip, pk=pk)
@@ -190,32 +190,35 @@ class TripAddStopView(LoginRequiredMixin, View):
         except (ValueError, TypeError):
             return JsonResponse({"error": "Invalid JSON"}, status=400)
 
-        winery_id = body.get("winery_id")
-        if not winery_id:
-            return JsonResponse({"error": "winery_id required"}, status=400)
+        place_id = body.get("place_id")
+        if not place_id:
+            # Fall back to winery_id for backward compatibility
+            place_id = body.get("winery_id")
+        if not place_id:
+            return JsonResponse({"error": "place_id required"}, status=400)
 
-        winery = get_object_or_404(Winery, pk=winery_id)
+        place = get_object_or_404(Place, pk=place_id)
 
         # Check if already added
-        if TripWinery.all_objects.filter(trip=trip, winery=winery).exists():
-            tw = TripWinery.all_objects.get(trip=trip, winery=winery)
+        if TripStop.all_objects.filter(trip=trip, place=place).exists():
+            tw = TripStop.all_objects.get(trip=trip, place=place)
             tw.is_active = True
             tw.save(update_fields=["is_active", "updated_at"])
         else:
-            max_order = trip.trip_wineries.order_by("-order").values_list("order", flat=True).first() or 0
-            tw = TripWinery.objects.create(
-                trip=trip, winery=winery, order=max_order + 1
+            max_order = trip.trip_stops.order_by("-order").values_list("order", flat=True).first() or 0
+            tw = TripStop.objects.create(
+                trip=trip, place=place, order=max_order + 1
             )
 
         return JsonResponse({
             "ok": True,
             "stop_id": str(tw.pk),
-            "winery_id": str(winery.pk),
-            "name": winery.name,
-            "city": winery.city,
-            "state": winery.state,
+            "place_id": str(place.pk),
+            "name": place.name,
+            "city": place.city,
+            "state": place.state,
             "order": tw.order,
-            "image_url": winery.image_url or "",
+            "image_url": place.image_url or "",
         })
 
 
@@ -224,7 +227,7 @@ class TripUpdateStopView(LoginRequiredMixin, View):
 
     def post(self, request, pk, stop_pk):
         trip = get_object_or_404(Trip, pk=pk)
-        stop = get_object_or_404(TripWinery, pk=stop_pk, trip=trip)
+        stop = get_object_or_404(TripStop, pk=stop_pk, trip=trip)
         try:
             body = _json.loads(request.body)
         except (ValueError, TypeError):
@@ -261,7 +264,7 @@ class TripReorderStopsView(LoginRequiredMixin, View):
 
         stops = body.get("stops", [])
         for item in stops:
-            TripWinery.objects.filter(
+            TripStop.objects.filter(
                 pk=item["stop_id"], trip=trip
             ).update(order=item["order"])
 
@@ -273,12 +276,12 @@ class TripRemoveStopView(LoginRequiredMixin, View):
 
     def post(self, request, pk, stop_pk):
         trip = get_object_or_404(Trip, pk=pk)
-        stop = get_object_or_404(TripWinery, pk=stop_pk, trip=trip)
+        stop = get_object_or_404(TripStop, pk=stop_pk, trip=trip)
         stop.is_active = False
         stop.save(update_fields=["is_active", "updated_at"])
 
         # Re-sequence remaining stops
-        remaining = list(trip.trip_wineries.order_by("order"))
+        remaining = list(trip.trip_stops.order_by("order"))
         for idx, tw in enumerate(remaining, start=1):
             if tw.order != idx:
                 tw.order = idx
@@ -485,7 +488,7 @@ class TripRemoveMemberView(LoginRequiredMixin, View):
 
 
 class QuickTripView(LoginRequiredMixin, View):
-    """AJAX endpoint: create a new trip with a winery as the first stop."""
+    """AJAX endpoint: create a new trip with a place as the first stop."""
 
     def post(self, request):
         try:
@@ -493,11 +496,13 @@ class QuickTripView(LoginRequiredMixin, View):
         except (ValueError, TypeError):
             return JsonResponse({"error": "Invalid JSON"}, status=400)
 
-        winery = None
-        winery_id = body.get("winery_id")
+        place = None
+        place_id = body.get("place_id")
+        if not place_id:
+            place_id = body.get("winery_id")  # backward compatibility
 
-        if winery_id:
-            winery = get_object_or_404(Winery, pk=winery_id)
+        if place_id:
+            place = get_object_or_404(Place, pk=place_id)
         else:
             name = body.get("name", "").strip()
             if not name:
@@ -508,13 +513,13 @@ class QuickTripView(LoginRequiredMixin, View):
 
             if lat and lng:
                 lat_d, lng_d = Decimal(str(lat)), Decimal(str(lng))
-                winery = Winery.objects.filter(
+                place = Place.objects.filter(
                     name__iexact=name,
                     latitude__range=(lat_d - Decimal("0.001"), lat_d + Decimal("0.001")),
                     longitude__range=(lng_d - Decimal("0.001"), lng_d + Decimal("0.001")),
                 ).first()
 
-            if not winery:
+            if not place:
                 addr = body.get("address", "")
                 city, state = "", ""
                 if addr:
@@ -527,31 +532,31 @@ class QuickTripView(LoginRequiredMixin, View):
                         city = parts[0]
 
                 place_type = body.get("place_type", "winery")
-                winery = Winery.objects.create(
+                place = Place.objects.create(
                     name=name, address=addr, city=city, state=state,
                     latitude=lat, longitude=lng,
                     website=body.get("website", ""),
                     image_url=body.get("photo_url", ""),
-                    place_type=place_type if place_type in dict(Winery.PlaceType.choices) else "winery",
+                    place_type=place_type if place_type in dict(Place.PlaceType.choices) else "winery",
                     phone=body.get("phone", ""),
                     description=body.get("description", ""),
                 )
             else:
                 changed = []
-                if body.get("photo_url") and not winery.image_url:
-                    winery.image_url = body["photo_url"]
+                if body.get("photo_url") and not place.image_url:
+                    place.image_url = body["photo_url"]
                     changed.append("image_url")
-                if body.get("phone") and not winery.phone:
-                    winery.phone = body["phone"]
+                if body.get("phone") and not place.phone:
+                    place.phone = body["phone"]
                     changed.append("phone")
-                if body.get("description") and not winery.description:
-                    winery.description = body["description"]
+                if body.get("description") and not place.description:
+                    place.description = body["description"]
                     changed.append("description")
                 if changed:
-                    winery.save(update_fields=changed + ["updated_at"])
+                    place.save(update_fields=changed + ["updated_at"])
 
         trip = Trip.objects.create(
-            name=f"Trip to {winery.name}",
+            name=f"Trip to {place.name}",
             created_by=request.user,
             status=Trip.Status.DRAFT,
         )
@@ -559,7 +564,7 @@ class QuickTripView(LoginRequiredMixin, View):
             trip=trip, user=request.user,
             role=TripMember.Role.ORGANIZER, rsvp_status="accepted",
         )
-        TripWinery.objects.create(trip=trip, winery=winery, order=1)
+        TripStop.objects.create(trip=trip, place=place, order=1)
 
         return JsonResponse({
             "trip_id": str(trip.pk),
@@ -578,7 +583,7 @@ class LiveTripView(LoginRequiredMixin, View):
 
         trip = get_object_or_404(
             Trip.objects.prefetch_related(
-                "trip_wineries__winery__wines", "trip_members__user"
+                "trip_stops__place__menu_items", "trip_members__user"
             ),
             pk=pk,
         )
@@ -593,7 +598,7 @@ class LiveTripView(LoginRequiredMixin, View):
             trip.status = Trip.Status.IN_PROGRESS
             trip.save(update_fields=["status", "updated_at"])
 
-        stops = list(trip.trip_wineries.select_related("winery").order_by("order"))
+        stops = list(trip.trip_stops.select_related("place").order_by("order"))
         if not stops:
             messages.info(request, "Add stops to your itinerary before starting.")
             return redirect("trip_detail", pk=trip.pk)
@@ -604,20 +609,20 @@ class LiveTripView(LoginRequiredMixin, View):
         if current_index >= len(stops):
             current_index = len(stops) - 1
 
-        # Find existing visits for this user at each stop's winery (today)
+        # Find existing visits for this user at each stop's place (today)
         from apps.visits.models import VisitWine
         today = timezone.now().date()
         user = request.user
-        stop_visits_json = {}  # index -> {visit_id, winery_name, ...}
+        stop_visits_json = {}  # index -> {visit_id, place_name, ...}
         for idx, stop in enumerate(stops):
             visit = VisitLog.objects.filter(
-                user=user, winery=stop.winery, visited_at__date=today
+                user=user, place=stop.place, visited_at__date=today
             ).first()
             if visit:
                 wines_logged = list(
                     VisitWine.objects.filter(visit=visit)
-                    .select_related("wine")
-                    .values("id", "wine_id", "wine_name", "wine_type",
+                    .select_related("menu_item")
+                    .values("id", "menu_item_id", "wine_name", "wine_type",
                             "wine_vintage", "serving_type", "quantity",
                             "tasting_notes", "rating", "is_favorite",
                             "purchased", "purchased_quantity",
@@ -626,13 +631,13 @@ class LiveTripView(LoginRequiredMixin, View):
                 # Convert UUIDs and Decimals for JSON
                 for w in wines_logged:
                     w["id"] = str(w["id"])
-                    w["wine_id"] = str(w["wine_id"]) if w["wine_id"] else None
+                    w["menu_item_id"] = str(w["menu_item_id"]) if w["menu_item_id"] else None
                     if w.get("purchased_price") is not None:
                         w["purchased_price"] = float(w["purchased_price"])
 
                 stop_visits_json[idx] = {
                     "visit_id": str(visit.pk),
-                    "winery_name": stop.winery.name,
+                    "place_name": stop.place.name,
                     "ratings": {
                         "rating_overall": visit.rating_overall,
                         "rating_staff": visit.rating_staff,
@@ -643,25 +648,25 @@ class LiveTripView(LoginRequiredMixin, View):
                     "wines": wines_logged,
                 }
 
-        # Compute per-winery stats: past visit count and favorite/top wine count
+        # Compute per-place stats: past visit count and favorite/top wine count
         from apps.visits.models import VisitWine
         from django.db.models import Count, Q
-        winery_stats = {}
+        place_stats = {}
         for stop in stops:
-            winery_id = stop.winery_id
-            if winery_id not in winery_stats:
+            place_id = stop.place_id
+            if place_id not in place_stats:
                 past_visits = VisitLog.objects.filter(
-                    user=user, winery_id=winery_id
+                    user=user, place_id=place_id
                 ).exclude(visited_at__date=today).count()
                 fav_wines = VisitWine.objects.filter(
-                    visit__user=user, visit__winery_id=winery_id
+                    visit__user=user, visit__place_id=place_id
                 ).filter(Q(is_favorite=True) | Q(rating__gte=4)).count()
-                winery_stats[winery_id] = {
+                place_stats[place_id] = {
                     "past_visits": past_visits,
                     "fav_wines": fav_wines,
                 }
-            stop.past_visits = winery_stats[winery_id]["past_visits"]
-            stop.fav_wines = winery_stats[winery_id]["fav_wines"]
+            stop.past_visits = place_stats[place_id]["past_visits"]
+            stop.fav_wines = place_stats[place_id]["fav_wines"]
 
         import json
         return render(request, "trips/live.html", {
@@ -679,26 +684,26 @@ class LiveTripCheckinView(LoginRequiredMixin, View):
         from django.utils import timezone
 
         trip = get_object_or_404(Trip, pk=pk)
-        stop = get_object_or_404(TripWinery, pk=stop_pk, trip=trip)
+        stop = get_object_or_404(TripStop, pk=stop_pk, trip=trip)
         user = request.user
         today = timezone.now().date()
 
         # Idempotent: don't create duplicate
         visit = VisitLog.objects.filter(
-            user=user, winery=stop.winery, visited_at__date=today
+            user=user, place=stop.place, visited_at__date=today
         ).first()
 
         if not visit:
             visit = VisitLog.objects.create(
                 user=user,
-                winery=stop.winery,
+                place=stop.place,
                 visited_at=timezone.now(),
             )
 
         return JsonResponse({
             "ok": True,
             "visit_id": str(visit.pk),
-            "winery_name": stop.winery.name,
+            "place_name": stop.place.name,
             "checked_in_at": visit.visited_at.strftime("%I:%M %p"),
         })
 
@@ -711,12 +716,12 @@ class LiveTripUndoCheckinView(LoginRequiredMixin, View):
         from apps.visits.models import VisitWine
 
         trip = get_object_or_404(Trip, pk=pk)
-        stop = get_object_or_404(TripWinery, pk=stop_pk, trip=trip)
+        stop = get_object_or_404(TripStop, pk=stop_pk, trip=trip)
         user = request.user
         today = timezone.now().date()
 
         visit = VisitLog.objects.filter(
-            user=user, winery=stop.winery, visited_at__date=today
+            user=user, place=stop.place, visited_at__date=today
         ).first()
 
         if visit:
@@ -755,11 +760,11 @@ class LiveTripRateView(LoginRequiredMixin, View):
 
 
 class LiveTripWineView(LoginRequiredMixin, View):
-    """AJAX: log a wine tasting (known wine or ad-hoc)."""
+    """AJAX: log a wine tasting (known menu item or ad-hoc)."""
 
     def post(self, request, pk):
         from apps.visits.models import VisitWine
-        from apps.wineries.models import Wine
+        from apps.wineries.models import MenuItem
 
         trip = get_object_or_404(Trip, pk=pk)  # noqa: F841
         try:
@@ -770,9 +775,9 @@ class LiveTripWineView(LoginRequiredMixin, View):
         visit = get_object_or_404(VisitLog, pk=body.get("visit_id"), user=request.user)
 
         wine_id = body.get("wine_id")
-        wine = None
+        menu_item = None
         if wine_id:
-            wine = get_object_or_404(Wine, pk=wine_id)
+            menu_item = get_object_or_404(MenuItem, pk=wine_id)
 
         # Update existing or create new
         vw_id = body.get("visit_wine_id")
@@ -781,13 +786,13 @@ class LiveTripWineView(LoginRequiredMixin, View):
         else:
             vw = VisitWine(visit=visit)
 
-        if wine:
-            vw.wine = wine
-            vw.wine_name = wine.name
-            vw.wine_type = wine.varietal
-            vw.wine_vintage = wine.vintage
+        if menu_item:
+            vw.menu_item = menu_item
+            vw.wine_name = menu_item.name
+            vw.wine_type = menu_item.varietal
+            vw.wine_vintage = menu_item.vintage
         else:
-            vw.wine = None
+            vw.menu_item = None
             vw.wine_name = body.get("wine_name", "")
             vw.wine_type = body.get("wine_type", "")
             vw.wine_vintage = int(body["wine_vintage"]) if body.get("wine_vintage") else None
@@ -853,7 +858,7 @@ class LiveTripAdvanceView(LoginRequiredMixin, View):
         except (ValueError, TypeError):
             return JsonResponse({"error": "Invalid JSON"}, status=400)
 
-        stop_count = trip.trip_wineries.count()
+        stop_count = trip.trip_stops.count()
         meta = trip.metadata or {}
         current = meta.get("current_stop_index", 0)
 
@@ -887,20 +892,20 @@ class LiveTripCompleteView(LoginRequiredMixin, View):
 
 
 class LiveTripWineMenuView(LoginRequiredMixin, View):
-    """AJAX: fetch known wines for a winery (scrapes website if needed)."""
+    """AJAX: fetch known menu items for a place (scrapes website if needed)."""
 
-    def get(self, request, pk, winery_pk):
-        from apps.wineries.models import Winery as WineryModel
-        from apps.wineries.scraper import scrape_and_cache_wines
+    def get(self, request, pk, place_pk):
+        from apps.wineries.models import Place as PlaceModel
+        from apps.wineries.scraper import scrape_and_cache_menu_items
 
         trip = get_object_or_404(Trip, pk=pk)  # noqa: F841
-        winery = get_object_or_404(WineryModel, pk=winery_pk)
+        place = get_object_or_404(PlaceModel, pk=place_pk)
 
         if request.GET.get("refresh"):
-            winery.wine_menu_last_scraped = None
-            winery.save(update_fields=["wine_menu_last_scraped", "updated_at"])
+            place.wine_menu_last_scraped = None
+            place.save(update_fields=["wine_menu_last_scraped", "updated_at"])
 
-        wines = scrape_and_cache_wines(winery)
+        menu_items = scrape_and_cache_menu_items(place)
 
         return JsonResponse({
             "ok": True,
@@ -915,8 +920,8 @@ class LiveTripWineMenuView(LoginRequiredMixin, View):
                     "price": float(w.price) if w.price else None,
                     "image_url": w.image_url or "",
                 }
-                for w in wines
+                for w in menu_items
             ],
-            "has_website": bool(winery.website),
-            "winery_name": winery.name,
+            "has_website": bool(place.website),
+            "place_name": place.name,
         })

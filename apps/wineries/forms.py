@@ -1,11 +1,11 @@
 from django import forms
 
-from apps.wineries.models import Wine, Winery
+from apps.wineries.models import MenuItem, Place
 
 
-class WineryForm(forms.ModelForm):
+class PlaceForm(forms.ModelForm):
     class Meta:
-        model = Winery
+        model = Place
         fields = ["name", "description", "address", "city", "state", "country", "website", "phone"]
         widgets = {
             "description": forms.Textarea(attrs={"class": "materialize-textarea", "rows": 3}),
@@ -14,7 +14,7 @@ class WineryForm(forms.ModelForm):
 
 class PlaceAdminForm(forms.ModelForm):
     class Meta:
-        model = Winery
+        model = Place
         fields = ["name", "place_type", "description", "address", "city", "state", "country",
                   "latitude", "longitude", "website", "phone", "image_url", "is_active"]
         widgets = {
@@ -22,9 +22,9 @@ class PlaceAdminForm(forms.ModelForm):
         }
 
 
-class WineForm(forms.ModelForm):
+class MenuItemForm(forms.ModelForm):
     class Meta:
-        model = Wine
+        model = MenuItem
         fields = ["name", "varietal", "vintage", "description"]
         widgets = {
             "description": forms.Textarea(attrs={"class": "materialize-textarea", "rows": 3}),

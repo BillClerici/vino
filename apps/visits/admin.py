@@ -10,7 +10,7 @@ class VisitWineInline(admin.TabularInline):
 
 @admin.register(VisitLog)
 class VisitLogAdmin(admin.ModelAdmin):
-    list_display = ("user", "winery", "visited_at", "rating_overall", "is_active")
+    list_display = ("user", "place", "visited_at", "rating_overall", "is_active")
     list_filter = ("rating_overall", "is_active")
-    search_fields = ("user__email", "winery__name")
+    search_fields = ("user__email", "place__name")
     inlines = [VisitWineInline]

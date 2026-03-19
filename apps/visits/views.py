@@ -6,7 +6,7 @@ from django.views.generic import ListView
 
 from apps.visits.forms import VisitLogForm
 from apps.visits.models import VisitLog
-from apps.wineries.models import Winery
+from apps.wineries.models import Place
 
 
 class VisitListView(LoginRequiredMixin, ListView):
@@ -18,26 +18,26 @@ class VisitListView(LoginRequiredMixin, ListView):
     def get_queryset(self):
         return (
             VisitLog.objects.filter(user=self.request.user)
-            .select_related("winery")
-            .prefetch_related("wines_tasted__wine")
+            .select_related("place")
+            .prefetch_related("wines_tasted__menu_item")
             .order_by("-visited_at")
         )
 
 
 class CheckInView(LoginRequiredMixin, View):
-    """Log a new winery visit — the core user action."""
+    """Log a new place visit — the core user action."""
 
     def get(self, request):
-        winery_id = request.GET.get("winery")
+        place_id = request.GET.get("winery")
         initial = {}
-        winery = None
-        if winery_id:
-            winery = get_object_or_404(Winery, pk=winery_id)
-            initial["winery"] = winery.pk
+        place = None
+        if place_id:
+            place = get_object_or_404(Place, pk=place_id)
+            initial["winery"] = place.pk
         form = VisitLogForm(initial=initial)
         return render(request, "visits/checkin.html", {
             "form": form,
-            "preselected_winery": winery,
+            "preselected_place": place,
         })
 
     def post(self, request):
@@ -46,7 +46,7 @@ class CheckInView(LoginRequiredMixin, View):
             visit = form.save(commit=False)
             visit.user = request.user
             visit.save()
-            messages.success(request, f"Checked in at {visit.winery.name}!")
+            messages.success(request, f"Checked in at {visit.place.name}!")
             return redirect("visit_detail", pk=visit.pk)
         return render(request, "visits/checkin.html", {"form": form})
 
@@ -54,7 +54,7 @@ class CheckInView(LoginRequiredMixin, View):
 class VisitDetailView(LoginRequiredMixin, View):
     def get(self, request, pk):
         visit = get_object_or_404(
-            VisitLog.objects.select_related("winery").prefetch_related("wines_tasted__wine"),
+            VisitLog.objects.select_related("place").prefetch_related("wines_tasted__menu_item"),
             pk=pk,
             user=request.user,
         )

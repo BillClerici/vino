@@ -59,16 +59,16 @@
                         </div>
                         {% endif %}
 
-                        <!-- Winery Select -->
+                        <!-- Place Select -->
                         <div class="row" style="margin-bottom: 0;">
                             <div class="input-field col s12">
-                                {% if preselected_winery %}
-                                <input type="hidden" name="winery" value="{{ preselected_winery.pk }}">
-                                <input type="text" value="{{ preselected_winery.name }}" disabled>
+                                {% if preselected_place %}
+                                <input type="hidden" name="place" value="{{ preselected_place.pk }}">
+                                <input type="text" value="{{ preselected_place.name }}" disabled>
                                 <label class="active">Place</label>
                                 {% else %}
-                                {{ form.winery }}
-                                <label for="{{ form.winery.id_for_label }}" class="active">Winery</label>
+                                {{ form.place }}
+                                <label for="{{ form.place.id_for_label }}" class="active">Place</label>
                                 {% endif %}
                             </div>
                         </div>
