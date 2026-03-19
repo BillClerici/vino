@@ -16,15 +16,18 @@ logger = logging.getLogger(__name__)
 
 CACHE_DAYS = 7
 
-# Patterns that indicate a wine-related page
+# Patterns that indicate a wine or beer menu page
 WINE_PATH_PATTERNS = re.compile(
-    r"/(our-)?wines?(/|$)|/wine-menu|/wine-list|/tasting|/varietals|/collection|/cellar|/shop|/menu|/products|/store|/purchase",
+    r"/(our-)?wines?(/|$)|/wine-menu|/wine-list|/tasting|/varietals|/collection|/cellar"
+    r"|/(our-)?beers?(/|$)|/beer-menu|/beer-list|/tap-list|/on-tap|/brews"
+    r"|/shop|/menu|/products|/store|/purchase",
     re.IGNORECASE,
 )
 
-# Common wine page subpaths to try if nothing found in links
+# Common subpaths to try if nothing found in links
 COMMON_WINE_PATHS = [
     "/wines", "/our-wines", "/wine-menu", "/wine-list",
+    "/beers", "/our-beers", "/beer-menu", "/tap-list", "/on-tap",
     "/shop", "/menu", "/tasting-menu", "/products",
 ]
 
@@ -111,21 +114,21 @@ def extract_wines_from_html(html: str, winery_name: str) -> list[dict]:
     """Use Claude to extract a structured wine list from HTML."""
     from apps.api.ai_utils import get_claude
 
-    prompt = f"""You are extracting wines from the website of "{winery_name}".
+    prompt = f"""You are extracting drinks/beverages from the website of "{winery_name}".
 
-Analyze the HTML below and find every wine mentioned. For each wine, extract:
-- "name": string (the wine's name, e.g. "Reserve Chardonnay")
-- "varietal": string (e.g. "Chardonnay", "Cabernet Sauvignon", "Red Blend", "Muscadine")
-- "vintage": integer or null (e.g. 2022)
+Analyze the HTML below and find every wine or beer mentioned. For each item, extract:
+- "name": string (the drink's name, e.g. "Reserve Chardonnay" or "Hazy IPA")
+- "varietal": string (for wine: e.g. "Chardonnay", "Cabernet Sauvignon". For beer: e.g. "IPA", "Stout", "Lager", "Pilsner", "Amber Ale")
+- "vintage": integer or null (mainly for wine, e.g. 2022. Usually null for beer.)
 - "description": string (brief tasting notes or description from the site, 1-2 sentences)
-- "wine_type": string (one of: "Red", "White", "Rosé", "Sparkling", "Other")
-- "price": number or null (price in dollars, e.g. 29.99. Look for prices near each wine — tasting fees, bottle prices, shop prices. Use null if no price found.)
-- "image_url": string or null (the full absolute URL of the wine's bottle/label image if found in a nearby <img> tag src attribute. Must be a complete URL starting with http. Use null if no image found.)
+- "wine_type": string (for wine: one of "Red", "White", "Rosé", "Sparkling". For beer: one of "Ale", "Lager", "Stout", "IPA", "Sour", "Other". Use "Other" if unsure.)
+- "price": number or null (price in dollars, e.g. 29.99. Look for prices near each item. Use null if no price found.)
+- "image_url": string or null (the full absolute URL of the product image if found in a nearby <img> tag src attribute. Must be a complete URL starting with http. Use null if no image found.)
 
-Be thorough — look for wine names in menus, product listings, tasting notes, wine club pages, and anywhere wines are listed.
-For images, look for <img> tags near each wine entry — product photos, bottle shots, or label images. Convert relative URLs to absolute using the site's domain. Ignore tiny icons, logos, and decorative images.
-If a varietal isn't explicitly stated, infer it from the wine name if possible.
-Return a JSON array. If no wines found, return [].
+Be thorough — look for drink names in menus, product listings, tasting notes, tap lists, club pages, and anywhere drinks are listed.
+For images, look for <img> tags near each entry — product photos, bottle/can shots, or label images. Convert relative URLs to absolute using the site's domain. Ignore tiny icons, logos, and decorative images.
+If a varietal isn't explicitly stated, infer it from the name if possible.
+Return a JSON array. If no drinks found, return [].
 Return ONLY the JSON array, no other text.
 
 HTML:

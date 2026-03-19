@@ -358,7 +358,7 @@ class TripInviteView(LoginRequiredMixin, View):
         subject = f"You're invited to {trip.name} — Vino Trip"
         body_text = (
             f"Hi {greeting},\n\n"
-            f"{inviter} has invited you to join a wine trip!\n\n"
+            f"{inviter} has invited you to join a trip!\n\n"
             f"Trip: {trip.name}\n"
         )
         if trip.scheduled_date:
@@ -526,11 +526,13 @@ class QuickTripView(LoginRequiredMixin, View):
                     elif len(parts) == 2:
                         city = parts[0]
 
+                place_type = body.get("place_type", "winery")
                 winery = Winery.objects.create(
                     name=name, address=addr, city=city, state=state,
                     latitude=lat, longitude=lng,
                     website=body.get("website", ""),
                     image_url=body.get("photo_url", ""),
+                    place_type=place_type if place_type in dict(Winery.PlaceType.choices) else "winery",
                 )
             elif body.get("photo_url") and not winery.image_url:
                 winery.image_url = body["photo_url"]
@@ -687,6 +689,32 @@ class LiveTripCheckinView(LoginRequiredMixin, View):
             "winery_name": stop.winery.name,
             "checked_in_at": visit.visited_at.strftime("%I:%M %p"),
         })
+
+
+class LiveTripUndoCheckinView(LoginRequiredMixin, View):
+    """AJAX: undo a check-in — soft-deletes the VisitLog and its wines."""
+
+    def post(self, request, pk, stop_pk):
+        from django.utils import timezone
+        from apps.visits.models import VisitWine
+
+        trip = get_object_or_404(Trip, pk=pk)
+        stop = get_object_or_404(TripWinery, pk=stop_pk, trip=trip)
+        user = request.user
+        today = timezone.now().date()
+
+        visit = VisitLog.objects.filter(
+            user=user, winery=stop.winery, visited_at__date=today
+        ).first()
+
+        if visit:
+            # Soft-delete wines logged on this visit
+            VisitWine.objects.filter(visit=visit).update(is_active=False)
+            # Soft-delete the visit
+            visit.is_active = False
+            visit.save(update_fields=["is_active", "updated_at"])
+
+        return JsonResponse({"ok": True})
 
 
 class LiveTripRateView(LoginRequiredMixin, View):

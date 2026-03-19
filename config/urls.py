@@ -39,7 +39,7 @@ urlpatterns = [
     path('register/', RegisterView.as_view(), name='register'),
     path('logout/', LogoutView.as_view(), name='logout'),
     # User-facing features
-    path('wineries/', include('apps.wineries.urls')),
+    path('places/', include('apps.wineries.urls')),
     path('visits/', include('apps.visits.urls')),
     path('trips/', include('apps.trips.urls')),
     path('palate/', include('apps.palate.urls')),

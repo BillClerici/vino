@@ -187,7 +187,7 @@
     <!-- Stop Cards -->
     <div id="stops-container">
         {% for stop in stops %}
-        <div class="live-stop-card" id="stop-card-{{ forloop.counter0 }}" data-stop-pk="{{ stop.pk }}" data-winery-pk="{{ stop.winery.pk }}"
+        <div class="live-stop-card" id="stop-card-{{ forloop.counter0 }}" data-stop-pk="{{ stop.pk }}" data-winery-pk="{{ stop.winery.pk }}" data-place-type="{{ stop.winery.place_type }}"
              style="{% if forloop.counter0 != current_index %}display:none;{% endif %}">
 
             <div class="stop-hero">
@@ -198,6 +198,9 @@
                     {% if stop.fav_wines %}
                     <span class="stop-badge favs"><i class="material-icons" style="font-size: 0.8rem;">star</i> {{ stop.fav_wines }} fav{{ stop.fav_wines|pluralize }}</span>
                     {% endif %}
+                    <button class="stop-badge undo-checkin-btn" id="undo-btn-{{ forloop.counter0 }}" onclick="event.stopPropagation();undoCheckin({{ forloop.counter0 }}, '{{ stop.pk }}')" style="display:none; cursor:pointer; border:none; background:#fce4ec; color:#c62828; padding:3px 10px; border-radius:12px; font-size:0.72rem; font-weight:700; align-items:center; gap:4px;">
+                        <i class="material-icons" style="font-size: 0.8rem;">undo</i> Undo Check-in
+                    </button>
                 </div>
                 {% if stop.winery.image_url %}
                 <img src="{{ stop.winery.image_url }}" alt="{{ stop.winery.name }}" class="stop-hero-img">
@@ -231,21 +234,28 @@
             <!-- Post-Checkin Content (tabs) -->
             <div id="post-checkin-{{ forloop.counter0 }}" style="display:none;">
                 <div class="live-tabs">
+                    {% if stop.winery.place_type == 'winery' %}
                     <div class="live-tab active" data-tab="wines" data-stop="{{ forloop.counter0 }}" onclick="switchTab({{ forloop.counter0 }}, 'wines')">
                         <i class="material-icons tiny" style="vertical-align: middle;">wine_bar</i> Wines
                     </div>
-                    <div class="live-tab" data-tab="rating" data-stop="{{ forloop.counter0 }}" onclick="switchTab({{ forloop.counter0 }}, 'rating')">
+                    {% elif stop.winery.place_type == 'brewery' %}
+                    <div class="live-tab active" data-tab="wines" data-stop="{{ forloop.counter0 }}" onclick="switchTab({{ forloop.counter0 }}, 'wines')">
+                        <i class="material-icons tiny" style="vertical-align: middle;">sports_bar</i> Beers
+                    </div>
+                    {% endif %}
+                    <div class="live-tab {% if stop.winery.place_type == 'restaurant' or stop.winery.place_type == 'other' %}active{% endif %}" data-tab="rating" data-stop="{{ forloop.counter0 }}" onclick="switchTab({{ forloop.counter0 }}, 'rating')">
                         <i class="material-icons tiny" style="vertical-align: middle;">star</i> Experience
                     </div>
                 </div>
 
-                <!-- Wines Tab -->
+                {% if stop.winery.place_type == 'winery' or stop.winery.place_type == 'brewery' %}
+                <!-- Drinks Tab -->
                 <div class="live-tab-content active" id="tab-wines-{{ forloop.counter0 }}">
-                    <!-- Wine Menu from Website -->
+                    <!-- Menu from Website -->
                     <div id="wine-menu-{{ forloop.counter0 }}" style="display:none; margin-bottom: 12px;">
                         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
                             <span style="font-size:0.82rem;font-weight:600;color:#757575;display:inline-flex;align-items:center;gap:4px;">
-                                <i class="material-icons" style="font-size:1rem;">menu_book</i> Wine Menu
+                                <i class="material-icons" style="font-size:1rem;">menu_book</i> {% if stop.winery.place_type == 'brewery' %}Beer Menu{% else %}Wine Menu{% endif %}
                             </span>
                             <button onclick="loadWineMenu({{ forloop.counter0 }}, true)" style="border:none;background:none;color:#7e57c2;font-size:0.78rem;cursor:pointer;display:inline-flex;align-items:center;gap:2px;">
                                 <i class="material-icons" style="font-size:0.85rem;">refresh</i> Refresh
@@ -254,36 +264,45 @@
                         <div id="wine-menu-cards-{{ forloop.counter0 }}" class="wine-menu-cards">
                             <div style="padding:16px;color:#9e9e9e;font-size:0.82rem;display:flex;align-items:center;gap:6px;">
                                 <div class="preloader-wrapper small active" style="width:18px;height:18px;"><div class="spinner-layer spinner-purple-only"><div class="circle-clipper left"><div class="circle"></div></div></div></div>
-                                Loading wine menu. This may take a few minutes...
+                                Loading menu... This may take a few minutes...
                             </div>
                         </div>
                     </div>
 
                     <div id="wine-list-{{ forloop.counter0 }}">
-                        <!-- Logged wines appear here -->
+                        <!-- Logged drinks appear here -->
                     </div>
                     <button class="add-wine-btn" onclick="showWineForm({{ forloop.counter0 }})">
-                        <i class="material-icons">add_circle_outline</i> Add a Wine
+                        <i class="material-icons">add_circle_outline</i> {% if stop.winery.place_type == 'brewery' %}Add a Beer{% else %}Add a Wine{% endif %}
                     </button>
                     <div class="wine-form" id="wine-form-{{ forloop.counter0 }}" style="display:none;">
                         <div style="display: flex; gap: 10px; margin-bottom: 10px;">
                             <div style="flex: 1;">
-                                <label>Wine Name</label>
-                                <input type="text" id="wf-name-{{ forloop.counter0 }}" placeholder="e.g. Estate Chardonnay">
+                                <label>{% if stop.winery.place_type == 'brewery' %}Beer Name{% else %}Wine Name{% endif %}</label>
+                                <input type="text" id="wf-name-{{ forloop.counter0 }}" placeholder="{% if stop.winery.place_type == 'brewery' %}e.g. Hazy IPA{% else %}e.g. Estate Chardonnay{% endif %}">
                             </div>
                             <div style="width: 80px;">
-                                <label>Vintage</label>
-                                <input type="number" id="wf-vintage-{{ forloop.counter0 }}" placeholder="2022" min="1900" max="2099">
+                                <label>{% if stop.winery.place_type == 'brewery' %}Year{% else %}Vintage{% endif %}</label>
+                                <input type="number" id="wf-vintage-{{ forloop.counter0 }}" placeholder="2024" min="1900" max="2099">
                             </div>
                         </div>
                         <div style="margin-bottom: 10px;">
-                            <label>Wine Type</label>
+                            <label>{% if stop.winery.place_type == 'brewery' %}Beer Style{% else %}Wine Type{% endif %}</label>
                             <div class="type-options" id="wf-type-{{ forloop.counter0 }}">
+                                {% if stop.winery.place_type == 'brewery' %}
+                                <span class="type-opt" style="color:#f57c00;border-color:currentColor;" data-val="IPA" onclick="selectType({{ forloop.counter0 }}, this)">IPA</span>
+                                <span class="type-opt" style="color:#5d4037;border-color:currentColor;" data-val="Stout" onclick="selectType({{ forloop.counter0 }}, this)">Stout</span>
+                                <span class="type-opt" style="color:#fbc02d;border-color:currentColor;" data-val="Lager" onclick="selectType({{ forloop.counter0 }}, this)">Lager</span>
+                                <span class="type-opt" style="color:#e65100;border-color:currentColor;" data-val="Ale" onclick="selectType({{ forloop.counter0 }}, this)">Ale</span>
+                                <span class="type-opt" style="color:#7cb342;border-color:currentColor;" data-val="Sour" onclick="selectType({{ forloop.counter0 }}, this)">Sour</span>
+                                <span class="type-opt other" data-val="Other" onclick="selectType({{ forloop.counter0 }}, this)">Other</span>
+                                {% else %}
                                 <span class="type-opt wine-red" data-val="Red" onclick="selectType({{ forloop.counter0 }}, this)">Red</span>
                                 <span class="type-opt white" data-val="White" onclick="selectType({{ forloop.counter0 }}, this)">White</span>
                                 <span class="type-opt rose" data-val="Rosé" onclick="selectType({{ forloop.counter0 }}, this)">Rosé</span>
                                 <span class="type-opt sparkling" data-val="Sparkling" onclick="selectType({{ forloop.counter0 }}, this)">Sparkling</span>
                                 <span class="type-opt other" data-val="Other" onclick="selectType({{ forloop.counter0 }}, this)">Other</span>
+                                {% endif %}
                             </div>
                         </div>
                         <div style="display: flex; gap: 10px; margin-bottom: 10px;">
@@ -291,9 +310,9 @@
                                 <label>How Did You Have It?</label>
                                 <div class="serving-options" id="wf-serving-{{ forloop.counter0 }}">
                                     <span class="serving-opt selected" data-val="tasting" onclick="selectServing({{ forloop.counter0 }}, this)"><i class="material-icons" style="font-size:0.85rem;">local_bar</i> Tasting</span>
-                                    <span class="serving-opt" data-val="glass" onclick="selectServing({{ forloop.counter0 }}, this)"><i class="material-icons" style="font-size:0.85rem;">wine_bar</i> Glass</span>
+                                    <span class="serving-opt" data-val="glass" onclick="selectServing({{ forloop.counter0 }}, this)"><i class="material-icons" style="font-size:0.85rem;">{% if stop.winery.place_type == 'brewery' %}sports_bar{% else %}wine_bar{% endif %}</i> {% if stop.winery.place_type == 'brewery' %}Pint{% else %}Glass{% endif %}</span>
                                     <span class="serving-opt" data-val="flight" onclick="selectServing({{ forloop.counter0 }}, this)"><i class="material-icons" style="font-size:0.85rem;">view_column</i> Flight</span>
-                                    <span class="serving-opt" data-val="bottle" onclick="selectServing({{ forloop.counter0 }}, this)"><i class="material-icons" style="font-size:0.85rem;">liquor</i> Bottle</span>
+                                    <span class="serving-opt" data-val="bottle" onclick="selectServing({{ forloop.counter0 }}, this)"><i class="material-icons" style="font-size:0.85rem;">liquor</i> {% if stop.winery.place_type == 'brewery' %}Can/Bottle{% else %}Bottle{% endif %}</span>
                                 </div>
                             </div>
                             <div style="width: 80px;">
@@ -327,7 +346,7 @@
                         </div>
                         <div style="margin-bottom: 10px;">
                             <label>Tasting Notes</label>
-                            <textarea id="wf-notes-{{ forloop.counter0 }}" placeholder="Fruity, oaky, dry, sweet... what did you think?"></textarea>
+                            <textarea id="wf-notes-{{ forloop.counter0 }}" placeholder="{% if stop.winery.place_type == 'brewery' %}Hoppy, malty, citrus, smooth... what did you think?{% else %}Fruity, oaky, dry, sweet... what did you think?{% endif %}"></textarea>
                         </div>
                         <div style="margin-bottom: 12px;">
                             <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
@@ -354,7 +373,7 @@
                         </div>
                         <div style="display: flex; gap: 8px;">
                             <button onclick="saveWine({{ forloop.counter0 }})" style="flex:1;padding:10px;border:none;border-radius:8px;background:#7e57c2;color:#fff;font-size:0.88rem;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:4px;">
-                                <i class="material-icons" style="font-size:0.95rem;">add</i> Log Wine
+                                <i class="material-icons" style="font-size:0.95rem;">add</i> {% if stop.winery.place_type == 'brewery' %}Log Beer{% else %}Log Wine{% endif %}
                             </button>
                             <button onclick="hideWineForm({{ forloop.counter0 }})" style="padding:10px 16px;border:1px solid #e0e0e0;border-radius:8px;background:#fff;color:#757575;font-size:0.88rem;cursor:pointer;">
                                 Cancel
@@ -363,8 +382,10 @@
                     </div>
                 </div>
 
+                {% endif %}
+
                 <!-- Experience Tab -->
-                <div class="live-tab-content" id="tab-rating-{{ forloop.counter0 }}">
+                <div class="live-tab-content {% if stop.winery.place_type == 'restaurant' or stop.winery.place_type == 'other' %}active{% endif %}" id="tab-rating-{{ forloop.counter0 }}">
                     <div class="rating-group">
                         <div class="rating-label">Overall Experience</div>
                         <div class="star-rating" data-stop="{{ forloop.counter0 }}" data-field="rating_overall">
@@ -454,6 +475,32 @@ function checkin(stopIndex, stopPk) {
     });
 }
 
+function undoCheckin(stopIndex, stopPk) {
+    if (!confirm('Undo check-in? This will remove your ratings and wine logs for this stop.')) return;
+    api('/trips/' + tripId + '/live/undo-checkin/' + stopPk + '/').then(function(data) {
+        if (data.ok) {
+            delete visitIds[stopIndex];
+            // Hide post-checkin content
+            document.getElementById('post-checkin-' + stopIndex).style.display = 'none';
+            // Hide checked badge, show checkin button
+            document.getElementById('checked-badge-' + stopIndex).style.display = 'none';
+            document.getElementById('checkin-btn-' + stopIndex).style.display = 'flex';
+            // Hide undo button
+            var undoBtn = document.getElementById('undo-btn-' + stopIndex);
+            if (undoBtn) undoBtn.style.display = 'none';
+            // Clear wine list
+            var wineList = document.getElementById('wine-list-' + stopIndex);
+            if (wineList) wineList.innerHTML = '';
+            // Reset progress dot
+            var dot = document.querySelector('.progress-dot[data-index="' + stopIndex + '"]');
+            if (dot) {
+                dot.classList.remove('completed');
+                dot.textContent = 'Stop ' + (stopIndex + 1);
+            }
+        }
+    });
+}
+
 function showPostCheckin(stopIndex, wineryName, timeStr) {
     document.getElementById('checkin-btn-' + stopIndex).style.display = 'none';
     var badge = document.getElementById('checked-badge-' + stopIndex);
@@ -462,6 +509,9 @@ function showPostCheckin(stopIndex, wineryName, timeStr) {
     document.getElementById('post-checkin-' + stopIndex).style.display = 'block';
     var dot = document.querySelector('.progress-dot[data-index="' + stopIndex + '"]');
     if (dot) { dot.classList.add('completed'); dot.textContent = 'Stop ' + (parseInt(dot.dataset.index) + 1); }
+    // Show undo button
+    var undoBtn = document.getElementById('undo-btn-' + stopIndex);
+    if (undoBtn) undoBtn.style.display = 'inline-flex';
     // Auto-load wine menu
     loadWineMenu(stopIndex);
 }
@@ -475,9 +525,12 @@ function loadWineMenu(stopIndex, forceRefresh) {
     var menuSection = document.getElementById('wine-menu-' + stopIndex);
     var cardsContainer = document.getElementById('wine-menu-cards-' + stopIndex);
 
+    // No menu section for restaurants/other
+    if (!menuSection || !cardsContainer) return;
+
     // Show loading
     menuSection.style.display = 'block';
-    cardsContainer.innerHTML = '<div style="padding:16px;color:#9e9e9e;font-size:0.82rem;display:flex;align-items:center;gap:6px;"><div class="preloader-wrapper small active" style="width:18px;height:18px;"><div class="spinner-layer spinner-purple-only"><div class="circle-clipper left"><div class="circle"></div></div></div></div> Loading wine menu. This may take a few minutes...</div>';
+    cardsContainer.innerHTML = '<div style="padding:16px;color:#9e9e9e;font-size:0.82rem;display:flex;align-items:center;gap:6px;"><div class="preloader-wrapper small active" style="width:18px;height:18px;"><div class="spinner-layer spinner-purple-only"><div class="circle-clipper left"><div class="circle"></div></div></div></div> Loading menu... This may take a few minutes...</div>';
 
     var url = '/trips/' + tripId + '/live/wine-menu/' + wineryPk + '/';
     if (forceRefresh) url += '?refresh=1';
@@ -807,15 +860,29 @@ function toggleWineEdit(vwId) {
 
     var stopIndex = card.dataset.stopIndex;
     var d = card.dataset;
-    var servings = ['tasting','glass','flight','bottle'];
-    var types = [{v:'Red',c:'wine-red'},{v:'White',c:'white'},{v:'Rosé',c:'rose'},{v:'Sparkling',c:'sparkling'},{v:'Other',c:'other'}];
+    var stopCard = document.getElementById('stop-card-' + stopIndex);
+    var placeType = stopCard ? stopCard.dataset.placeType : 'winery';
+    var isBeer = placeType === 'brewery';
+
+    var servings = isBeer
+        ? [{v:'tasting',l:'Tasting'},{v:'glass',l:'Pint'},{v:'flight',l:'Flight'},{v:'bottle',l:'Can/Bottle'}]
+        : [{v:'tasting',l:'Tasting'},{v:'glass',l:'Glass'},{v:'flight',l:'Flight'},{v:'bottle',l:'Bottle'}];
+    var types = isBeer
+        ? [{v:'IPA',c:'',s:'color:#f57c00;border-color:currentColor;'},{v:'Stout',c:'',s:'color:#5d4037;border-color:currentColor;'},{v:'Lager',c:'',s:'color:#fbc02d;border-color:currentColor;'},{v:'Ale',c:'',s:'color:#e65100;border-color:currentColor;'},{v:'Sour',c:'',s:'color:#7cb342;border-color:currentColor;'},{v:'Other',c:'other',s:''}]
+        : [{v:'Red',c:'wine-red',s:''},{v:'White',c:'white',s:''},{v:'Rosé',c:'rose',s:''},{v:'Sparkling',c:'sparkling',s:''},{v:'Other',c:'other',s:''}];
+
+    var nameLabel = isBeer ? 'BEER NAME' : 'WINE NAME';
+    var yearLabel = isBeer ? 'YEAR' : 'VINTAGE';
+    var typeLabel = isBeer ? 'BEER STYLE' : 'TYPE';
+    var notesPlaceholder = isBeer ? 'Hoppy, malty, citrus, smooth...' : 'Fruity, oaky, dry, sweet...';
+    var purchaseLabel = isBeer ? 'Bought a Pack/Can?' : 'Bought a Bottle?';
 
     var servHtml = servings.map(function(s) {
-        return '<span class="serving-opt' + (d.servingType === s ? ' selected' : '') + '" data-val="' + s + '" onclick="editSelectServing(this)">' + getServingLabel(s) + '</span>';
+        return '<span class="serving-opt' + (d.servingType === s.v ? ' selected' : '') + '" data-val="' + s.v + '" onclick="editSelectServing(this)">' + s.l + '</span>';
     }).join('');
 
     var typeHtml = types.map(function(t) {
-        return '<span class="type-opt ' + t.c + (d.wineType === t.v ? ' selected' : '') + '" data-val="' + t.v + '" onclick="editSelectType(this)">' + t.v + '</span>';
+        return '<span class="type-opt ' + t.c + (d.wineType === t.v ? ' selected' : '') + '" ' + (t.s ? 'style="' + t.s + '"' : '') + ' data-val="' + t.v + '" onclick="editSelectType(this)">' + t.v + '</span>';
     }).join('');
 
     var starsHtml = '';
@@ -825,20 +892,20 @@ function toggleWineEdit(vwId) {
 
     panel.innerHTML =
         '<div style="display:flex;gap:10px;margin-bottom:8px;">' +
-        '<div style="flex:1;"><label style="font-size:0.78rem;color:#9e9e9e;font-weight:600;">WINE NAME</label><input type="text" class="ve-name" value="' + (d.wineName || '').replace(/"/g,'&quot;') + '" style="width:100%;border:1px solid #e0e0e0;border-radius:6px;padding:6px 8px;font-size:0.85rem;box-sizing:border-box;margin-top:3px;"></div>' +
-        '<div style="width:75px;"><label style="font-size:0.78rem;color:#9e9e9e;font-weight:600;">VINTAGE</label><input type="number" class="ve-vintage" value="' + (d.wineVintage || '') + '" min="1900" max="2099" style="width:100%;border:1px solid #e0e0e0;border-radius:6px;padding:6px 8px;font-size:0.85rem;box-sizing:border-box;margin-top:3px;"></div>' +
+        '<div style="flex:1;"><label style="font-size:0.78rem;color:#9e9e9e;font-weight:600;">' + nameLabel + '</label><input type="text" class="ve-name" value="' + (d.wineName || '').replace(/"/g,'&quot;') + '" style="width:100%;border:1px solid #e0e0e0;border-radius:6px;padding:6px 8px;font-size:0.85rem;box-sizing:border-box;margin-top:3px;"></div>' +
+        '<div style="width:75px;"><label style="font-size:0.78rem;color:#9e9e9e;font-weight:600;">' + yearLabel + '</label><input type="number" class="ve-vintage" value="' + (d.wineVintage || '') + '" min="1900" max="2099" style="width:100%;border:1px solid #e0e0e0;border-radius:6px;padding:6px 8px;font-size:0.85rem;box-sizing:border-box;margin-top:3px;"></div>' +
         '</div>' +
-        '<div style="margin-bottom:8px;"><label style="font-size:0.78rem;color:#9e9e9e;font-weight:600;">TYPE</label><div class="type-options ve-type" style="margin-top:3px;">' + typeHtml + '</div></div>' +
+        '<div style="margin-bottom:8px;"><label style="font-size:0.78rem;color:#9e9e9e;font-weight:600;">' + typeLabel + '</label><div class="type-options ve-type" style="margin-top:3px;">' + typeHtml + '</div></div>' +
         '<div style="display:flex;gap:10px;margin-bottom:8px;align-items:flex-start;">' +
         '<div style="flex:1;"><label style="font-size:0.78rem;color:#9e9e9e;font-weight:600;">SERVING</label><div class="serving-options ve-serving" style="margin-top:3px;">' + servHtml + '</div></div>' +
         '<div style="width:75px;"><label style="font-size:0.78rem;color:#9e9e9e;font-weight:600;">QTY</label><input type="number" class="ve-qty" value="' + (d.quantity || 1) + '" min="1" style="width:100%;border:1px solid #e0e0e0;border-radius:6px;padding:6px 8px;font-size:0.85rem;box-sizing:border-box;margin-top:3px;text-align:center;"></div>' +
         '</div>' +
         '<div style="margin-bottom:8px;"><label style="font-size:0.78rem;color:#9e9e9e;font-weight:600;">RATING</label><div class="wine-mini-stars ve-rating" style="margin-top:3px;">' + starsHtml + '</div></div>' +
-        '<div style="margin-bottom:8px;"><label style="font-size:0.78rem;color:#9e9e9e;font-weight:600;">TASTING NOTES</label><textarea class="ve-notes" style="width:100%;border:1px solid #e0e0e0;border-radius:6px;padding:6px 8px;font-size:0.85rem;font-family:inherit;min-height:50px;box-sizing:border-box;resize:vertical;margin-top:3px;" placeholder="Fruity, oaky, dry, sweet...">' + (d.tastingNotes || '') + '</textarea></div>' +
+        '<div style="margin-bottom:8px;"><label style="font-size:0.78rem;color:#9e9e9e;font-weight:600;">TASTING NOTES</label><textarea class="ve-notes" style="width:100%;border:1px solid #e0e0e0;border-radius:6px;padding:6px 8px;font-size:0.85rem;font-family:inherit;min-height:50px;box-sizing:border-box;resize:vertical;margin-top:3px;" placeholder="' + notesPlaceholder + '">' + (d.tastingNotes || '') + '</textarea></div>' +
         '<div style="margin-bottom:8px;">' +
         '<div style="margin-top:3px;">' +
         '<button type="button" class="ve-purchased-btn" data-active="' + (d.purchased === '1' ? '1' : '0') + '" onclick="toggleEditPurchase(this)" style="display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:16px;border:1.5px solid ' + (d.purchased === '1' ? '#43a047' : '#e0e0e0') + ';background:' + (d.purchased === '1' ? '#e8f5e9' : '#fff') + ';color:' + (d.purchased === '1' ? '#2e7d32' : '#616161') + ';font-size:0.8rem;font-weight:600;cursor:pointer;transition:all 0.15s;">' +
-        '<i class="material-icons" style="font-size:0.9rem;">shopping_bag</i> Bought a Bottle?' +
+        '<i class="material-icons" style="font-size:0.9rem;">shopping_bag</i> ' + purchaseLabel +
         '</button>' +
         '</div>' +
         '<div class="ve-purch-details" style="display:' + (d.purchased === '1' ? 'flex' : 'none') + ';gap:10px;margin-top:6px;">' +
@@ -953,6 +1020,7 @@ function updateWineRating(vwId, stopIndex, rating) {
 }
 
 function removeWine(vwId) {
+    if (!confirm('Delete this item? This cannot be undone.')) return;
     fetch('/trips/' + tripId + '/live/wine/', {
         method: 'DELETE',
         headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },

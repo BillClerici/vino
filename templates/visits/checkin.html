@@ -44,7 +44,7 @@
                         <div class="checkin-header">
                             <i class="material-icons">add_location</i>
                             <h5 style="font-weight: 600; color: #455a64; margin: 8px 0 4px;">Check In</h5>
-                            <p class="grey-text" style="font-size: 0.9rem;">Log your winery visit and rate your experience</p>
+                            <p class="grey-text" style="font-size: 0.9rem;">Log your visit and rate your experience</p>
                         </div>
 
                         {% if form.errors %}
@@ -65,7 +65,7 @@
                                 {% if preselected_winery %}
                                 <input type="hidden" name="winery" value="{{ preselected_winery.pk }}">
                                 <input type="text" value="{{ preselected_winery.name }}" disabled>
-                                <label class="active">Winery</label>
+                                <label class="active">Place</label>
                                 {% else %}
                                 {{ form.winery }}
                                 <label for="{{ form.winery.id_for_label }}" class="active">Winery</label>

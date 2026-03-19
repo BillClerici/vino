@@ -207,7 +207,7 @@
             <a href="{% url 'landing' %}"><i class="material-icons">dashboard</i>Dashboard</a>
         </li>
         <li class="{% if 'winery' in request.resolver_match.url_name %}active{% endif %}">
-            <a href="{% url 'winery_list' %}"><i class="material-icons">explore</i>Wineries</a>
+            <a href="{% url 'winery_list' %}"><i class="material-icons">explore</i>Places</a>
         </li>
         <li class="{% if request.resolver_match.url_name == 'checkin' or 'visit' in request.resolver_match.url_name %}active{% endif %}">
             <a href="{% url 'visit_list' %}"><i class="material-icons">add_location</i>My Visits</a>

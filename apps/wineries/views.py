@@ -194,6 +194,9 @@ class FavoritePlaceView(LoginRequiredMixin, View):
                 elif len(parts) == 2:
                     city = parts[0]
 
+            place_type = body.get("place_type", "winery")
+            if place_type not in dict(Winery.PlaceType.choices):
+                place_type = "winery"
             winery = Winery.objects.create(
                 name=name,
                 address=addr,
@@ -203,6 +206,7 @@ class FavoritePlaceView(LoginRequiredMixin, View):
                 longitude=lng,
                 website=website,
                 image_url=photo_url,
+                place_type=place_type,
             )
         elif photo_url and not winery.image_url:
             winery.image_url = photo_url

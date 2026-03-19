@@ -5,7 +5,14 @@ from apps.core.models import BaseModel
 
 
 class Winery(BaseModel):
+    class PlaceType(models.TextChoices):
+        WINERY = "winery", "Winery"
+        BREWERY = "brewery", "Brewery"
+        RESTAURANT = "restaurant", "Restaurant"
+        OTHER = "other", "Other"
+
     name = models.CharField(max_length=255, db_index=True)
+    place_type = models.CharField(max_length=20, choices=PlaceType.choices, default=PlaceType.WINERY)
     description = models.TextField(blank=True)
 
     # Location

@@ -140,7 +140,7 @@
             <div class="col s6 m3">
                 <div class="card-panel stat-card hoverable">
                     <div class="stat-number teal-text text-darken-1">{{ unique_wineries }}</div>
-                    <div class="stat-label grey-text">Wineries Visited</div>
+                    <div class="stat-label grey-text">Places Visited</div>
                 </div>
             </div>
             <div class="col s6 m3">
@@ -169,7 +169,7 @@
                                 <i class="material-icons deep-purple-text text-lighten-1">add_location</i>
                                 <div class="action-text">
                                     <div class="action-title">Check In</div>
-                                    <div class="action-sub">Log a winery visit</div>
+                                    <div class="action-sub">Log a visit</div>
                                 </div>
                             </a>
                         </div>
@@ -178,7 +178,7 @@
                                 <i class="material-icons teal-text text-lighten-1">explore</i>
                                 <div class="action-text">
                                     <div class="action-title">Explore</div>
-                                    <div class="action-sub">Discover new wineries</div>
+                                    <div class="action-sub">Discover new places</div>
                                 </div>
                             </a>
                         </div>
@@ -230,7 +230,7 @@
                         {% empty %}
                         <div class="center-align" style="padding: 30px 0;">
                             <i class="material-icons medium grey-text text-lighten-1">wine_bar</i>
-                            <p class="grey-text">No check-ins yet. Visit a winery to get started!</p>
+                            <p class="grey-text">No check-ins yet. Visit a place to get started!</p>
                             <a href="{% url 'checkin' %}" class="btn deep-purple lighten-1 waves-effect waves-light" style="margin-top: 8px;">
                                 <i class="material-icons left">add_location</i>First Check-in
                             </a>
@@ -317,7 +317,7 @@
         <!-- Discover Section -->
         {% if discover %}
         <div style="margin-top: 8px;">
-            <div class="section-title"><i class="material-icons">local_fire_department</i> Discover New Wineries</div>
+            <div class="section-title"><i class="material-icons">local_fire_department</i> Discover New Places</div>
             <div class="row">
                 {% for w in discover %}
                 <div class="col s12 m6 l3">
@@ -356,7 +356,7 @@
         <div class="container">
             <div style="font-size: 3.5rem; margin-bottom: 8px;">&#127863;</div>
             <h2>Vino Trip</h2>
-            <p>Your personal wine companion. Discover wineries, log tastings, and plan unforgettable trips with friends.</p>
+            <p>Your personal trip companion. Discover places, log tastings, and plan unforgettable trips with friends.</p>
             <div style="margin-top: 28px;">
                 <a href="{% url 'register' %}" class="btn-large white purple-text text-darken-3 waves-effect" style="margin-right: 8px;">
                     <i class="material-icons left">person_add</i>Get Started
@@ -382,7 +382,7 @@
                 <div class="card-panel feature-card hoverable">
                     <i class="material-icons teal-text">explore</i>
                     <h5>Discover</h5>
-                    <p>Browse wineries, read reviews, and find your next favorite spot.</p>
+                    <p>Browse places, read reviews, and find your next favorite spot.</p>
                 </div>
             </div>
             <div class="col s12 m3">
