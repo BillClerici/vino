@@ -138,11 +138,16 @@
 
 {% block content %}
 <div class="container" style="margin-top: 20px; padding-bottom: 30px; max-width: 95%;">
-    <div style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
+    <div style="margin-bottom: 16px; display: flex; align-items: center; gap: 10px;">
         <a href="{% url 'trip_list' %}" style="display: inline-flex; align-items: center; gap: 5px; border: none; background: #546e7a; border-radius: 18px; padding: 6px 16px; text-decoration: none; font-size: 0.82rem; font-weight: 600; color: #fff; line-height: 1.4; transition: all 0.15s; box-shadow: 0 2px 6px rgba(84,110,122,0.3);" onmouseover="this.style.background='#455a64';this.style.boxShadow='0 3px 10px rgba(84,110,122,0.4)'" onmouseout="this.style.background='#546e7a';this.style.boxShadow='0 2px 6px rgba(84,110,122,0.3)'">
             <i class="material-icons" style="font-size: 1rem;">arrow_back</i> Back
         </a>
-        <button onclick="deleteTrip()" style="display: inline-flex; align-items: center; gap: 5px; border: none; background: #c62828; border-radius: 18px; padding: 6px 16px; cursor: pointer; font-size: 0.82rem; font-weight: 600; color: #fff; line-height: 1.4; transition: all 0.15s; flex-shrink: 0; box-shadow: 0 2px 6px rgba(198,40,40,0.3);" onmouseover="this.style.background='#b71c1c';this.style.boxShadow='0 3px 10px rgba(198,40,40,0.4)'" onmouseout="this.style.background='#c62828';this.style.boxShadow='0 2px 6px rgba(198,40,40,0.3)'">
+        {% if show_start_button %}
+        <a href="{% url 'trip_live' pk=trip.pk %}" style="display: inline-flex; align-items: center; gap: 5px; border: none; background: #7e57c2; border-radius: 18px; padding: 6px 16px; text-decoration: none; font-size: 0.82rem; font-weight: 600; color: #fff; line-height: 1.4; transition: all 0.15s; box-shadow: 0 2px 6px rgba(126,87,194,0.3);" onmouseover="this.style.background='#6a3fb5';this.style.boxShadow='0 3px 10px rgba(126,87,194,0.4)'" onmouseout="this.style.background='#7e57c2';this.style.boxShadow='0 2px 6px rgba(126,87,194,0.3)'">
+            <i class="material-icons" style="font-size: 1rem;">play_arrow</i> {% if trip.status == 'in_progress' %}Continue Trip{% else %}Start Trip{% endif %}
+        </a>
+        {% endif %}
+        <button onclick="deleteTrip()" style="margin-left: auto; display: inline-flex; align-items: center; gap: 5px; border: none; background: #c62828; border-radius: 18px; padding: 6px 16px; cursor: pointer; font-size: 0.82rem; font-weight: 600; color: #fff; line-height: 1.4; transition: all 0.15s; flex-shrink: 0; box-shadow: 0 2px 6px rgba(198,40,40,0.3);" onmouseover="this.style.background='#b71c1c';this.style.boxShadow='0 3px 10px rgba(198,40,40,0.4)'" onmouseout="this.style.background='#c62828';this.style.boxShadow='0 2px 6px rgba(198,40,40,0.3)'">
             <i class="material-icons" style="font-size: 1rem;">delete</i> Delete Trip
         </button>
     </div>
@@ -354,7 +359,7 @@
                                 </div>
                                 {% endif %}
 
-                                <div style="display: flex; align-items: center; margin-top: 6px;">
+                                <div style="display: flex; align-items: center; margin-top: 16px; padding-top: 12px; border-top: 1px solid #f0f0f0;">
                                     <div style="display: flex; gap: 8px;">
                                         <button onclick="saveStopDetails('{{ stop.pk }}')" style="padding: 6px 16px; border-radius: 4px; border: none; background: #7e57c2; color: #fff; font-size: 0.82rem; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
                                             <i class="material-icons" style="font-size: 0.95rem;">save</i> Save

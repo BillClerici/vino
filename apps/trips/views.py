@@ -32,6 +32,17 @@ class TripListView(LoginRequiredMixin, ListView):
             .order_by("-created_at")
         )
 
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        from datetime import date
+        today = date.today()
+        for trip in ctx["trips"]:
+            trip.show_start_button = (
+                trip.status == "in_progress"
+                or (trip.status == "confirmed" and trip.scheduled_date and trip.scheduled_date <= today)
+            )
+        return ctx
+
 
 class TripCreateView(LoginRequiredMixin, View):
     def get(self, request):
@@ -100,6 +111,15 @@ class TripDetailView(LoginRequiredMixin, View):
         for stop in stops:
             stop.has_cached_wines = stop.winery.wines.exists()
 
+        from datetime import date
+        today = date.today()
+        show_start_button = (
+            trip.status == Trip.Status.IN_PROGRESS
+            or (trip.status == Trip.Status.CONFIRMED
+                and trip.scheduled_date
+                and trip.scheduled_date <= today)
+        )
+
         return render(request, "trips/detail.html", {
             "trip": trip,
             "is_member": is_member,
@@ -109,6 +129,7 @@ class TripDetailView(LoginRequiredMixin, View):
             "favorites": favorites,
             "visited": visited,
             "stop_winery_ids": stop_winery_ids,
+            "show_start_button": show_start_button,
         })
 
 

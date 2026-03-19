@@ -47,7 +47,6 @@
     </div>
 
     {% for trip in trips %}
-    <a href="{% url 'trip_detail' pk=trip.pk %}" style="color: inherit;">
         <div class="card trip-card hoverable">
             <div class="card-content">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
@@ -70,7 +69,7 @@
                     </div>
                     <span class="trip-chip {{ trip.status }}">{{ trip.get_status_display }}</span>
                 </div>
-                <div style="margin-top: 10px; display: flex; align-items: center; gap: 16px;">
+                <div style="margin-top: 10px; display: flex; align-items: center; justify-content: space-between;">
                     <div style="display: flex;">
                         {% for tm in trip.trip_members.all|slice:":4" %}
                         <span class="member-avatar" title="{{ tm.display_name }}">
@@ -81,10 +80,19 @@
                         <span class="member-avatar" style="background: #e0e0e0; color: #757575;">+{{ trip.trip_members.count|add:"-4" }}</span>
                         {% endif %}
                     </div>
+                    <div style="display: flex; gap: 8px;">
+                        <a href="{% url 'trip_detail' pk=trip.pk %}" style="display:inline-flex;align-items:center;gap:4px;padding:5px 12px;border-radius:14px;border:1.5px solid #e0e0e0;background:#fff;color:#616161;font-size:0.78rem;font-weight:600;text-decoration:none;transition:all 0.15s;" onmouseover="this.style.borderColor='#7e57c2';this.style.color='#7e57c2'" onmouseout="this.style.borderColor='#e0e0e0';this.style.color='#616161'">
+                            <i class="material-icons" style="font-size:0.9rem;">edit</i> Trip Details
+                        </a>
+                        {% if trip.show_start_button %}
+                        <a href="{% url 'trip_live' pk=trip.pk %}" style="display:inline-flex;align-items:center;gap:4px;padding:5px 12px;border-radius:14px;border:none;background:#7e57c2;color:#fff;font-size:0.78rem;font-weight:600;text-decoration:none;transition:all 0.15s;box-shadow:0 2px 6px rgba(126,87,194,0.3);" onmouseover="this.style.background='#6a3fb5'" onmouseout="this.style.background='#7e57c2'">
+                            <i class="material-icons" style="font-size:0.9rem;">play_arrow</i> {% if trip.status == 'in_progress' %}Continue Trip{% else %}Start Trip{% endif %}
+                        </a>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
         </div>
-    </a>
     {% empty %}
     <div class="center-align" style="padding: 60px 0;">
         <i class="material-icons large grey-text text-lighten-1">map</i>
