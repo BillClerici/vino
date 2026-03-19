@@ -1,6 +1,7 @@
 import json as _json
 from decimal import Decimal
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -130,6 +131,7 @@ class TripDetailView(LoginRequiredMixin, View):
             "visited": visited,
             "stop_place_ids": stop_place_ids,
             "show_start_button": show_start_button,
+            "google_maps_api_key": settings.GOOGLE_MAPS_API_KEY,
         })
 
 
@@ -674,6 +676,7 @@ class LiveTripView(LoginRequiredMixin, View):
             "stops": stops,
             "current_index": current_index,
             "stop_visits_json": json.dumps(stop_visits_json),
+            "google_maps_api_key": settings.GOOGLE_MAPS_API_KEY,
         })
 
 

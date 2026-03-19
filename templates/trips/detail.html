@@ -114,6 +114,17 @@
     .sortable-ghost { opacity: 0.3; }
     .sortable-chosen { box-shadow: 0 4px 16px rgba(0,0,0,0.15); }
 
+    /* Route map */
+    #route-map { width: 100%; height: 350px; border-radius: 8px; }
+
+    /* Distance between stops */
+    .distance-card {
+        display: flex; align-items: center; justify-content: center; gap: 8px;
+        padding: 6px 0; color: #9e9e9e; font-size: 0.78rem;
+    }
+    .distance-card i { font-size: 0.9rem; }
+    .distance-card .distance-line { flex: 1; height: 1px; background: #e0e0e0; max-width: 60px; }
+
     /* Wine menu in stop details */
     .wine-menu-cards-detail::-webkit-scrollbar { height: 10px; }
     .wine-menu-cards-detail::-webkit-scrollbar-track { background: #f5f5f5; border-radius: 5px; }
@@ -267,7 +278,14 @@
 
                     <div id="stops-list" style="margin-top: 16px;">
                         {% for stop in stops %}
-                        <div class="stop-card" data-stop-id="{{ stop.pk }}" data-place-id="{{ stop.place.pk }}" >
+                        {% if not forloop.first %}
+                        <div class="distance-card" id="distance-{{ forloop.counter0 }}">
+                            <div class="distance-line"></div>
+                            <i class="material-icons">more_vert</i>
+                            <div class="distance-line"></div>
+                        </div>
+                        {% endif %}
+                        <div class="stop-card" data-stop-id="{{ stop.pk }}" data-place-id="{{ stop.place.pk }}" data-lat="{{ stop.place.latitude|default:'' }}" data-lng="{{ stop.place.longitude|default:'' }}">
                             <div class="stop-header" onclick="toggleStopDetails(this)" style="cursor: pointer;">
                                 <div class="drag-handle" title="Drag to reorder" onclick="event.stopPropagation()"><i class="material-icons">drag_indicator</i></div>
                                 <div class="stop-number">{{ stop.order }}</div>
@@ -387,6 +405,18 @@
 
                 </div>
             </div>
+
+            <!-- Route Map -->
+            {% if stops %}
+            <div class="card" style="border-radius: 8px;">
+                <div class="card-content">
+                    <span class="card-title" style="font-size: 1.1rem; font-weight: 600; color: #455a64; margin-bottom: 12px; display: inline-flex; align-items: center; gap: 6px;">
+                        <i class="material-icons">map</i> Route Map
+                    </span>
+                    <div id="route-map"></div>
+                </div>
+            </div>
+            {% endif %}
 
             <!-- Members -->
             <div class="card" style="border-radius: 8px;">
@@ -623,7 +653,10 @@ function setupDragAndDrop() {
                 if (orderInput) orderInput.value = num;
                 order.push({ stop_id: card.dataset.stopId, order: num });
             });
-            api('/trips/' + tripId + '/reorder/', { stops: order });
+            api('/trips/' + tripId + '/reorder/', { stops: order }).then(function() {
+                calcDistances();
+                refreshRouteMap();
+            });
         }
     });
 }
@@ -952,5 +985,160 @@ function renderStopWineMenuCards(container, wines) {
         container.appendChild(card);
     });
 }
+
+// ── Distance Between Stops (Routes API) ──
+function calcDistances() {
+    var list = document.getElementById('stops-list');
+    // Remove existing distance cards
+    list.querySelectorAll('.distance-card').forEach(function(dc) { dc.remove(); });
+
+    var stops = list.querySelectorAll('.stop-card');
+    if (stops.length < 2) return;
+
+    // Insert fresh distance cards between each stop
+    for (var d = 1; d < stops.length; d++) {
+        var dc = document.createElement('div');
+        dc.className = 'distance-card';
+        dc.id = 'distance-' + d;
+        dc.innerHTML = '<div class="distance-line"></div><i class="material-icons" style="font-size:0.85rem;color:#e0e0e0;">more_vert</i><div class="distance-line"></div>';
+        stops[d].parentNode.insertBefore(dc, stops[d]);
+    }
+
+    var coords = [];
+    stops.forEach(function(card) {
+        var lat = parseFloat(card.dataset.lat);
+        var lng = parseFloat(card.dataset.lng);
+        coords.push((!isNaN(lat) && !isNaN(lng)) ? { lat: lat, lng: lng } : null);
+    });
+
+    var apiKey = '{{ google_maps_api_key }}';
+    if (!apiKey) return;
+
+    for (var i = 0; i < coords.length - 1; i++) {
+        (function(idx) {
+            if (!coords[idx] || !coords[idx + 1]) return;
+            var distCard = document.getElementById('distance-' + (idx + 1));
+            if (!distCard) return;
+
+            fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Goog-Api-Key': apiKey,
+                    'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration'
+                },
+                body: JSON.stringify({
+                    origin: { location: { latLng: { latitude: coords[idx].lat, longitude: coords[idx].lng } } },
+                    destination: { location: { latLng: { latitude: coords[idx + 1].lat, longitude: coords[idx + 1].lng } } },
+                    travelMode: 'DRIVE'
+                })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.routes && data.routes.length > 0) {
+                    var route = data.routes[0];
+                    var meters = route.distanceMeters || 0;
+                    var miles = (meters / 1609.34).toFixed(1);
+                    var seconds = parseInt(route.duration) || 0;
+                    var mins = Math.round(seconds / 60);
+                    var timeStr = mins >= 60 ? Math.floor(mins / 60) + ' hr ' + (mins % 60) + ' min' : mins + ' min';
+
+                    distCard.innerHTML =
+                        '<div class="distance-line"></div>' +
+                        '<i class="material-icons" style="font-size:0.85rem;">directions_car</i>' +
+                        '<span>' + miles + ' mi</span>' +
+                        '<span style="color:#bdbdbd;">·</span>' +
+                        '<span>' + timeStr + '</span>' +
+                        '<div class="distance-line"></div>';
+                }
+            })
+            .catch(function() {});
+        })(i);
+    }
+}
+
+// ── Route Map ──
+var routeMap = null;
+function initRouteMap() {
+    var mapEl = document.getElementById('route-map');
+    if (!mapEl) return;
+
+    var stops = document.querySelectorAll('#stops-list .stop-card');
+    var coords = [];
+    var labels = [];
+    stops.forEach(function(card, idx) {
+        var lat = parseFloat(card.dataset.lat);
+        var lng = parseFloat(card.dataset.lng);
+        if (!isNaN(lat) && !isNaN(lng)) {
+            coords.push({ lat: lat, lng: lng });
+            labels.push({ num: idx + 1, name: card.querySelector('.stop-number').nextElementSibling.nextElementSibling.querySelector('span').textContent || ('Stop ' + (idx + 1)) });
+        }
+    });
+
+    if (coords.length === 0) { mapEl.style.display = 'none'; return; }
+
+    routeMap = new google.maps.Map(mapEl, {
+        center: coords[0],
+        zoom: 10,
+        mapId: '374457006826d906d63af582',
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: true,
+    });
+
+    var bounds = new google.maps.LatLngBounds();
+
+    // Add markers for each stop
+    coords.forEach(function(pos, idx) {
+        bounds.extend(pos);
+        var pinDiv = document.createElement('div');
+        pinDiv.style.cssText = 'width:28px;height:28px;border-radius:50%;background:#7e57c2;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.75rem;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);';
+        pinDiv.textContent = idx + 1;
+        new google.maps.marker.AdvancedMarkerElement({
+            map: routeMap,
+            position: pos,
+            title: labels[idx] ? labels[idx].name : 'Stop ' + (idx + 1),
+            content: pinDiv,
+        });
+    });
+
+    // Draw polyline connecting stops
+    if (coords.length > 1) {
+        new google.maps.Polyline({
+            path: coords,
+            geodesic: true,
+            strokeColor: '#7e57c2',
+            strokeOpacity: 0.8,
+            strokeWeight: 3,
+            map: routeMap,
+        });
+    }
+
+    routeMap.fitBounds(bounds);
+    google.maps.event.addListenerOnce(routeMap, 'bounds_changed', function() {
+        if (routeMap.getZoom() > 14) routeMap.setZoom(14);
+    });
+}
+
+function refreshRouteMap() {
+    if (routeMap) initRouteMap();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    calcDistances();
+});
 </script>
+{% if google_maps_api_key %}
+<script>
+(g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]);for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.googleapis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?console.warn(p+" only loads once."):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({
+    key: "{{ google_maps_api_key }}",
+    v: "weekly"
+});
+google.maps.importLibrary("maps").then(function() {
+    return google.maps.importLibrary("marker");
+}).then(function() {
+    initRouteMap();
+});
+</script>
+{% endif %}
 {% endblock %}

@@ -4,7 +4,7 @@
 
 {% block extra_css %}
 <style>
-    .progress-bar { display: flex; align-items: center; justify-content: center; padding: 16px 0; gap: 0; flex-wrap: nowrap; overflow-x: auto; }
+    .progress-bar { display: flex; align-items: center; justify-content: center; padding: 0; gap: 0; flex-wrap: nowrap; overflow: visible; }
     .progress-step { display: flex; align-items: center; flex-shrink: 0; }
     .progress-dot {
         padding: 4px 12px; border-radius: 14px;
@@ -15,7 +15,7 @@
     .progress-dot.completed { background: #43a047; border-color: #43a047; color: #fff; }
     .progress-dot.current { background: #7e57c2; border-color: #7e57c2; color: #fff; }
     .progress-dot.upcoming { background: #f5f5f5; border-color: #e0e0e0; color: #bdbdbd; }
-    .progress-dot.active-stop { transform: scale(1.2); box-shadow: 0 3px 10px rgba(126,87,194,0.4); background: #7e57c2 !important; border-color: #7e57c2 !important; color: #fff !important; }
+    .progress-dot.active-stop { box-shadow: 0 3px 10px rgba(126,87,194,0.5); background: #7e57c2 !important; border-color: #7e57c2 !important; color: #fff !important; }
     .progress-line { width: 28px; height: 2px; background: #e0e0e0; flex-shrink: 0; }
     .progress-line.completed { background: #43a047; }
 
@@ -148,40 +148,88 @@
     .wine-menu-card .wmc-detail { font-size: 0.72rem; color: #9e9e9e; }
     .wine-menu-card .wmc-desc { font-size: 0.7rem; color: #bdbdbd; margin-top: 4px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 
-    /* Nav */
-    .live-nav { display: flex; gap: 12px; padding: 16px 0 30px; }
-    .live-nav button { flex: 1; padding: 14px; border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: none; transition: all 0.15s; }
-    .nav-prev { background: #546e7a; color: #fff; box-shadow: 0 3px 10px rgba(84,110,122,0.3); }
+    /* Nav buttons (inline with progress bar) */
+    .nav-btn {
+        padding: 8px 18px; border-radius: 18px; font-size: 0.85rem; font-weight: 600;
+        cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
+        border: none; transition: all 0.15s; flex-shrink: 0;
+    }
+    .nav-prev { background: #546e7a; color: #fff; }
     .nav-prev:hover { background: #455a64; }
-    .nav-prev:disabled { opacity: 0.35; cursor: default; box-shadow: none; }
-    .nav-next { background: #7e57c2; color: #fff; box-shadow: 0 3px 10px rgba(126,87,194,0.3); }
+    .nav-prev:disabled { opacity: 0.35; cursor: default; }
+    .nav-next { background: #7e57c2; color: #fff; }
     .nav-next:hover { background: #6a3fb5; }
-    .nav-complete { background: #43a047; color: #fff; box-shadow: 0 3px 10px rgba(67,160,71,0.3); }
+    .nav-complete { background: #43a047; color: #fff; }
     .nav-complete:hover { background: #388e3c; }
+
+    /* Route map */
+    #live-route-map { width: 100%; height: 300px; border-radius: 8px; }
+    .trip-stats {
+        display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+        padding: 8px 16px; background: #f5f5f5; border-radius: 8px; margin-bottom: 8px;
+        font-size: 0.82rem; color: #616161;
+    }
+    .trip-stats .stat-item { display: inline-flex; align-items: center; gap: 4px; }
+    .trip-stats .stat-item i { font-size: 0.9rem; color: #9e9e9e; }
+    .next-stop-distance {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 3px 10px; border-radius: 12px; font-size: 0.72rem; font-weight: 700;
+        background: #ede7f6; color: #7e57c2;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container" style="margin-top: 12px; padding-bottom: 30px; max-width: 95%;">
 
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+    <div style="margin-bottom: 8px;">
         <a href="{% url 'trip_detail' pk=trip.pk %}" style="display: inline-flex; align-items: center; gap: 5px; background: #546e7a; border-radius: 18px; padding: 6px 16px; text-decoration: none; font-size: 0.82rem; font-weight: 600; color: #fff; line-height: 1.4;">
             <i class="material-icons" style="font-size: 1rem;">arrow_back</i> Trip Details
         </a>
-        <span style="font-weight: 700; font-size: 1.1rem; color: #455a64;">{{ trip.name }}</span>
     </div>
 
-    <!-- Progress Bar -->
-    <div class="progress-bar" id="progress-bar">
-        {% for stop in stops %}
-        <div class="progress-step">
-            {% if not forloop.first %}<div class="progress-line {% if forloop.counter0 <= current_index %}completed{% endif %}"></div>{% endif %}
-            <div class="progress-dot {% if forloop.counter0 < current_index %}completed{% elif forloop.counter0 == current_index %}current{% else %}upcoming{% endif %}{% if forloop.counter0 == current_index %} active-stop{% endif %}"
-                 data-index="{{ forloop.counter0 }}" onclick="goToStop({{ forloop.counter0 }})" title="{{ stop.place.name }}">
-                Stop {{ forloop.counter }}
-            </div>
+    <!-- Trip Stats (next stop distance) -->
+    <div class="trip-stats" id="trip-stats">
+        <div class="stat-item"><i class="material-icons">place</i> {{ stops|length }} stop{{ stops|length|pluralize }}</div>
+        <div class="stat-item" id="next-stop-info" style="display:none;">
+            <i class="material-icons">directions_car</i> Next: <span id="next-stop-dist"></span>
         </div>
-        {% endfor %}
+        <span style="flex: 1; text-align: center; font-weight: 700; font-size: 1.1rem; color: #455a64;">{{ trip.name }}</span>
+        <button id="btn-route-map" onclick="toggleRouteMap()" style="display:inline-flex;align-items:center;gap:4px;padding:4px 12px;border-radius:14px;border:1.5px solid #7e57c2;background:#fff;color:#7e57c2;font-size:0.75rem;font-weight:600;cursor:pointer;transition:all 0.15s;" onmouseover="this.style.background='#ede7f6'" onmouseout="this.style.background='#fff'">
+            <i class="material-icons" style="font-size:0.85rem;">map</i> Show Route Map
+        </button>
+    </div>
+
+    <!-- Route Map (hidden by default) -->
+    <div id="route-map-container" style="display: none; margin-bottom: 12px;">
+        <div id="live-route-map"></div>
+    </div>
+
+    <!-- Progress Bar with Nav -->
+    <div style="display: flex; align-items: center; gap: 16px; padding: 12px 0; min-height: 44px;">
+        <button class="nav-btn nav-prev" id="btn-prev" onclick="navigate('prev')" {% if current_index == 0 %}disabled{% endif %}>
+            <i class="material-icons" style="font-size: 0.9rem;">chevron_left</i> Prev
+        </button>
+        <div class="progress-bar" id="progress-bar" style="flex: 1; padding: 0;">
+            {% for stop in stops %}
+            <div class="progress-step">
+                {% if not forloop.first %}<div class="progress-line {% if forloop.counter0 <= current_index %}completed{% endif %}"></div>{% endif %}
+                <div class="progress-dot {% if forloop.counter0 < current_index %}completed{% elif forloop.counter0 == current_index %}current{% else %}upcoming{% endif %}{% if forloop.counter0 == current_index %} active-stop{% endif %}"
+                     data-index="{{ forloop.counter0 }}" onclick="goToStop({{ forloop.counter0 }})" title="{{ stop.place.name }}">
+                    Stop {{ forloop.counter }}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% if current_index >= stops|length|add:"-1" %}
+        <button class="nav-btn nav-complete" id="btn-next" onclick="completeTrip()">
+            <i class="material-icons" style="font-size: 0.9rem;">flag</i> Complete
+        </button>
+        {% else %}
+        <button class="nav-btn nav-next" id="btn-next" onclick="navigate('next')">
+            Next <i class="material-icons" style="font-size: 0.9rem;">chevron_right</i>
+        </button>
+        {% endif %}
     </div>
 
     <!-- Stop Cards -->
@@ -422,21 +470,7 @@
         {% endfor %}
     </div>
 
-    <!-- Navigation -->
-    <div class="live-nav">
-        <button class="nav-prev" id="btn-prev" onclick="navigate('prev')" {% if current_index == 0 %}disabled{% endif %}>
-            <i class="material-icons">chevron_left</i> Previous
-        </button>
-        {% if current_index >= stops|length|add:"-1" %}
-        <button class="nav-complete" id="btn-next" onclick="completeTrip()">
-            <i class="material-icons">flag</i> Complete Trip
-        </button>
-        {% else %}
-        <button class="nav-next" id="btn-next" onclick="navigate('next')">
-            Next Stop <i class="material-icons">chevron_right</i>
-        </button>
-        {% endif %}
-    </div>
+    <div style="padding-bottom: 30px;"></div>
 </div>
 {% endblock %}
 
@@ -1061,12 +1095,12 @@ function showStop(index) {
     document.getElementById('btn-prev').disabled = (index === 0);
     var btnNext = document.getElementById('btn-next');
     if (index >= totalStops - 1) {
-        btnNext.className = 'nav-complete';
-        btnNext.innerHTML = '<i class="material-icons">flag</i> Complete Trip';
+        btnNext.className = 'nav-btn nav-complete';
+        btnNext.innerHTML = '<i class="material-icons" style="font-size:0.9rem;">flag</i> Complete';
         btnNext.onclick = completeTrip;
     } else {
-        btnNext.className = 'nav-next';
-        btnNext.innerHTML = 'Next Stop <i class="material-icons">chevron_right</i>';
+        btnNext.className = 'nav-btn nav-next';
+        btnNext.innerHTML = 'Next <i class="material-icons" style="font-size:0.9rem;">chevron_right</i>';
         btnNext.onclick = function() { navigate('next'); };
     }
     currentIndex = index;
@@ -1136,5 +1170,180 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+
+// ── Route Map & Distance ──
+var liveRouteMap = null;
+var stopCoords = [];
+var routeMarkers = []; // store marker pin divs for color updates
+
+function getStopCoords() {
+    var coords = [];
+    document.querySelectorAll('.live-stop-card').forEach(function(card) {
+        var lat = parseFloat(card.dataset.stopPk ? card.closest('#stops-container').querySelector('[data-stop-pk="' + card.dataset.stopPk + '"]') : null);
+        coords.push(null);
+    });
+    // Re-read from data attributes
+    coords = [];
+    {% for stop in stops %}
+    coords.push({% if stop.place.latitude and stop.place.longitude %}{ lat: {{ stop.place.latitude }}, lng: {{ stop.place.longitude }}, name: "{{ stop.place.name|escapejs }}" }{% else %}null{% endif %});
+    {% endfor %}
+    return coords;
+}
+
+var mapsReady = false;
+
+function toggleRouteMap() {
+    var container = document.getElementById('route-map-container');
+    var btn = document.getElementById('btn-route-map');
+    if (container.style.display === 'none') {
+        container.style.display = 'block';
+        btn.innerHTML = '<i class="material-icons" style="font-size:0.9rem;">map</i> Hide Route Map';
+        if (!liveRouteMap) {
+            if (mapsReady) {
+                initLiveRouteMap();
+            } else {
+                var check = setInterval(function() {
+                    if (mapsReady) { clearInterval(check); initLiveRouteMap(); }
+                }, 200);
+            }
+        }
+    } else {
+        container.style.display = 'none';
+        btn.innerHTML = '<i class="material-icons" style="font-size:0.9rem;">map</i> Show Route Map';
+    }
+}
+
+function initLiveRouteMap() {
+    var mapEl = document.getElementById('live-route-map');
+    if (!mapEl) return;
+
+    var coords = getStopCoords();
+    var validCoords = coords.filter(function(c) { return c !== null; });
+    if (validCoords.length === 0) return;
+
+    liveRouteMap = new google.maps.Map(mapEl, {
+        center: validCoords[0],
+        zoom: 10,
+        mapId: '374457006826d906d63af582',
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: true,
+    });
+
+    var bounds = new google.maps.LatLngBounds();
+
+    routeMarkers = [];
+    coords.forEach(function(pos, idx) {
+        if (!pos) return;
+        bounds.extend(pos);
+        var pinDiv = document.createElement('div');
+        var isActive = idx === currentIndex;
+        pinDiv.style.cssText = 'width:28px;height:28px;border-radius:50%;background:' + (isActive ? '#7e57c2' : (visitIds[idx] ? '#43a047' : '#9e9e9e')) + ';color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.75rem;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);' + (isActive ? 'transform:scale(1.2);' : '');
+        pinDiv.textContent = idx + 1;
+        routeMarkers[idx] = pinDiv;
+        new google.maps.marker.AdvancedMarkerElement({
+            map: liveRouteMap,
+            position: pos,
+            title: pos.name,
+            content: pinDiv,
+        });
+    });
+
+    if (validCoords.length > 1) {
+        new google.maps.Polyline({
+            path: validCoords,
+            geodesic: true,
+            strokeColor: '#7e57c2',
+            strokeOpacity: 0.8,
+            strokeWeight: 3,
+            map: liveRouteMap,
+        });
+    }
+
+    liveRouteMap.fitBounds(bounds);
+    google.maps.event.addListenerOnce(liveRouteMap, 'bounds_changed', function() {
+        if (liveRouteMap.getZoom() > 14) liveRouteMap.setZoom(14);
+    });
+}
+
+// Calculate distance to next stop
+function calcNextStopDistance() {
+    var coords = getStopCoords();
+    if (currentIndex >= coords.length - 1) {
+        document.getElementById('next-stop-info').style.display = 'none';
+        return;
+    }
+    var from = coords[currentIndex];
+    var to = coords[currentIndex + 1];
+    if (!from || !to) {
+        document.getElementById('next-stop-info').style.display = 'none';
+        return;
+    }
+
+    var apiKey = '{{ google_maps_api_key }}';
+    if (!apiKey) return;
+
+    fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Key': apiKey,
+            'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration'
+        },
+        body: JSON.stringify({
+            origin: { location: { latLng: { latitude: from.lat, longitude: from.lng } } },
+            destination: { location: { latLng: { latitude: to.lat, longitude: to.lng } } },
+            travelMode: 'DRIVE'
+        })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.routes && data.routes.length > 0) {
+            var route = data.routes[0];
+            var miles = (route.distanceMeters / 1609.34).toFixed(1);
+            var mins = Math.round(parseInt(route.duration) / 60);
+            var timeStr = mins >= 60 ? Math.floor(mins / 60) + ' hr ' + (mins % 60) + ' min' : mins + ' min';
+            document.getElementById('next-stop-dist').textContent = miles + ' mi · ' + timeStr;
+            document.getElementById('next-stop-info').style.display = 'inline-flex';
+        }
+    })
+    .catch(function() {});
+}
+
+// Recalc on navigation
+function updateRouteMarkers() {
+    routeMarkers.forEach(function(pinDiv, idx) {
+        if (!pinDiv) return;
+        var isActive = idx === currentIndex;
+        var isChecked = !!visitIds[idx];
+        var color = isActive ? '#7e57c2' : (isChecked ? '#43a047' : '#9e9e9e');
+        pinDiv.style.background = color;
+        pinDiv.style.transform = isActive ? 'scale(1.2)' : 'scale(1)';
+        pinDiv.style.boxShadow = isActive ? '0 3px 10px rgba(126,87,194,0.5)' : '0 2px 6px rgba(0,0,0,0.3)';
+    });
+}
+
+var origShowStop = showStop;
+showStop = function(index) {
+    origShowStop(index);
+    calcNextStopDistance();
+    updateRouteMarkers();
+};
+
+// Initial calc
+calcNextStopDistance();
 </script>
+{% if google_maps_api_key %}
+<script>
+(g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]);for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.googleapis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?console.warn(p+" only loads once."):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({
+    key: "{{ google_maps_api_key }}",
+    v: "weekly"
+});
+google.maps.importLibrary("maps").then(function() {
+    return google.maps.importLibrary("marker");
+}).then(function() {
+    mapsReady = true;
+});
+</script>
+{% endif %}
 {% endblock %}
