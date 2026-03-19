@@ -220,16 +220,35 @@
         </li>
 
         {% if user.is_superuser %}
-        <!-- Admin section — superusers only, expanded by default -->
+        <!-- App Admin section -->
         <li><div class="divider"></div></li>
         <li class="no-padding">
             <ul class="collapsible collapsible-accordion">
-                <li class="admin-collapsible active">
+                <li class="admin-collapsible {% if 'admin_places' in request.resolver_match.url_name %}active{% endif %}">
                     <a class="collapsible-header">
-                        <i class="material-icons">admin_panel_settings</i>Admin
+                        <i class="material-icons">apps</i>App Admin
                         <i class="material-icons right" style="margin-left:auto;">expand_more</i>
                     </a>
-                    <div class="collapsible-body" style="display: block;">
+                    <div class="collapsible-body" {% if 'admin_places' in request.resolver_match.url_name %}style="display: block;"{% endif %}>
+                        <ul>
+                            <li class="{% if request.resolver_match.url_name == 'admin_places_list' %}active{% endif %}">
+                                <a href="{% url 'admin_places_list' %}"><i class="material-icons">place</i>Places</a>
+                            </li>
+                        </ul>
+                    </div>
+                </li>
+            </ul>
+        </li>
+
+        <!-- Sys Admin section -->
+        <li class="no-padding">
+            <ul class="collapsible collapsible-accordion">
+                <li class="admin-collapsible {% if 'admin_users' in request.resolver_match.url_name or 'admin_roles' in request.resolver_match.url_name or 'admin_controlpoints' in request.resolver_match.url_name or 'admin_cpgroups' in request.resolver_match.url_name or 'admin_lookups' in request.resolver_match.url_name or request.resolver_match.url_name == 'app_settings' %}active{% endif %}">
+                    <a class="collapsible-header">
+                        <i class="material-icons">admin_panel_settings</i>Sys Admin
+                        <i class="material-icons right" style="margin-left:auto;">expand_more</i>
+                    </a>
+                    <div class="collapsible-body" {% if 'admin_users' in request.resolver_match.url_name or 'admin_roles' in request.resolver_match.url_name or 'admin_controlpoints' in request.resolver_match.url_name or 'admin_cpgroups' in request.resolver_match.url_name or 'admin_lookups' in request.resolver_match.url_name or request.resolver_match.url_name == 'app_settings' %}style="display: block;"{% endif %}>
                         <ul>
                             <li class="{% if request.resolver_match.url_name == 'app_settings' %}active{% endif %}">
                                 <a href="{% url 'app_settings' %}"><i class="material-icons">settings</i>App Settings</a>
@@ -296,13 +315,12 @@
             // Initialize sidenav
             var sidenavInstance = M.Sidenav.init(sidenavEl);
 
-            // Initialize collapsible + force admin open
+            // Initialize collapsible — only open sections with active child
             M.Collapsible.init(document.querySelectorAll('.collapsible'));
-            var adminColl = document.querySelector('.admin-collapsible');
-            if (adminColl) {
-                var ci = M.Collapsible.getInstance(adminColl.closest('.collapsible'));
+            document.querySelectorAll('.admin-collapsible.active').forEach(function(el) {
+                var ci = M.Collapsible.getInstance(el.closest('.collapsible'));
                 if (ci) ci.open(0);
-            }
+            });
 
             // State
             var pinBtn = document.getElementById('pin-nav-btn');

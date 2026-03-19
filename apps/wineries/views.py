@@ -2,15 +2,16 @@ import json
 
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.db.models import Avg, Count, Max, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse, reverse_lazy
 from django.views import View
-from django.views.generic import ListView
+from django.views.generic import CreateView, ListView, UpdateView
 
 from apps.visits.models import VisitLog
-from apps.wineries.forms import WineForm, WineryForm
+from apps.wineries.forms import PlaceAdminForm, WineForm, WineryForm
 from apps.wineries.models import FavoriteWinery, Winery
 
 
@@ -207,10 +208,23 @@ class FavoritePlaceView(LoginRequiredMixin, View):
                 website=website,
                 image_url=photo_url,
                 place_type=place_type,
+                phone=body.get("phone", ""),
+                description=body.get("description", ""),
             )
-        elif photo_url and not winery.image_url:
-            winery.image_url = photo_url
-            winery.save(update_fields=["image_url", "updated_at"])
+        else:
+            # Update existing place with any missing data
+            changed = []
+            if photo_url and not winery.image_url:
+                winery.image_url = photo_url
+                changed.append("image_url")
+            if body.get("phone") and not winery.phone:
+                winery.phone = body["phone"]
+                changed.append("phone")
+            if body.get("description") and not winery.description:
+                winery.description = body["description"]
+                changed.append("description")
+            if changed:
+                winery.save(update_fields=changed + ["updated_at"])
 
         # Toggle favorite
         fav, created = FavoriteWinery.all_objects.get_or_create(
@@ -323,4 +337,219 @@ class WineCreateView(LoginRequiredMixin, View):
         return render(request, "wineries/wine_form.html", {
             "form": form,
             "winery": winery,
+        })
+
+
+# ── App Admin: Places CRUD ──
+
+class AppAdminRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
+    def test_func(self):
+        return self.request.user.is_superuser
+
+
+class PlaceAdminListView(AppAdminRequiredMixin, ListView):
+    model = Winery
+    template_name = "admin/list.html"
+
+    def get_queryset(self):
+        return Winery.all_objects.all().order_by("name")
+
+    def get_context_data(self, **kwargs):
+        from django.utils.safestring import mark_safe
+
+        ctx = super().get_context_data(**kwargs)
+        ctx["page_title"] = "Places"
+        ctx["icon"] = "place"
+        ctx["create_url"] = reverse("admin_places_create")
+        ctx["columns"] = ["", "Name", "Type", "City", "State", "Website", "Active"]
+        ctx["rows"] = [
+            {
+                "values": [
+                    mark_safe(
+                        f'<img src="{w.image_url}" style="width:36px;height:36px;border-radius:6px;object-fit:cover;">'
+                        if w.image_url else
+                        '<div style="width:36px;height:36px;border-radius:6px;background:#ede7f6;display:flex;align-items:center;justify-content:center;">'
+                        '<i class="material-icons" style="color:#7e57c2;font-size:1.1rem;">place</i></div>'
+                    ),
+                    w.name,
+                    w.get_place_type_display(),
+                    w.city or "—",
+                    w.state or "—",
+                    w.website[:40] + "..." if len(w.website) > 40 else (w.website or "—"),
+                    "Yes" if w.is_active else "No",
+                ],
+                "edit_url": reverse("admin_places_edit", args=[w.pk]),
+                "delete_url": reverse("admin_places_delete", args=[w.pk]),
+            }
+            for w in ctx["object_list"]
+        ]
+        return ctx
+
+
+class PlaceAdminCreateView(AppAdminRequiredMixin, CreateView):
+    model = Winery
+    form_class = PlaceAdminForm
+    template_name = "admin/form.html"
+    success_url = reverse_lazy("admin_places_list")
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["page_title"] = "Create Place"
+        ctx["icon"] = "add_business"
+        ctx["cancel_url"] = reverse("admin_places_list")
+        return ctx
+
+    def form_valid(self, form):
+        place = form.save()
+        messages.success(self.request, f'Place "{place.name}" created.')
+        return redirect(self.success_url)
+
+
+class PlaceAdminEditView(AppAdminRequiredMixin, UpdateView):
+    model = Winery
+    form_class = PlaceAdminForm
+    template_name = "admin/place_edit.html"
+    success_url = reverse_lazy("admin_places_list")
+
+    def get_queryset(self):
+        return Winery.all_objects.all()
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        place = self.object
+        ctx["page_title"] = f"Edit Place: {place.name}"
+        ctx["icon"] = "edit"
+        ctx["cancel_url"] = reverse("admin_places_list")
+
+        # Stats
+        from django.db.models import Avg, Count
+        ctx["trip_count"] = place.trip_stops.filter(is_active=True).values("trip").distinct().count()
+        ctx["favorite_count"] = place.favorited_by.filter(is_active=True).count()
+        ctx["visit_count"] = place.visits.filter(is_active=True).count()
+        avg = place.visits.filter(is_active=True).aggregate(avg=Avg("rating_overall"))["avg"]
+        ctx["avg_rating"] = round(avg, 1) if avg else None
+        ctx["wine_count"] = place.wines.count()
+        ctx["has_menu"] = place.place_type in ("winery", "brewery")
+
+        return ctx
+
+    def form_valid(self, form):
+        place = form.save()
+        messages.success(self.request, f'Place "{place.name}" updated.')
+        return redirect(self.success_url)
+
+
+class PlaceAdminFetchGoogleView(AppAdminRequiredMixin, View):
+    """AJAX: fetch place details from Google Places API."""
+
+    def post(self, request, pk):
+        import httpx
+        from django.conf import settings as django_settings
+
+        winery = get_object_or_404(Winery.all_objects, pk=pk)
+        api_key = django_settings.GOOGLE_MAPS_API_KEY
+        if not api_key:
+            return JsonResponse({"error": "Google Maps API key not configured"}, status=400)
+
+        # Build search query
+        search_query = winery.name
+        if winery.city:
+            search_query += f" {winery.city}"
+        if winery.state:
+            search_query += f" {winery.state}"
+
+        try:
+            # Use Places API (New) — Text Search
+            with httpx.Client(timeout=10) as client:
+                resp = client.post(
+                    "https://places.googleapis.com/v1/places:searchText",
+                    headers={
+                        "Content-Type": "application/json",
+                        "X-Goog-Api-Key": api_key,
+                        "X-Goog-FieldMask": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.editorialSummary,places.photos,places.location",
+                    },
+                    json={"textQuery": search_query, "maxResultCount": 1},
+                )
+                resp.raise_for_status()
+                data = resp.json()
+
+            places = data.get("places", [])
+            if not places:
+                return JsonResponse({"error": "Place not found on Google"}, status=404)
+
+            place = places[0]
+            result = {
+                "ok": True,
+                "name": place.get("displayName", {}).get("text", ""),
+                "address": place.get("formattedAddress", ""),
+                "phone": place.get("nationalPhoneNumber", ""),
+                "website": place.get("websiteUri", ""),
+                "description": place.get("editorialSummary", {}).get("text", "") if place.get("editorialSummary") else "",
+                "image_url": "",
+            }
+
+            # Get photo URL if available
+            photos = place.get("photos", [])
+            if photos and api_key:
+                photo_name = photos[0].get("name", "")
+                if photo_name:
+                    result["image_url"] = f"https://places.googleapis.com/v1/{photo_name}/media?maxWidthPx=400&key={api_key}"
+
+            # Get lat/lng
+            location = place.get("location", {})
+            result["latitude"] = location.get("latitude")
+            result["longitude"] = location.get("longitude")
+
+            return JsonResponse(result)
+
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+
+
+class PlaceAdminMenuView(AppAdminRequiredMixin, View):
+    """AJAX: fetch/scrape wine or beer menu for a place (admin)."""
+
+    def get(self, request, pk):
+        from apps.wineries.scraper import scrape_and_cache_wines
+
+        winery = get_object_or_404(Winery.all_objects, pk=pk)
+
+        if request.GET.get("refresh"):
+            winery.wine_menu_last_scraped = None
+            winery.save(update_fields=["wine_menu_last_scraped", "updated_at"])
+
+        wines = scrape_and_cache_wines(winery)
+
+        from django.http import JsonResponse
+        return JsonResponse({
+            "ok": True,
+            "wines": [
+                {
+                    "wine_id": str(w.pk),
+                    "name": w.name,
+                    "varietal": w.varietal,
+                    "vintage": w.vintage,
+                    "description": w.description or "",
+                    "wine_type": (w.metadata or {}).get("wine_type", ""),
+                    "price": float(w.price) if w.price else None,
+                    "image_url": w.image_url or "",
+                }
+                for w in wines
+            ],
+        })
+
+
+class PlaceAdminDeleteView(AppAdminRequiredMixin, View):
+    def post(self, request, pk):
+        place = get_object_or_404(Winery.all_objects, pk=pk)
+        place.is_active = False
+        place.save(update_fields=["is_active", "updated_at"])
+        messages.success(request, f'Place "{place.name}" deactivated.')
+        return redirect("admin_places_list")
+
+    def get(self, request, pk):
+        place = get_object_or_404(Winery.all_objects, pk=pk)
+        return render(request, "admin/delete.html", {
+            "object_name": place.name,
+            "cancel_url": reverse("admin_places_list"),
         })

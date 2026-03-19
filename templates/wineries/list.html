@@ -331,6 +331,19 @@ function getPlaceType() {
     if (activeFilters.has('restaurant')) return 'restaurant';
     return 'winery';
 }
+// Store extra Google Places data keyed by lat,lng for use when creating places
+var placeExtras = {}; // "lat,lng" -> {phone, description}
+function storePlaceExtra(place, lat, lng) {
+    var key = Math.round(lat * 10000) + ',' + Math.round(lng * 10000);
+    placeExtras[key] = {
+        phone: place.nationalPhoneNumber || '',
+        description: (place.editorialSummary && place.editorialSummary.text) ? place.editorialSummary.text : ''
+    };
+}
+function getPlaceExtra(lat, lng) {
+    var key = Math.round(lat * 10000) + ',' + Math.round(lng * 10000);
+    return placeExtras[key] || {};
+}
 var Place;
 var markersByWineryId = {};
 
@@ -499,9 +512,10 @@ function toggleFavorite(wineryId, btnEl) {
 }
 
 function toggleFavoritePlace(name, addr, lat, lng, website, photoUrl, btnEl) {
+    var extra = getPlaceExtra(lat, lng);
     fetch('/places/favorite-place/', {
         method: 'POST', headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name, address: addr, lat: lat, lng: lng, website: website, photo_url: photoUrl || '', place_type: getPlaceType() })
+        body: JSON.stringify({ name: name, address: addr, lat: lat, lng: lng, website: website, photo_url: photoUrl || '', place_type: getPlaceType(), phone: extra.phone || '', description: extra.description || '' })
     }).then(function(r) { return r.json(); }).then(function(data) {
         if (data.winery_id && lat && lng && !markersByWineryId[data.winery_id]) {
             var allM = searchMarkers.concat(Object.keys(filterMarkers).reduce(function(a, k) { return a.concat(filterMarkers[k]); }, []));
@@ -537,9 +551,10 @@ function addStopToTrip(wineryId, btnEl) {
 
 function addPlaceStopToTrip(name, addr, lat, lng, website, photoUrl, btnEl) {
     // First create/find the place, then add as stop
+    var extra = getPlaceExtra(lat, lng);
     fetch('/places/favorite-place/', {
         method: 'POST', headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name, address: addr, lat: lat, lng: lng, website: website, photo_url: photoUrl || '', place_type: getPlaceType() })
+        body: JSON.stringify({ name: name, address: addr, lat: lat, lng: lng, website: website, photo_url: photoUrl || '', place_type: getPlaceType(), phone: extra.phone || '', description: extra.description || '' })
     }).then(function(r) { return r.json(); }).then(function(data) {
         if (data.winery_id) {
             // Unfavorite it if we just auto-favorited (we only want to create the winery, not fav)
@@ -562,9 +577,10 @@ function startTripFromWinery(wineryId, btnEl) {
 
 function startTripFromPlace(name, addr, lat, lng, website, photoUrl, btnEl) {
     if (addingToTripId) { addPlaceStopToTrip(name, addr, lat, lng, website, photoUrl, btnEl); return; }
+    var extra = getPlaceExtra(lat, lng);
     fetch('/trips/quick/', {
         method: 'POST', headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name, address: addr, lat: lat, lng: lng, website: website, photo_url: photoUrl || '', place_type: getPlaceType() })
+        body: JSON.stringify({ name: name, address: addr, lat: lat, lng: lng, website: website, photo_url: photoUrl || '', place_type: getPlaceType(), phone: extra.phone || '', description: extra.description || '' })
     }).then(function(r) { return r.json(); }).then(function(data) {
         if (data.trip_url) window.location.href = data.trip_url;
     }).catch(function(e) { console.error('Start trip error:', e); });
@@ -728,7 +744,7 @@ async function searchNearby(type) {
     try {
         var result = await Place.searchByText({
             textQuery: type.replace('_', ' '),
-            fields: ['displayName', 'location', 'formattedAddress', 'rating', 'photos', 'websiteURI'],
+            fields: ['displayName', 'location', 'formattedAddress', 'rating', 'photos', 'websiteURI', 'nationalPhoneNumber', 'editorialSummary'],
             locationBias: { center: { lat: center.lat(), lng: center.lng() }, radius: radius },
             maxResultCount: 20
         });
@@ -740,9 +756,10 @@ async function searchNearby(type) {
             var name = place.displayName || '', addr = place.formattedAddress || '';
             var rating = place.rating ? place.rating.toFixed(1) : null;
             var photoUrl = getPhotoUrl(place, 260), website = place.websiteURI || '';
-            var badge = '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:0.7rem;background:' + color + ';color:#fff;text-transform:capitalize;">' + type.replace('_', ' ') + '</span>';
             var plat = typeof pos.lat === 'function' ? pos.lat() : pos.lat;
             var plng = typeof pos.lng === 'function' ? pos.lng() : pos.lng;
+            storePlaceExtra(place, plat, plng);
+            var badge = '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:0.7rem;background:' + color + ';color:#fff;text-transform:capitalize;">' + type.replace('_', ' ') + '</span>';
             var favBtn = buildPlaceFavButton(name, addr, plat, plng, website, photoUrl) + buildPlaceTripButton(name, addr, plat, plng, website, photoUrl);
             marker.addListener('click', function() {
                 infoWindow.setContent(buildInfoHtml(name, addr, rating, photoUrl, badge, website, favBtn));
@@ -762,7 +779,7 @@ async function searchPlaces(query, bounds, hasDbMarkers) {
     try {
         var result = await Place.searchByText({
             textQuery: searchText,
-            fields: ['displayName', 'location', 'formattedAddress', 'rating', 'photos', 'websiteURI'],
+            fields: ['displayName', 'location', 'formattedAddress', 'rating', 'photos', 'websiteURI', 'nationalPhoneNumber', 'editorialSummary'],
             locationBias: map.getBounds() || { lat: 35.5318, lng: -81.0298 },
             maxResultCount: 10
         });
@@ -779,6 +796,7 @@ async function searchPlaces(query, bounds, hasDbMarkers) {
             var photoUrl = getPhotoUrl(place, 260), website = place.websiteURI || '';
             var sLat = typeof pos.lat === 'function' ? pos.lat() : pos.lat;
             var sLng = typeof pos.lng === 'function' ? pos.lng() : pos.lng;
+            storePlaceExtra(place, sLat, sLng);
             var favBtn = buildPlaceFavButton(name, addr, sLat, sLng, website, photoUrl) + buildPlaceTripButton(name, addr, sLat, sLng, website, photoUrl);
             marker.addListener('click', function() {
                 infoWindow.setContent(buildInfoHtml(name, addr, rating, photoUrl, null, website, favBtn));

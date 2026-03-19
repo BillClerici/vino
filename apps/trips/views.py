@@ -533,10 +533,22 @@ class QuickTripView(LoginRequiredMixin, View):
                     website=body.get("website", ""),
                     image_url=body.get("photo_url", ""),
                     place_type=place_type if place_type in dict(Winery.PlaceType.choices) else "winery",
+                    phone=body.get("phone", ""),
+                    description=body.get("description", ""),
                 )
-            elif body.get("photo_url") and not winery.image_url:
-                winery.image_url = body["photo_url"]
-                winery.save(update_fields=["image_url", "updated_at"])
+            else:
+                changed = []
+                if body.get("photo_url") and not winery.image_url:
+                    winery.image_url = body["photo_url"]
+                    changed.append("image_url")
+                if body.get("phone") and not winery.phone:
+                    winery.phone = body["phone"]
+                    changed.append("phone")
+                if body.get("description") and not winery.description:
+                    winery.description = body["description"]
+                    changed.append("description")
+                if changed:
+                    winery.save(update_fields=changed + ["updated_at"])
 
         trip = Trip.objects.create(
             name=f"Trip to {winery.name}",

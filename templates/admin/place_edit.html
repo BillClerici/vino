@@ -1,0 +1,356 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }} — Admin{% endblock %}
+
+{% block extra_css %}
+<style>
+    .place-stat {
+        text-align: center; padding: 14px 10px; border-radius: 8px;
+        background: #fff; border: 1px solid #f0f0f0;
+    }
+    .place-stat .stat-val { font-size: 1.6rem; font-weight: 700; line-height: 1.1; }
+    .place-stat .stat-lbl { font-size: 0.72rem; color: #9e9e9e; text-transform: uppercase; letter-spacing: 0.3px; margin-top: 4px; }
+    .wine-menu-cards-admin { display: flex; overflow-x: auto; gap: 8px; padding-bottom: 8px; }
+    .wine-menu-cards-admin::-webkit-scrollbar { height: 10px; }
+    .wine-menu-cards-admin::-webkit-scrollbar-track { background: #f5f5f5; border-radius: 5px; }
+    .wine-menu-cards-admin::-webkit-scrollbar-thumb { background: #bdbdbd; border-radius: 5px; }
+    .wine-menu-cards-admin::-webkit-scrollbar-thumb:hover { background: #9e9e9e; }
+    .wmc-card {
+        min-width: 150px; max-width: 180px; padding: 10px 12px; border: 1.5px solid #e0e0e0;
+        border-radius: 10px; background: #fff; flex-shrink: 0; transition: all 0.15s;
+    }
+    .wmc-card:hover { border-color: #bdbdbd; box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
+    .wmc-card .wmc-name { font-weight: 600; font-size: 0.82rem; color: #333; margin-bottom: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .wmc-card .wmc-detail { font-size: 0.72rem; color: #9e9e9e; }
+    .wmc-card .wmc-desc { font-size: 0.7rem; color: #bdbdbd; margin-top: 4px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .wine-color-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+    .wine-color-dot.wine-red { background: #b71c1c; }
+    .wine-color-dot.white { background: #f9a825; }
+    .wine-color-dot.rose { background: #ec407a; }
+    .wine-color-dot.sparkling { background: #ffd54f; }
+    .wine-color-dot.other { background: #78909c; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container" style="margin-top: 20px; max-width: 95%;">
+    <div class="row">
+        <div class="col s12">
+            <!-- Header with name and stats -->
+            <div class="card" style="border-radius: 8px;">
+                <div class="card-content">
+                    <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
+                        {% if object.image_url %}
+                        <img src="{{ object.image_url }}" id="place-img" alt="" style="width: 64px; height: 64px; border-radius: 10px; object-fit: cover; flex-shrink: 0;">
+                        {% else %}
+                        <div id="place-img-placeholder" style="width: 64px; height: 64px; border-radius: 10px; background: #ede7f6; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                            <i class="material-icons" style="color: #7e57c2; font-size: 1.8rem;">place</i>
+                        </div>
+                        {% endif %}
+                        <div style="flex: 1;">
+                            <h5 style="margin: 0; font-weight: 700; color: #333;">{{ object.name }}</h5>
+                            <div style="font-size: 0.85rem; color: #9e9e9e; margin-top: 2px;">
+                                <span style="display:inline-flex;align-items:center;gap:3px;padding:2px 10px;border-radius:10px;font-size:0.72rem;font-weight:600;text-transform:uppercase;background:#ede7f6;color:#7e57c2;">{{ object.get_place_type_display }}</span>
+                                {% if object.city %} &middot; {{ object.city }}{% if object.state %}, {{ object.state }}{% endif %}{% endif %}
+                            </div>
+                        </div>
+                        <button onclick="fetchFromGoogle()" id="google-fetch-btn" style="display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:18px;border:1.5px solid #4285f4;background:#fff;color:#4285f4;font-size:0.78rem;font-weight:600;cursor:pointer;transition:all 0.15s;flex-shrink:0;" onmouseover="this.style.background='#e8f0fe'" onmouseout="this.style.background='#fff'">
+                            <i class="material-icons" style="font-size:0.95rem;">travel_explore</i> Fetch from Google
+                        </button>
+                    </div>
+
+                    <!-- Stats badges -->
+                    <div class="row" style="margin-bottom: 0;">
+                        <div class="col s6 m2">
+                            <div class="place-stat">
+                                <div class="stat-val deep-purple-text">{{ trip_count }}</div>
+                                <div class="stat-lbl">Trips</div>
+                            </div>
+                        </div>
+                        <div class="col s6 m2">
+                            <div class="place-stat">
+                                <div class="stat-val red-text text-lighten-1">{{ favorite_count }}</div>
+                                <div class="stat-lbl">Favorites</div>
+                            </div>
+                        </div>
+                        <div class="col s6 m2">
+                            <div class="place-stat">
+                                <div class="stat-val teal-text">{{ visit_count }}</div>
+                                <div class="stat-lbl">Visits</div>
+                            </div>
+                        </div>
+                        <div class="col s6 m2">
+                            <div class="place-stat">
+                                <div class="stat-val amber-text text-darken-2">{% if avg_rating %}{{ avg_rating }}{% else %}&mdash;{% endif %}</div>
+                                <div class="stat-lbl">Avg Rating</div>
+                            </div>
+                        </div>
+                        <div class="col s6 m2">
+                            <div class="place-stat">
+                                <div class="stat-val blue-grey-text">{{ wine_count }}</div>
+                                <div class="stat-lbl">{% if object.place_type == 'brewery' %}Beers{% else %}Wines{% endif %}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- Left: Edit Form -->
+                <div class="col s12 m7">
+                    <div class="card" style="border-radius: 8px;">
+                        <form method="post">
+                            {% csrf_token %}
+                            <div class="card-content">
+                                <span class="card-title" style="font-size: 1.1rem; font-weight: 600; color: #455a64; display: inline-flex; align-items: center; gap: 6px;">
+                                    <i class="material-icons">edit</i> Place Details
+                                </span>
+
+                                {% if form.errors %}
+                                <div class="card-panel red lighten-4" style="padding: 10px;">
+                                    <ul class="browser-default">
+                                        {% for field, errors in form.errors.items %}
+                                        {% for error in errors %}
+                                        <li><strong>{{ field }}:</strong> {{ error }}</li>
+                                        {% endfor %}
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                                {% endif %}
+
+                                {% for field in form %}
+                                <div class="row" style="margin-bottom: 0;">
+                                    <div class="input-field col s12">
+                                        {% if field.field.widget.input_type == 'checkbox' %}
+                                        <label>
+                                            {{ field }}
+                                            <span>{{ field.label }}</span>
+                                        </label>
+                                        {% elif field.field.widget.input_type == 'select' or field.field.widget.attrs.multiple %}
+                                        <label for="{{ field.id_for_label }}" class="active">{{ field.label }}</label>
+                                        {{ field }}
+                                        {% else %}
+                                        {{ field }}
+                                        <label for="{{ field.id_for_label }}" class="{% if field.value %}active{% endif %}">{{ field.label }}</label>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <div class="card-action right-align">
+                                <a href="{{ cancel_url }}" class="btn-flat waves-effect">Cancel</a>
+                                <button type="submit" class="btn blue-grey darken-1 waves-effect waves-light">
+                                    <i class="material-icons left">save</i>Save
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Right: Menu -->
+                <div class="col s12 m5">
+                    {% if has_menu %}
+                    <div class="card" style="border-radius: 8px;">
+                        <div class="card-content">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                <span class="card-title" style="font-size: 1.1rem; font-weight: 600; color: #455a64; display: inline-flex; align-items: center; gap: 6px; margin: 0;">
+                                    <i class="material-icons" style="color: #7e57c2;">menu_book</i>
+                                    {% if object.place_type == 'brewery' %}Beer Menu{% else %}Wine Menu{% endif %}
+                                </span>
+                                <button id="menu-btn" onclick="loadPlaceMenu(this)" style="border: 1.5px solid #7e57c2; background: #fff; color: #7e57c2; font-size: 0.78rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 3px; padding: 4px 12px; border-radius: 14px;" onmouseover="this.style.background='#ede7f6'" onmouseout="this.style.background='#fff'">
+                                    <i class="material-icons" style="font-size: 0.85rem;">{% if wine_count %}refresh{% else %}download{% endif %}</i> {% if wine_count %}Refresh{% else %}Load Menu{% endif %}
+                                </button>
+                            </div>
+                            <div id="menu-cards" class="wine-menu-cards-admin"></div>
+                            <div id="menu-count" style="font-size: 0.75rem; color: #bdbdbd; margin-top: 8px;"></div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if object.website %}
+                    <div class="card" style="border-radius: 8px;">
+                        <div class="card-content">
+                            <span class="card-title" style="font-size: 1.1rem; font-weight: 600; color: #455a64; display: inline-flex; align-items: center; gap: 6px; margin: 0;">
+                                <i class="material-icons">language</i> Website
+                            </span>
+                            <div style="margin-top: 8px;">
+                                <a href="{{ object.website }}" target="_blank" rel="noopener" style="color: #7e57c2; font-weight: 600; word-break: break-all;">{{ object.website }}</a>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        M.updateTextFields();
+        M.FormSelect.init(document.querySelectorAll('select'));
+    });
+
+    var placeId = '{{ object.pk }}';
+    var csrfToken = '{{ csrf_token }}';
+
+    function fetchFromGoogle() {
+        var btn = document.getElementById('google-fetch-btn');
+        btn.innerHTML = '<i class="material-icons" style="font-size:0.95rem;">hourglass_top</i> Fetching...';
+        btn.disabled = true;
+
+        fetch('/places/' + placeId + '/fetch-google/', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' }
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.error) {
+                alert('Google: ' + data.error);
+                btn.innerHTML = '<i class="material-icons" style="font-size:0.95rem;">travel_explore</i> Fetch from Google';
+                btn.disabled = false;
+                return;
+            }
+
+            var filled = [];
+
+            // Fill empty fields only — don't overwrite existing data
+            function fillField(fieldId, value) {
+                if (!value) return;
+                var el = document.getElementById(fieldId);
+                if (!el) return;
+                if (el.value && el.value.trim()) return; // Don't overwrite
+                el.value = value;
+                filled.push(el);
+                // Activate Materialize label
+                var label = el.parentElement.querySelector('label');
+                if (label) label.classList.add('active');
+            }
+
+            fillField('id_description', data.description);
+            fillField('id_address', data.address);
+            fillField('id_phone', data.phone);
+            fillField('id_website', data.website);
+            fillField('id_image_url', data.image_url);
+            if (data.latitude) fillField('id_latitude', parseFloat(data.latitude).toFixed(6));
+            if (data.longitude) fillField('id_longitude', parseFloat(data.longitude).toFixed(6));
+
+            // Parse city/state from address if empty
+            if (data.address) {
+                var cityEl = document.getElementById('id_city');
+                var stateEl = document.getElementById('id_state');
+                if (cityEl && !cityEl.value.trim()) {
+                    var parts = data.address.split(',');
+                    if (parts.length >= 3) {
+                        cityEl.value = parts[parts.length - 3].trim();
+                        var label = cityEl.parentElement.querySelector('label');
+                        if (label) label.classList.add('active');
+                        filled.push(cityEl);
+                    }
+                    if (stateEl && !stateEl.value.trim() && parts.length >= 2) {
+                        var stateZip = parts[parts.length - 2].trim().split(' ');
+                        if (stateZip.length >= 1) {
+                            stateEl.value = stateZip[0];
+                            var label2 = stateEl.parentElement.querySelector('label');
+                            if (label2) label2.classList.add('active');
+                            filled.push(stateEl);
+                        }
+                    }
+                }
+            }
+
+            // Flash filled fields
+            filled.forEach(function(el) {
+                el.style.transition = 'background 0.3s';
+                el.style.background = '#e8f5e9';
+                setTimeout(function() { el.style.background = ''; }, 2000);
+            });
+
+            btn.innerHTML = '<i class="material-icons" style="font-size:0.95rem;">check</i> Fetched!';
+            btn.style.borderColor = '#43a047';
+            btn.style.color = '#43a047';
+            setTimeout(function() {
+                btn.innerHTML = '<i class="material-icons" style="font-size:0.95rem;">travel_explore</i> Fetch from Google';
+                btn.style.borderColor = '#4285f4';
+                btn.style.color = '#4285f4';
+                btn.disabled = false;
+            }, 3000);
+        })
+        .catch(function() {
+            alert('Failed to fetch from Google');
+            btn.innerHTML = '<i class="material-icons" style="font-size:0.95rem;">travel_explore</i> Fetch from Google';
+            btn.disabled = false;
+        });
+    }
+
+    function getTypeClass(type) {
+        var t = (type || '').toLowerCase();
+        if (t.indexOf('red') >= 0 || t.indexOf('ipa') >= 0 || t.indexOf('ale') >= 0) return 'wine-red';
+        if (t.indexOf('white') >= 0 || t.indexOf('lager') >= 0 || t.indexOf('pilsner') >= 0) return 'white';
+        if (t.indexOf('ros') >= 0 || t.indexOf('sour') >= 0) return 'rose';
+        if (t.indexOf('spark') >= 0 || t.indexOf('stout') >= 0) return 'sparkling';
+        return 'other';
+    }
+
+    function loadPlaceMenu(btnEl) {
+        var container = document.getElementById('menu-cards');
+        var countEl = document.getElementById('menu-count');
+        var isRefresh = btnEl && btnEl.dataset.loaded === '1';
+
+        container.innerHTML = '<div style="padding:20px;color:#9e9e9e;font-size:0.82rem;display:flex;align-items:center;justify-content:center;gap:6px;width:100%;"><div class="preloader-wrapper small active" style="width:18px;height:18px;"><div class="spinner-layer spinner-purple-only"><div class="circle-clipper left"><div class="circle"></div></div></div></div> Loading menu... This may take a few minutes...</div>';
+
+        var url = '/places/' + placeId + '/admin-menu/';
+        if (isRefresh) url += '?refresh=1';
+
+        fetch(url, { headers: { 'X-CSRFToken': csrfToken } })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data.ok || !data.wines || data.wines.length === 0) {
+                container.innerHTML = '<div style="padding:20px;color:#bdbdbd;font-size:0.85rem;text-align:center;width:100%;">No items found on the website.</div>';
+                countEl.textContent = '';
+                return;
+            }
+            countEl.textContent = data.wines.length + ' items loaded';
+            container.innerHTML = '';
+            data.wines.forEach(function(wine) {
+                var typeClass = getTypeClass(wine.wine_type || wine.varietal);
+                var card = document.createElement('div');
+                card.className = 'wmc-card';
+                var menuName = wine.name;
+                if (wine.vintage) menuName = menuName.replace(new RegExp('\\b' + wine.vintage + '\\b'), '').trim();
+                var vintage = wine.vintage ? ' ' + wine.vintage : '';
+                var detail = wine.varietal || wine.wine_type || '';
+                var imgHtml = wine.image_url
+                    ? '<img src="' + wine.image_url + '" style="width:100%;height:70px;object-fit:contain;border-radius:6px;margin-bottom:6px;background:#fafafa;" onerror="this.style.display=\'none\'">'
+                    : '';
+                card.innerHTML =
+                    imgHtml +
+                    '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">' +
+                    '<div class="wine-color-dot ' + typeClass + '"></div>' +
+                    '<div class="wmc-name">' + menuName + vintage + '</div>' +
+                    '</div>' +
+                    (detail ? '<div class="wmc-detail">' + detail + (wine.price ? ' · $' + parseFloat(wine.price).toFixed(2) : '') + '</div>' : '') +
+                    (wine.description ? '<div class="wmc-desc">' + wine.description + '</div>' : '');
+                container.appendChild(card);
+            });
+            // Switch button to Refresh
+            if (btnEl) {
+                btnEl.dataset.loaded = '1';
+                btnEl.innerHTML = '<i class="material-icons" style="font-size:0.85rem;">refresh</i> Refresh';
+            }
+        })
+        .catch(function() {
+            container.innerHTML = '<div style="padding:20px;color:#ef9a9a;font-size:0.85rem;text-align:center;width:100%;">Failed to load menu.</div>';
+        });
+    }
+
+    // Auto-load if wines are already cached
+    {% if wine_count > 0 %}
+    document.addEventListener('DOMContentLoaded', function() {
+        loadPlaceMenu(document.getElementById('menu-btn'));
+    });
+    {% endif %}
+</script>
+{% endblock %}

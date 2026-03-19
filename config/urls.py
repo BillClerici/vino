@@ -27,6 +27,12 @@ from apps.rbac.views import (
     UserListView,
 )
 from apps.users.views import LoginView, LogoutView, RegisterView
+from apps.wineries.views import (
+    PlaceAdminCreateView,
+    PlaceAdminDeleteView,
+    PlaceAdminEditView,
+    PlaceAdminListView,
+)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -64,5 +70,10 @@ urlpatterns = [
     path('manage/lookups/create/', LookupCreateView.as_view(), name='admin_lookups_create'),
     path('manage/lookups/<uuid:pk>/edit/', LookupEditView.as_view(), name='admin_lookups_edit'),
     path('manage/lookups/<uuid:pk>/delete/', LookupDeleteView.as_view(), name='admin_lookups_delete'),
+    # App Admin (superuser)
+    path('manage/places/', PlaceAdminListView.as_view(), name='admin_places_list'),
+    path('manage/places/create/', PlaceAdminCreateView.as_view(), name='admin_places_create'),
+    path('manage/places/<uuid:pk>/edit/', PlaceAdminEditView.as_view(), name='admin_places_edit'),
+    path('manage/places/<uuid:pk>/delete/', PlaceAdminDeleteView.as_view(), name='admin_places_delete'),
     path('auth/', include('social_django.urls', namespace='social')),
 ]
