@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block title %}My Palate — VinoVoyage{% endblock %}
+
+{% block extra_css %}
+<style>
+    .palate-hero {
+        text-align: center;
+        padding: 30px 0 20px;
+    }
+    .palate-hero .hero-icon { font-size: 3.5rem; color: #7e57c2; }
+    .palate-stat {
+        text-align: center;
+        padding: 16px;
+    }
+    .palate-stat .ps-number { font-size: 1.8rem; font-weight: 700; }
+    .palate-stat .ps-label { font-size: 0.8rem; color: #9e9e9e; text-transform: uppercase; letter-spacing: 0.5px; }
+    .varietal-bar { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f5f5f5; }
+    .varietal-bar:last-child { border-bottom: none; }
+    .varietal-bar .vb-name { min-width: 120px; font-weight: 600; font-size: 0.9rem; }
+    .varietal-bar .vb-track { flex: 1; height: 8px; background: #f5f5f5; border-radius: 4px; overflow: hidden; }
+    .varietal-bar .vb-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, #7e57c2, #ab47bc); }
+    .varietal-bar .vb-count { font-size: 0.82rem; color: #9e9e9e; min-width: 60px; text-align: right; }
+    .star-display { color: #ffb300; }
+    .preference-chip {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 8px 16px; border-radius: 20px; margin: 4px;
+        font-size: 0.85rem; background: #ede7f6; color: #4a148c;
+    }
+    .ai-badge {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 4px 10px; border-radius: 12px;
+        background: linear-gradient(135deg, #7e57c2, #ab47bc);
+        color: #fff; font-size: 0.7rem; font-weight: 600;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container" style="margin-top: 20px; padding-bottom: 30px;">
+    <div class="palate-hero">
+        <i class="material-icons hero-icon">wine_bar</i>
+        <h4 style="font-weight: 700; color: #333; margin: 8px 0 4px;">My Palate</h4>
+        <p class="grey-text">Your wine personality, built from every sip.</p>
+    </div>
+
+    <!-- Stats Overview -->
+    <div class="row">
+        <div class="col s6 m3">
+            <div class="card-panel palate-stat hoverable" style="border-radius: 8px;">
+                <div class="ps-number deep-purple-text">{{ visit_stats.total_visits|default:0 }}</div>
+                <div class="ps-label">Total Visits</div>
+            </div>
+        </div>
+        <div class="col s6 m3">
+            <div class="card-panel palate-stat hoverable" style="border-radius: 8px;">
+                <div class="ps-number teal-text">{% if visit_stats.avg_overall %}{{ visit_stats.avg_overall|floatformat:1 }}{% else %}&mdash;{% endif %}</div>
+                <div class="ps-label">Avg Rating</div>
+            </div>
+        </div>
+        <div class="col s6 m3">
+            <div class="card-panel palate-stat hoverable" style="border-radius: 8px;">
+                <div class="ps-number amber-text text-darken-2">{% if visit_stats.avg_ambience %}{{ visit_stats.avg_ambience|floatformat:1 }}{% else %}&mdash;{% endif %}</div>
+                <div class="ps-label">Avg Ambience</div>
+            </div>
+        </div>
+        <div class="col s6 m3">
+            <div class="card-panel palate-stat hoverable" style="border-radius: 8px;">
+                <div class="ps-number orange-text">{% if visit_stats.avg_food %}{{ visit_stats.avg_food|floatformat:1 }}{% else %}&mdash;{% endif %}</div>
+                <div class="ps-label">Avg Food</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col s12 m8">
+            <!-- AI Palate Profile -->
+            <div class="card" style="border-radius: 8px;">
+                <div class="card-content">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span class="card-title" style="font-size: 1.1rem; font-weight: 600; color: #455a64;">
+                            <i class="material-icons">auto_awesome</i> Taste Profile
+                        </span>
+                        <span class="ai-badge"><i class="material-icons" style="font-size: 0.8rem;">psychology</i> AI-Powered</span>
+                    </div>
+
+                    {% if profile.preferences %}
+                    <div style="margin-top: 16px;">
+                        {% for key, value in profile.preferences.items %}
+                        <div class="preference-chip">
+                            <strong>{{ key|title }}:</strong> {{ value }}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% if profile.last_analyzed_at %}
+                    <div style="margin-top: 12px; font-size: 0.8rem; color: #bdbdbd;">
+                        Last analyzed {{ profile.last_analyzed_at|date:"M j, Y" }}
+                    </div>
+                    {% endif %}
+                    {% else %}
+                    <div class="center-align" style="padding: 30px 0;">
+                        <i class="material-icons medium grey-text text-lighten-1">psychology</i>
+                        <p class="grey-text">Your taste profile hasn't been generated yet.</p>
+                        <p class="grey-text" style="font-size: 0.85rem;">
+                            Keep checking in and rating wineries — once you have enough data,
+                            our AI will analyze your preferences.
+                        </p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Top Varietals -->
+            <div class="card" style="border-radius: 8px;">
+                <div class="card-content">
+                    <span class="card-title" style="font-size: 1.1rem; font-weight: 600; color: #455a64;">
+                        <i class="material-icons">local_bar</i> Top Varietals
+                    </span>
+                    {% for v in top_varietals %}
+                    <div class="varietal-bar">
+                        <span class="vb-name">{{ v.wine__varietal|default:"Unknown" }}</span>
+                        <div class="vb-track">
+                            <div class="vb-fill" style="width: {% widthratio v.count top_varietals.0.count 100 %}%;"></div>
+                        </div>
+                        <span class="vb-count">{{ v.count }} tasted{% if v.avg_rating %} &middot; {{ v.avg_rating|floatformat:1 }} &#9733;{% endif %}</span>
+                    </div>
+                    {% empty %}
+                    <div class="center-align" style="padding: 20px 0;">
+                        <p class="grey-text">No wines tasted yet. Start logging wines during your check-ins!</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Recent Activity -->
+        <div class="col s12 m4">
+            <div class="card" style="border-radius: 8px;">
+                <div class="card-content">
+                    <span class="card-title" style="font-size: 1.1rem; font-weight: 600; color: #455a64;">
+                        <i class="material-icons">history</i> Recent Activity
+                    </span>
+                    {% for visit in recent_visits %}
+                    <a href="{% url 'visit_detail' pk=visit.pk %}" style="color: inherit;">
+                        <div style="padding: 10px 0; border-bottom: 1px solid #f5f5f5; display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="font-weight: 600; font-size: 0.9rem;">{{ visit.winery.name }}</div>
+                                <div style="font-size: 0.75rem; color: #9e9e9e;">{{ visit.visited_at|date:"M j" }}</div>
+                            </div>
+                            {% if visit.rating_overall %}
+                            <span class="star-display" style="font-size: 0.85rem;">{{ visit.rating_overall }} &#9733;</span>
+                            {% endif %}
+                        </div>
+                    </a>
+                    {% empty %}
+                    <p class="grey-text center-align" style="padding: 16px 0; font-size: 0.9rem;">No activity yet</p>
+                    {% endfor %}
+                </div>
+                {% if recent_visits %}
+                <div class="card-action">
+                    <a href="{% url 'visit_list' %}">View all visits</a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block title %}App Settings — VinoVoyage{% endblock %}
+
+{% block content %}
+<div class="container" style="margin-top: 20px; padding-bottom: 30px;">
+    <h5 style="font-weight: 600; color: #455a64; margin-top: 0;">
+        <i class="material-icons" style="vertical-align: middle;">settings</i> App Settings
+    </h5>
+
+    <!-- Status Cards -->
+    <div class="row" style="margin-top: 1.5rem;">
+        <div class="col s12 m4">
+            <div class="card-panel hoverable">
+                <i class="material-icons medium blue-grey-text">check_circle</i>
+                <h5>Server Up</h5>
+                <p class="grey-text">Django is running and ready.</p>
+            </div>
+        </div>
+        <div class="col s12 m4">
+            <div class="card-panel hoverable">
+                <i class="material-icons medium blue-grey-text">storage</i>
+                <h5>Database</h5>
+                <p class="grey-text">PostgreSQL connected.</p>
+            </div>
+        </div>
+        <div class="col s12 m4">
+            <div class="card-panel hoverable">
+                <i class="material-icons medium blue-grey-text">build</i>
+                <h5>Start Building</h5>
+                <p class="grey-text">Open setup_prompts.md to begin.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Component Dashboard -->
+    <div class="card">
+        <div class="card-content">
+            <span class="card-title blue-grey-text text-darken-3">
+                <i class="material-icons">dashboard</i> Installed Components
+            </span>
+            <p class="grey-text" style="margin-bottom: 15px;">Services and endpoints available in this application.</p>
+            <div style="overflow-x: auto;">
+                <table class="striped highlight" style="font-size: 0.9em;">
+                    <thead>
+                        <tr>
+                            <th>Component</th>
+                            <th>Description</th>
+                            <th>URL / Address</th>
+                            <th>Port(s)</th>
+                            <th>Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><i class="material-icons tiny green-text">check_circle</i> <strong>Django API</strong></td>
+                            <td>Web Framework & API Server</td>
+                            <td><a href="http://localhost:8000" target="_blank">http://localhost:8000</a></td>
+                            <td><code>8000</code></td>
+                            <td style="font-size: 0.85em;">Running</td>
+                        </tr>
+                        <tr>
+                            <td><i class="material-icons tiny green-text">favorite</i> <strong>Health Check</strong></td>
+                            <td>API Health Endpoint</td>
+                            <td><a href="http://localhost:8000/health/" target="_blank">http://localhost:8000/health/</a></td>
+                            <td><code>8000</code></td>
+                            <td style="font-size: 0.85em;">GET /health/</td>
+                        </tr>
+                        <tr>
+                            <td><i class="material-icons tiny blue-grey-text">admin_panel_settings</i> <strong>Django Admin</strong></td>
+                            <td>Built-in Admin Panel</td>
+                            <td><a href="http://localhost:8000/admin/" target="_blank">http://localhost:8000/admin/</a></td>
+                            <td><code>8000</code></td>
+                            <td style="font-size: 0.85em;">Superuser required</td>
+                        </tr>
+                        <tr>
+                            <td><i class="material-icons tiny blue-text">storage</i> <strong>PostgreSQL</strong></td>
+                            <td>Primary Database</td>
+                            <td><code>localhost:5432</code></td>
+                            <td><code>5432</code></td>
+                            <td style="font-size: 0.85em;">User: postgres / Pass: postgres</td>
+                        </tr>
+                        <tr>
+                            <td><i class="material-icons tiny red-text text-darken-1">cached</i> <strong>Redis</strong></td>
+                            <td>Cache & Celery Broker</td>
+                            <td><code>localhost:6379</code></td>
+                            <td><code>6379</code></td>
+                            <td style="font-size: 0.85em;">No auth (local dev)</td>
+                        </tr>
+                        <tr>
+                            <td><i class="material-icons tiny orange-text">engineering</i> <strong>Celery Worker</strong></td>
+                            <td>Background Task Worker</td>
+                            <td><code>—</code></td>
+                            <td><code>—</code></td>
+                            <td style="font-size: 0.85em;">docker compose logs worker</td>
+                        </tr>
+                        <tr>
+                            <td><i class="material-icons tiny teal-text">data_object</i> <strong>REST API (DRF)</strong></td>
+                            <td>Browsable API</td>
+                            <td><a href="http://localhost:8000/api/manage/" target="_blank">http://localhost:8000/api/manage/</a></td>
+                            <td><code>8000</code></td>
+                            <td style="font-size: 0.85em;">JWT Bearer token required</td>
+                        </tr>
+                        <tr>
+                            <td><i class="material-icons tiny orange-text">monitoring</i> <strong>Sentry</strong></td>
+                            <td>Error Tracking</td>
+                            <td><a href="https://sentry.io" target="_blank">https://sentry.io</a></td>
+                            <td><code>—</code></td>
+                            <td style="font-size: 0.85em;">Configure SENTRY_DSN in .env</td>
+                        </tr>
+                        <tr>
+                            <td><i class="material-icons tiny red-text">login</i> <strong>Google OAuth</strong></td>
+                            <td>Social Login Provider</td>
+                            <td><a href="http://localhost:8000/auth/login/google-oauth2/" target="_blank">http://localhost:8000/auth/login/google-oauth2/</a></td>
+                            <td><code>8000</code></td>
+                            <td style="font-size: 0.85em;">Callback: /auth/complete/google-oauth2/</td>
+                        </tr>
+                        <tr>
+                            <td><i class="material-icons tiny blue-text text-darken-3">business</i> <strong>Microsoft OAuth</strong></td>
+                            <td>Social Login Provider</td>
+                            <td><a href="http://localhost:8000/auth/login/microsoft-graph/" target="_blank">http://localhost:8000/auth/login/microsoft-graph/</a></td>
+                            <td><code>8000</code></td>
+                            <td style="font-size: 0.85em;">Callback: /auth/complete/microsoft-graph/</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+
+{% block title %}Check In — VinoVoyage{% endblock %}
+
+{% block extra_css %}
+<style>
+    .star-rating { display: flex; gap: 4px; direction: rtl; justify-content: flex-end; }
+    .star-rating input { display: none; }
+    .star-rating label {
+        font-size: 1.8rem;
+        color: #e0e0e0;
+        cursor: pointer;
+        transition: color 0.15s;
+        line-height: 1;
+    }
+    .star-rating label:hover,
+    .star-rating label:hover ~ label,
+    .star-rating input:checked ~ label {
+        color: #ffb300;
+    }
+    .rating-group { margin: 16px 0; }
+    .rating-group .rating-label {
+        font-size: 0.9rem;
+        color: #616161;
+        font-weight: 500;
+        margin-bottom: 4px;
+    }
+    .checkin-header {
+        text-align: center;
+        padding: 24px 0 16px;
+    }
+    .checkin-header i { font-size: 3rem; color: #7e57c2; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container" style="margin-top: 20px; padding-bottom: 30px;">
+    <div class="row">
+        <div class="col s12 m8 offset-m2">
+            <div class="card" style="border-radius: 8px;">
+                <form method="post" id="checkin-form">
+                    {% csrf_token %}
+                    <div class="card-content">
+                        <div class="checkin-header">
+                            <i class="material-icons">add_location</i>
+                            <h5 style="font-weight: 600; color: #455a64; margin: 8px 0 4px;">Check In</h5>
+                            <p class="grey-text" style="font-size: 0.9rem;">Log your winery visit and rate your experience</p>
+                        </div>
+
+                        {% if form.errors %}
+                        <div class="card-panel red lighten-4" style="padding: 10px;">
+                            <ul class="browser-default">
+                                {% for field, errors in form.errors.items %}
+                                {% for error in errors %}
+                                <li><strong>{{ field }}:</strong> {{ error }}</li>
+                                {% endfor %}
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %}
+
+                        <!-- Winery Select -->
+                        <div class="row" style="margin-bottom: 0;">
+                            <div class="input-field col s12">
+                                {% if preselected_winery %}
+                                <input type="hidden" name="winery" value="{{ preselected_winery.pk }}">
+                                <input type="text" value="{{ preselected_winery.name }}" disabled>
+                                <label class="active">Winery</label>
+                                {% else %}
+                                {{ form.winery }}
+                                <label for="{{ form.winery.id_for_label }}" class="active">Winery</label>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Visit Date -->
+                        <div class="row" style="margin-bottom: 0;">
+                            <div class="input-field col s12">
+                                {{ form.visited_at }}
+                                <label for="{{ form.visited_at.id_for_label }}" class="active">When did you visit?</label>
+                            </div>
+                        </div>
+
+                        <!-- Star Ratings -->
+                        <div style="margin: 24px 0 16px;">
+                            <h6 style="font-weight: 600; color: #455a64; margin-bottom: 12px;">
+                                <i class="material-icons tiny" style="vertical-align: middle;">star</i> Rate Your Experience
+                            </h6>
+
+                            <div class="rating-group">
+                                <div class="rating-label">Overall Experience</div>
+                                <div class="star-rating" data-field="rating_overall">
+                                    {% for i in "54321" %}
+                                    <input type="radio" name="rating_overall" id="overall-{{ i }}" value="{{ i }}">
+                                    <label for="overall-{{ i }}">&#9733;</label>
+                                    {% endfor %}
+                                </div>
+                            </div>
+
+                            <div class="rating-group">
+                                <div class="rating-label">Staff & Service</div>
+                                <div class="star-rating" data-field="rating_staff">
+                                    {% for i in "54321" %}
+                                    <input type="radio" name="rating_staff" id="staff-{{ i }}" value="{{ i }}">
+                                    <label for="staff-{{ i }}">&#9733;</label>
+                                    {% endfor %}
+                                </div>
+                            </div>
+
+                            <div class="rating-group">
+                                <div class="rating-label">Ambience & Vibe</div>
+                                <div class="star-rating" data-field="rating_ambience">
+                                    {% for i in "54321" %}
+                                    <input type="radio" name="rating_ambience" id="ambience-{{ i }}" value="{{ i }}">
+                                    <label for="ambience-{{ i }}">&#9733;</label>
+                                    {% endfor %}
+                                </div>
+                            </div>
+
+                            <div class="rating-group">
+                                <div class="rating-label">Food & Snacks</div>
+                                <div class="star-rating" data-field="rating_food">
+                                    {% for i in "54321" %}
+                                    <input type="radio" name="rating_food" id="food-{{ i }}" value="{{ i }}">
+                                    <label for="food-{{ i }}">&#9733;</label>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Notes -->
+                        <div class="row" style="margin-bottom: 0;">
+                            <div class="input-field col s12">
+                                {{ form.notes }}
+                                <label for="{{ form.notes.id_for_label }}" class="{% if form.notes.value %}active{% endif %}">Notes (tasting notes, thoughts, memories...)</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-action right-align">
+                        <a href="{% url 'landing' %}" class="btn-flat waves-effect">Cancel</a>
+                        <button type="submit" class="btn deep-purple lighten-1 waves-effect waves-light">
+                            <i class="material-icons left">check</i>Check In
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        M.updateTextFields();
+        M.FormSelect.init(document.querySelectorAll('select'));
+    });
+</script>
+{% endblock %}

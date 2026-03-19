@@ -1,0 +1,22 @@
+name: CI
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      DJANGO_SETTINGS_MODULE: config.settings.local
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements/dev.txt
+      - run: ruff check .
+      - run: mypy . --config-file pyproject.toml
+      - run: pytest --tb=short -q
+      - run: python -c "import sentry_sdk"

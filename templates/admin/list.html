@@ -1,0 +1,321 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }} — Admin{% endblock %}
+
+{% block extra_css %}
+<style>
+    .admin-table-wrapper {
+        overflow-x: auto;
+        max-height: calc(100vh - 340px);
+        overflow-y: auto;
+    }
+    .admin-table-wrapper table thead th {
+        position: sticky;
+        top: 0;
+        background: #fff;
+        z-index: 2;
+        box-shadow: 0 1px 0 0 #e0e0e0;
+    }
+    .sortable-header {
+        cursor: pointer;
+        user-select: none;
+        white-space: nowrap;
+    }
+    .sortable-header:hover {
+        background: #f5f5f5;
+    }
+    .sort-icon {
+        font-size: 16px;
+        vertical-align: middle;
+        opacity: 0.3;
+    }
+    .sort-icon.active {
+        opacity: 1;
+        color: #455a64;
+    }
+    .filter-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 10px;
+        flex-wrap: wrap;
+    }
+    .filter-bar .input-field {
+        margin: 0;
+        flex: 1;
+        min-width: 200px;
+    }
+    .filter-bar .input-field input {
+        margin: 0;
+        height: 2.5rem;
+    }
+    .filter-bar .input-field label {
+        top: -10px;
+    }
+    .pagination-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 0;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    .pagination-bar .page-info {
+        color: #607d8b;
+        font-size: 0.9rem;
+    }
+    .pagination-bar .page-size-select {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        color: #607d8b;
+        font-size: 0.9rem;
+    }
+    .pagination-bar .page-size-select select {
+        display: inline-block;
+        width: auto;
+        height: 2rem;
+        padding: 0 25px 0 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        background: #fff;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container" style="margin-top: 20px;">
+    <div class="row">
+        <div class="col s12">
+            <div class="card">
+                <div class="card-content">
+                    <!-- Header -->
+                    <div class="row" style="margin-bottom: 0;">
+                        <div class="col s6">
+                            <span class="card-title">
+                                <i class="material-icons">{{ icon }}</i> {{ page_title }}
+                            </span>
+                        </div>
+                        <div class="col s6 right-align">
+                            <a href="{{ create_url }}" class="btn blue-grey darken-1 waves-effect waves-light">
+                                <i class="material-icons left">add</i>Add New
+                            </a>
+                        </div>
+                    </div>
+
+                    {% if messages %}
+                    {% for message in messages %}
+                    <div class="card-panel {{ message.tags }} lighten-4" style="padding: 10px;">
+                        {{ message }}
+                    </div>
+                    {% endfor %}
+                    {% endif %}
+
+                    <!-- Filter bar -->
+                    <div class="filter-bar">
+                        <div class="input-field">
+                            <i class="material-icons prefix" style="font-size: 1.2rem; margin-top: 8px;">search</i>
+                            <input id="admin-filter-input" type="text" value="{{ filter_query|default:'' }}"
+                                   placeholder="Filter {{ page_title|lower }}..." style="padding-left: 2.5rem;">
+                        </div>
+                    </div>
+
+                    <!-- Scrollable table -->
+                    <div class="admin-table-wrapper">
+                        <table class="striped highlight" id="admin-table">
+                            <thead>
+                                <tr>
+                                    {% for col in columns %}
+                                    <th class="sortable-header" data-col-index="{{ forloop.counter0 }}">
+                                        {{ col }}
+                                        <i class="material-icons sort-icon {% if sort_col == forloop.counter0 %}active{% endif %}">
+                                            {% if sort_col == forloop.counter0 and sort_dir == 'desc' %}arrow_downward{% else %}arrow_upward{% endif %}
+                                        </i>
+                                    </th>
+                                    {% endfor %}
+                                    <th class="right-align" style="min-width: 100px;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-table-body">
+                                {% for row in rows %}
+                                <tr>
+                                    {% for val in row.values %}
+                                    <td>{{ val }}</td>
+                                    {% endfor %}
+                                    <td class="right-align" style="white-space: nowrap;">
+                                        <a href="{{ row.edit_url }}" class="btn-small btn-flat waves-effect" title="Edit">
+                                            <i class="material-icons">edit</i>
+                                        </a>
+                                        <a href="{{ row.delete_url }}" class="btn-small btn-flat waves-effect red-text" title="Delete"
+                                           onclick="return confirm('Are you sure?');">
+                                            <i class="material-icons">delete</i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr class="empty-row">
+                                    <td colspan="{{ columns|length|add:1 }}" class="center-align grey-text">
+                                        No records found.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Pagination bar -->
+                    <div class="pagination-bar">
+                        <div class="page-info">
+                            Showing <strong id="showing-start">1</strong>–<strong id="showing-end">{{ rows|length }}</strong>
+                            of <strong id="showing-total">{{ rows|length }}</strong> records
+                        </div>
+                        <div class="page-size-select">
+                            Show
+                            <select id="page-size-select">
+                                <option value="10">10</option>
+                                <option value="25" selected>25</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                            </select>
+                            per page
+                        </div>
+                        <ul class="pagination" id="pagination-controls" style="margin: 0;">
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    var table = document.getElementById('admin-table');
+    var tbody = document.getElementById('admin-table-body');
+    var filterInput = document.getElementById('admin-filter-input');
+    var pageSizeSelect = document.getElementById('page-size-select');
+    var paginationControls = document.getElementById('pagination-controls');
+    var showStart = document.getElementById('showing-start');
+    var showEnd = document.getElementById('showing-end');
+    var showTotal = document.getElementById('showing-total');
+
+    if (!table || !tbody) return;
+
+    var allRows = Array.from(tbody.querySelectorAll('tr:not(.empty-row)'));
+    var filteredRows = allRows.slice();
+    var currentPage = 1;
+    var pageSize = 25;
+    var sortCol = -1;
+    var sortAsc = true;
+
+    // ── Filter ──
+    filterInput.addEventListener('input', function() {
+        var q = this.value.toLowerCase();
+        filteredRows = allRows.filter(function(row) {
+            return row.textContent.toLowerCase().indexOf(q) !== -1;
+        });
+        currentPage = 1;
+        render();
+    });
+
+    // ── Sort ──
+    table.querySelectorAll('.sortable-header').forEach(function(th) {
+        th.addEventListener('click', function() {
+            var colIdx = parseInt(this.dataset.colIndex);
+            if (sortCol === colIdx) {
+                sortAsc = !sortAsc;
+            } else {
+                sortCol = colIdx;
+                sortAsc = true;
+            }
+            filteredRows.sort(function(a, b) {
+                var aVal = (a.children[colIdx] || {}).textContent || '';
+                var bVal = (b.children[colIdx] || {}).textContent || '';
+                // Try numeric sort
+                var aNum = parseFloat(aVal);
+                var bNum = parseFloat(bVal);
+                if (!isNaN(aNum) && !isNaN(bNum)) {
+                    return sortAsc ? aNum - bNum : bNum - aNum;
+                }
+                return sortAsc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+            });
+            // Update sort icons
+            table.querySelectorAll('.sort-icon').forEach(function(icon) {
+                icon.classList.remove('active');
+                icon.textContent = 'arrow_upward';
+            });
+            var activeIcon = this.querySelector('.sort-icon');
+            activeIcon.classList.add('active');
+            activeIcon.textContent = sortAsc ? 'arrow_upward' : 'arrow_downward';
+            currentPage = 1;
+            render();
+        });
+    });
+
+    // ── Page size ──
+    pageSizeSelect.addEventListener('change', function() {
+        pageSize = parseInt(this.value);
+        currentPage = 1;
+        render();
+    });
+
+    // ── Render ──
+    function render() {
+        var total = filteredRows.length;
+        var totalPages = Math.max(1, Math.ceil(total / pageSize));
+        if (currentPage > totalPages) currentPage = totalPages;
+        var start = (currentPage - 1) * pageSize;
+        var end = Math.min(start + pageSize, total);
+
+        // Show/hide rows
+        tbody.innerHTML = '';
+        if (total === 0) {
+            var emptyRow = document.createElement('tr');
+            var numCols = table.querySelectorAll('thead th').length;
+            emptyRow.innerHTML = '<td colspan="' + numCols + '" class="center-align grey-text">No records match your filter.</td>';
+            tbody.appendChild(emptyRow);
+        } else {
+            for (var i = start; i < end; i++) {
+                tbody.appendChild(filteredRows[i]);
+            }
+        }
+
+        // Update info
+        showStart.textContent = total === 0 ? 0 : start + 1;
+        showEnd.textContent = end;
+        showTotal.textContent = total;
+
+        // Pagination controls
+        var html = '';
+        html += '<li class="' + (currentPage === 1 ? 'disabled' : 'waves-effect') + '">';
+        html += '<a href="#!" data-page="' + (currentPage - 1) + '"><i class="material-icons">chevron_left</i></a></li>';
+        var startPage = Math.max(1, currentPage - 2);
+        var endPage = Math.min(totalPages, startPage + 4);
+        startPage = Math.max(1, endPage - 4);
+        for (var p = startPage; p <= endPage; p++) {
+            html += '<li class="' + (p === currentPage ? 'active blue-grey darken-1' : 'waves-effect') + '">';
+            html += '<a href="#!" data-page="' + p + '">' + p + '</a></li>';
+        }
+        html += '<li class="' + (currentPage === totalPages ? 'disabled' : 'waves-effect') + '">';
+        html += '<a href="#!" data-page="' + (currentPage + 1) + '"><i class="material-icons">chevron_right</i></a></li>';
+        paginationControls.innerHTML = html;
+
+        // Page click handlers
+        paginationControls.querySelectorAll('a[data-page]').forEach(function(a) {
+            a.addEventListener('click', function(e) {
+                e.preventDefault();
+                var p = parseInt(this.dataset.page);
+                if (p >= 1 && p <= totalPages && p !== currentPage) {
+                    currentPage = p;
+                    render();
+                }
+            });
+        });
+    }
+
+    render();
+})();
+</script>
+{% endblock %}

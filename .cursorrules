@@ -1,0 +1,80 @@
+# GSD Framework - Cursor Rules
+# App: Vino (vino)
+# Generated: 2026-03-18
+#
+# Include this file in every Cursor session for this project.
+
+## Mandatory conventions (never deviate)
+
+- Every Django model inherits from `apps.core.models.BaseModel`.
+- All primary keys are UUIDField. No integer or auto-increment PKs anywhere.
+- All foreign keys use UUIDs. No integer FK references.
+- All lookup/reference values (status, type, category, etc.) use the `LookupValue`
+  model in `apps/lookup/models.py` with parent-child hierarchy.
+  Never create a new table for a reference list.
+- Authentication is Google and Microsoft OAuth2 only. No passwords are stored.
+  User model is `apps.users.models.User`. set_unusable_password() always called.
+- Soft delete via `is_active = False`. Never issue DELETE in application code.
+- All API responses use the envelope: {"success": bool, "data": ..., "meta": ..., "errors": []}.
+- Docker Compose is used locally. All services defined in docker-compose.yml.
+- Environment variables loaded via django-environ. No hardcoded config values.
+- Settings split: base.py / local.py / dev.py / uat.py / prod.py.
+- Django app slug: `vino`.
+
+## .env protection (CRITICAL)
+
+- The .env, .env.docker, and .env.example files contain real pre-configured API keys.
+- NEVER remove, blank out, overwrite, or replace any existing key values.
+- NEVER replace real keys with placeholder text like "your-key-here" or "changeme".
+- If you need to add a new env var, APPEND it. Never rewrite the file.
+- If a Django setting references an env var, trust that .env already has it.
+
+## Project-specific rules
+
+- Authentication is Google and Microsoft OAuth2 only. No passwords are stored.
+- Docker Compose is used locally. All services defined in docker-compose.yml.
+- Deployments target DEV, UAT, and PROD AWS environments via AWS SSO. Never hardcode credentials.
+- Sentry for error tracking. All errors auto-reported. Check sentry.io for issues.
+
+## Data grids (MANDATORY)
+
+Every data grid / list table in the application MUST include all of the following
+features enabled by default. No exceptions.
+
+- **Client-side filtering** — a search input above the table that filters rows instantly on keystroke.
+- **Column sorting** — clickable column headers that toggle ascending/descending sort. Support both text and numeric sort (auto-detect). Show a sort direction icon on the active column.
+- **Pagination** — page size selector (10, 25, 50, 100) with prev/next page navigation and a "Showing X–Y of Z records" info line. Default page size is 25.
+- **Scrollable table** — the table body must scroll vertically (`max-height` with `overflow-y: auto`) and horizontally (`overflow-x: auto`) so it never clips content. Column headers must be sticky (`position: sticky; top: 0; background: #fff; z-index: 2`) so they remain visible during vertical scroll.
+- **Use the existing `templates/admin/list.html` pattern** as the reference implementation for all new list pages. Do not create list pages without these features.
+
+## Frontend interactivity (htmx preferred)
+
+- Use **htmx** for all server-driven interactivity: form submissions, partial page updates,
+  inline editing, toggles, loading indicators, and any UI that needs server data.
+- htmx is loaded globally via CDN in `templates/base.html`. CSRF token is auto-attached.
+- Prefer `hx-post`, `hx-get`, `hx-swap`, `hx-target`, and `hx-trigger` attributes
+  over writing custom `fetch()` / AJAX JavaScript.
+- For interactions that are purely client-side (drag-and-drop reorder, map manipulation,
+  dropdown toggles), vanilla JS or SortableJS is fine.
+- SortableJS is loaded globally in `base.html` for drag-and-drop reorder lists.
+- Materialize CSS 1.0.0 is the CSS framework (CDN). Use Material Icons for all icons.
+- Google Maps JavaScript API with AdvancedMarkerElement for map features.
+
+## Code style
+
+- Python 3.12+. Type hints on all function signatures.
+- Ruff for linting. MyPy for type checking.
+- Tests in pytest. Coverage minimum 80%.
+- No inline SQL. Use ORM or repository pattern.
+- All Celery tasks must be idempotent.
+- Service layer in apps/{module}/services.py. Views are thin.
+
+## When generating code, always
+
+1. Inherit from BaseModel - never from models.Model directly.
+2. Use UUID for all id fields and foreign keys.
+3. Use LookupValue for any reference/enum-like field.
+4. Route all reference values through ForeignKey to LookupValue.
+5. Write a migration immediately after any model change.
+6. Add a corresponding factory and test when creating a new model.
+7. Every list/grid page must include filtering, sorting, and pagination (see Data grids section).

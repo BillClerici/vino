@@ -1,0 +1,28 @@
+name: Deploy to PROD
+on:
+  release:
+    types: [published]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: prod
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::role/vino-deploy
+          aws-region: us-east-1
+      - name: Build and push to ECR
+        run: bash scripts/deploy.sh prod
+      - name: Run migrations
+        run: |
+          aws ecs run-task \
+            --cluster vino-prod \
+            --task-definition vino-migrate \
+            --launch-type FARGATE
+      - name: Verify health
+        run: curl -f https://example.com/api/health/ || exit 1

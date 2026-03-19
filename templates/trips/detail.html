@@ -1,0 +1,854 @@
+{% extends "base.html" %}
+
+{% block title %}{{ trip.name }} — VinoVoyage{% endblock %}
+
+{% block extra_css %}
+<style>
+    .trip-chip {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 4px 12px; border-radius: 12px;
+        font-size: 0.75rem; font-weight: 600; text-transform: uppercase;
+    }
+    .trip-chip.draft { background: #e0e0e0; color: #616161; }
+    .trip-chip.planning { background: #fff3e0; color: #e65100; }
+    .trip-chip.confirmed { background: #e8f5e9; color: #2e7d32; }
+    .trip-chip.in_progress { background: #e3f2fd; color: #1565c0; }
+    .trip-chip.completed { background: #f3e5f5; color: #7b1fa2; }
+    .trip-chip.cancelled { background: #fce4ec; color: #c62828; }
+
+
+    .stop-card {
+        border: 1px solid #f0f0f0; border-radius: 8px; padding: 16px;
+        margin-bottom: 10px; background: #fff; transition: box-shadow 0.15s;
+    }
+    .stop-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .stop-header { display: flex; align-items: center; gap: 12px; }
+    .stop-number {
+        width: 32px; height: 32px; border-radius: 50%;
+        background: #7e57c2; color: #fff;
+        display: flex; align-items: center; justify-content: center;
+        font-weight: 700; font-size: 0.85rem; flex-shrink: 0;
+    }
+    .stop-details { display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid #f5f5f5; }
+    .stop-details.open { display: block; }
+    .stop-field { margin-bottom: 10px; }
+    .stop-field label { font-size: 0.78rem; color: #9e9e9e; display: block; margin-bottom: 2px; }
+    .stop-field input, .stop-field textarea {
+        width: 100%; border: 1px solid #e0e0e0; border-radius: 4px;
+        padding: 6px 10px; font-size: 0.88rem; box-sizing: border-box;
+        font-family: inherit;
+    }
+    .stop-field textarea { resize: vertical; min-height: 50px; }
+    .stop-field input:focus, .stop-field textarea:focus { border-color: #7e57c2; outline: none; }
+    .stop-actions { display: flex; gap: 6px; margin-left: auto; }
+    .stop-actions button {
+        border: none; background: none; cursor: pointer; padding: 4px;
+        border-radius: 4px; color: #9e9e9e; transition: all 0.12s;
+    }
+    .stop-actions button:hover { background: #f5f5f5; color: #333; }
+    .stop-actions .remove-btn:hover { color: #c62828; background: #fce4ec; }
+
+    .member-card {
+        border: 1px solid #f0f0f0; border-radius: 8px; padding: 12px 16px;
+        margin-bottom: 10px; background: #fff; transition: box-shadow 0.15s;
+    }
+    .member-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .member-details { display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid #f5f5f5; }
+    .member-details.open { display: block; }
+    .member-row {
+        display: flex; align-items: center; gap: 12px;
+    }
+    .member-avatar {
+        width: 36px; height: 36px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-weight: 700; font-size: 0.85rem;
+    }
+    .rsvp-chip {
+        display: inline-flex; padding: 2px 8px; border-radius: 10px;
+        font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
+    }
+    .rsvp-chip.accepted { background: #e8f5e9; color: #2e7d32; }
+    .rsvp-chip.pending { background: #fff3e0; color: #e65100; }
+    .rsvp-chip.declined { background: #fce4ec; color: #c62828; }
+
+    .invite-bar { display: flex; gap: 8px; margin-top: 12px; }
+    .invite-bar input {
+        flex: 1; border: 1px solid #e0e0e0; border-radius: 4px;
+        padding: 6px 10px; font-size: 0.85rem;
+    }
+    .invite-bar input:focus { border-color: #7e57c2; outline: none; }
+    .invite-bar button {
+        padding: 6px 14px; border-radius: 4px; border: none;
+        background: #7e57c2; color: #fff; font-size: 0.82rem;
+        cursor: pointer; white-space: nowrap;
+    }
+    .invite-bar button:hover { background: #6a3fb5; }
+
+    .status-select {
+        border: 1px solid #e0e0e0; border-radius: 4px; padding: 4px 8px;
+        font-size: 0.82rem; background: #fff; cursor: pointer;
+    }
+    .status-select:focus { border-color: #7e57c2; outline: none; }
+    .save-hint { font-size: 0.72rem; color: #9e9e9e; font-style: italic; }
+
+    .trip-field { margin-bottom: 12px; }
+    .trip-field label {
+        font-size: 0.75rem; color: #9e9e9e; display: block; margin-bottom: 3px;
+        text-transform: uppercase; letter-spacing: 0.3px; font-weight: 600;
+    }
+    .trip-field input, .trip-field textarea {
+        width: 100%; border: 1px solid #e0e0e0; border-radius: 4px;
+        padding: 8px 10px; font-size: 0.88rem; box-sizing: border-box;
+        font-family: inherit; transition: border-color 0.15s;
+    }
+    .trip-field textarea { resize: vertical; min-height: 60px; }
+    .trip-field input:focus, .trip-field textarea:focus { border-color: #7e57c2; outline: none; }
+
+    .stop-card { cursor: default; }
+    .drag-handle {
+        cursor: grab; color: #ccc; display: flex; align-items: center;
+        padding: 0 2px; flex-shrink: 0; touch-action: none;
+    }
+    .drag-handle:active { cursor: grabbing; }
+    .drag-handle:hover { color: #9e9e9e; }
+    .sortable-ghost { opacity: 0.3; }
+    .sortable-chosen { box-shadow: 0 4px 16px rgba(0,0,0,0.15); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container" style="margin-top: 20px; padding-bottom: 30px;">
+    <div style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
+        <a href="{% url 'trip_list' %}" style="display: inline-flex; align-items: center; gap: 5px; border: none; background: #546e7a; border-radius: 18px; padding: 6px 16px; text-decoration: none; font-size: 0.82rem; font-weight: 600; color: #fff; line-height: 1.4; transition: all 0.15s; box-shadow: 0 2px 6px rgba(84,110,122,0.3);" onmouseover="this.style.background='#455a64';this.style.boxShadow='0 3px 10px rgba(84,110,122,0.4)'" onmouseout="this.style.background='#546e7a';this.style.boxShadow='0 2px 6px rgba(84,110,122,0.3)'">
+            <i class="material-icons" style="font-size: 1rem;">arrow_back</i> Back
+        </a>
+        <button onclick="deleteTrip()" style="display: inline-flex; align-items: center; gap: 5px; border: none; background: #c62828; border-radius: 18px; padding: 6px 16px; cursor: pointer; font-size: 0.82rem; font-weight: 600; color: #fff; line-height: 1.4; transition: all 0.15s; flex-shrink: 0; box-shadow: 0 2px 6px rgba(198,40,40,0.3);" onmouseover="this.style.background='#b71c1c';this.style.boxShadow='0 3px 10px rgba(198,40,40,0.4)'" onmouseout="this.style.background='#c62828';this.style.boxShadow='0 2px 6px rgba(198,40,40,0.3)'">
+            <i class="material-icons" style="font-size: 1rem;">delete</i> Delete Trip
+        </button>
+    </div>
+
+            <!-- Trip Details -->
+            <div class="card" style="border-radius: 8px;">
+                <div class="card-content" style="position: relative;">
+                    {% with first_stop_image=stops.0.winery.image_url %}
+                    {% if first_stop_image %}
+                    <img src="{{ first_stop_image }}" alt="" style="position: absolute; top: 16px; right: 16px; width: 72px; height: 72px; border-radius: 8px; object-fit: cover; box-shadow: 0 2px 8px rgba(0,0,0,0.12);">
+                    {% endif %}
+                    {% endwith %}
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+                        <span class="card-title" style="font-size: 1.1rem; font-weight: 600; color: #455a64; display: inline-flex; align-items: center; gap: 6px; margin: 0;">
+                            <i class="material-icons">info</i> Trip Details
+                        </span>
+                        <span class="save-hint" id="save-hint" style="display:none;">Saved</span>
+                    </div>
+
+                    <div class="trip-field">
+                        <label>Trip Name</label>
+                        <input type="text" id="trip-name" value="{{ trip.name }}" onblur="saveTripField()" style="font-size: 1.1rem; font-weight: 600;">
+                    </div>
+
+                    <div class="row" style="margin-bottom: 0;">
+                        <div class="col s6">
+                            <div class="trip-field">
+                                <label>Status</label>
+                                <select class="browser-default" id="trip-status" onchange="saveTripField()" style="width: 100%; border: 1px solid #e0e0e0; border-radius: 4px; padding: 6px 10px; font-size: 0.88rem; background: #fff; cursor: pointer; height: auto;">
+                                    <option value="draft" {% if trip.status == 'draft' %}selected{% endif %}>Draft</option>
+                                    <option value="planning" {% if trip.status == 'planning' %}selected{% endif %}>Planning</option>
+                                    <option value="confirmed" {% if trip.status == 'confirmed' %}selected{% endif %}>Confirmed</option>
+                                    <option value="in_progress" {% if trip.status == 'in_progress' %}selected{% endif %}>In Progress</option>
+                                    <option value="completed" {% if trip.status == 'completed' %}selected{% endif %}>Completed</option>
+                                    <option value="cancelled" {% if trip.status == 'cancelled' %}selected{% endif %}>Cancelled</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col s6">
+                            <div class="trip-field">
+                                <label>Description</label>
+                                <textarea id="trip-description" placeholder="What's this trip about?" onblur="saveTripField()">{{ trip.description }}</textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row" style="margin-bottom: 0;">
+                        <div class="col s3">
+                            <div class="trip-field">
+                                <label>Start Date</label>
+                                <input type="date" id="trip-date" value="{{ trip.scheduled_date|date:'Y-m-d' }}" onchange="saveTripField()">
+                            </div>
+                        </div>
+                        <div class="col s3">
+                            <div class="trip-field">
+                                <label>End Date</label>
+                                <input type="date" id="trip-end-date" value="{{ trip.end_date|date:'Y-m-d' }}" onchange="saveTripField()">
+                            </div>
+                        </div>
+                        <div class="col s3">
+                            <div class="trip-field">
+                                <label>Meeting Time</label>
+                                <input type="time" id="trip-meeting-time" value="{{ trip.meeting_time|date:'H:i' }}" onchange="saveTripField()">
+                            </div>
+                        </div>
+                        <div class="col s3">
+                            <div class="trip-field">
+                                <label>Transportation</label>
+                                <input type="text" id="trip-transportation" value="{{ trip.transportation }}" placeholder="Carpool, van, etc." onblur="saveTripField()">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row" style="margin-bottom: 0;">
+                        <div class="col s6">
+                            <div class="trip-field">
+                                <label>Meeting Location</label>
+                                <input type="text" id="trip-meeting-location" value="{{ trip.meeting_location }}" placeholder="Where to meet up" onblur="saveTripField()">
+                            </div>
+                        </div>
+                        <div class="col s6">
+                            <div class="trip-field">
+                                <label>Meeting Notes</label>
+                                <textarea id="trip-meeting-notes" placeholder="Parking details, what to bring, contact info..." onblur="saveTripField()">{{ trip.meeting_notes }}</textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row" style="margin-bottom: 0;">
+                        <div class="col s6">
+                            <div class="trip-field">
+                                <label>Budget / Cost Notes</label>
+                                <textarea id="trip-budget-notes" placeholder="Tasting fees, food budget, split info..." onblur="saveTripField()">{{ trip.budget_notes }}</textarea>
+                            </div>
+                        </div>
+                        <div class="col s6">
+                            <div class="trip-field">
+                                <label>General Notes</label>
+                                <textarea id="trip-notes" placeholder="Anything else..." onblur="saveTripField()">{{ trip.notes }}</textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Itinerary -->
+            <div class="card" style="border-radius: 8px;">
+                <div class="card-content">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span class="card-title" style="font-size: 1.1rem; font-weight: 600; color: #455a64; margin-bottom: 0; display: inline-flex; align-items: center; gap: 6px;">
+                            <i class="material-icons">route</i> Itinerary
+                        </span>
+                        <a href="{% url 'winery_list' %}?trip={{ trip.pk }}" class="btn-small waves-effect waves-light" style="background: #7e57c2;">
+                            <i class="material-icons left" style="margin-right: 4px;">add_location</i> Add Stop
+                        </a>
+                    </div>
+
+                    <div id="stops-list" style="margin-top: 16px;">
+                        {% for stop in stops %}
+                        <div class="stop-card" data-stop-id="{{ stop.pk }}" data-winery-id="{{ stop.winery.pk }}" >
+                            <div class="stop-header">
+                                <div class="drag-handle" title="Drag to reorder"><i class="material-icons">drag_indicator</i></div>
+                                <div class="stop-number">{{ stop.order }}</div>
+                                {% if stop.winery.image_url %}
+                                <img src="{{ stop.winery.image_url }}" alt="{{ stop.winery.name }}" style="width: 48px; height: 48px; border-radius: 6px; object-fit: cover; flex-shrink: 0;">
+                                {% else %}
+                                <div style="width: 48px; height: 48px; border-radius: 6px; background: #ede7f6; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                                    <i class="material-icons" style="color: #7e57c2; font-size: 1.3rem;">local_bar</i>
+                                </div>
+                                {% endif %}
+                                <div style="flex: 1;">
+                                    <a href="{% url 'winery_detail' pk=stop.winery.pk %}" style="font-weight: 600; color: #333;">{{ stop.winery.name }}</a>
+                                    {% if stop.winery.city %}
+                                    <div style="font-size: 0.78rem; color: #9e9e9e;">
+                                        {{ stop.winery.city }}{% if stop.winery.state %}, {{ stop.winery.state }}{% endif %}
+                                    </div>
+                                    {% endif %}
+                                    {% if stop.arrival_time %}
+                                    <div style="font-size: 0.78rem; color: #757575; margin-top: 2px;">
+                                        <i class="material-icons tiny">schedule</i> {{ stop.arrival_time|date:"M j, g:i A" }}
+                                        {% if stop.duration_minutes %}· {{ stop.duration_minutes }} min{% endif %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                <div class="stop-actions">
+                                    <button onclick="toggleStopDetails(this)" title="Edit details">
+                                        <i class="material-icons" style="font-size: 1.1rem;">edit</i>
+                                    </button>
+                                    <button class="remove-btn" onclick="removeStop('{{ stop.pk }}')" title="Delete">
+                                        <i class="material-icons" style="font-size: 1.1rem;">delete</i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="stop-details" id="details-{{ stop.pk }}">
+                                <div class="row" style="margin-bottom: 0;">
+                                    <div class="col s6">
+                                        <div class="stop-field">
+                                            <label>Arrival Date & Time</label>
+                                            <input type="datetime-local" value="{{ stop.arrival_time|date:'Y-m-d\TH:i' }}" data-field="arrival_time">
+                                        </div>
+                                    </div>
+                                    <div class="col s3">
+                                        <div class="stop-field">
+                                            <label>Duration (min)</label>
+                                            <input type="number" value="{{ stop.duration_minutes|default_if_none:'' }}" data-field="duration_minutes" placeholder="60">
+                                        </div>
+                                    </div>
+                                    <div class="col s3">
+                                        <div class="stop-field">
+                                            <label>Order</label>
+                                            <input type="number" value="{{ stop.order }}" data-field="order" min="1">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="stop-field">
+                                    <label>Description</label>
+                                    <textarea data-field="description" placeholder="What's planned at this stop?">{{ stop.description }}</textarea>
+                                </div>
+                                <div class="stop-field">
+                                    <label>Notes</label>
+                                    <textarea data-field="notes" placeholder="Personal notes, reminders...">{{ stop.notes }}</textarea>
+                                </div>
+                                <div class="stop-field">
+                                    <label>Meeting Details</label>
+                                    <textarea data-field="meeting_details" placeholder="Where to meet, contact info...">{{ stop.meeting_details }}</textarea>
+                                </div>
+                                <div class="stop-field">
+                                    <label>Travel Details</label>
+                                    <textarea data-field="travel_details" placeholder="Directions, parking, carpool...">{{ stop.travel_details }}</textarea>
+                                </div>
+                                <div style="display: flex; align-items: center; margin-top: 6px;">
+                                    <div style="display: flex; gap: 8px;">
+                                        <button onclick="saveStopDetails('{{ stop.pk }}')" style="padding: 6px 16px; border-radius: 4px; border: none; background: #7e57c2; color: #fff; font-size: 0.82rem; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+                                            <i class="material-icons" style="font-size: 0.95rem;">save</i> Save
+                                        </button>
+                                        <button onclick="cancelStopDetails(this)" style="padding: 6px 16px; border-radius: 4px; border: 1px solid #e0e0e0; background: #fff; color: #757575; font-size: 0.82rem; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+                                            <i class="material-icons" style="font-size: 0.95rem;">close</i> Cancel
+                                        </button>
+                                    </div>
+                                    <button onclick="removeStop('{{ stop.pk }}')" style="margin-left: auto; padding: 6px 16px; border-radius: 4px; border: 1px solid #e0e0e0; background: #fff; color: #c62828; font-size: 0.82rem; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" onmouseover="this.style.background='#fce4ec';this.style.borderColor='#c62828'" onmouseout="this.style.background='#fff';this.style.borderColor='#e0e0e0'">
+                                        <i class="material-icons" style="font-size: 0.95rem;">delete</i> Delete
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="center-align" style="padding: 20px 0;" id="no-stops-msg">
+                            <i class="material-icons medium grey-text text-lighten-1">add_location</i>
+                            <p class="grey-text">No stops yet.</p>
+                            <a href="{% url 'winery_list' %}?trip={{ trip.pk }}" class="btn-small waves-effect waves-light" style="background: #7e57c2; margin-top: 8px;">
+                                <i class="material-icons left" style="margin-right: 4px;">add_location</i> Add Your First Stop
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Members -->
+            <div class="card" style="border-radius: 8px;">
+                <div class="card-content">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <span class="card-title" style="font-size: 1.1rem; font-weight: 600; color: #455a64; display: inline-flex; align-items: center; gap: 6px; margin: 0;">
+                            <i class="material-icons">group</i> Members (<span id="member-count">{{ members|length }}</span>)
+                        </span>
+                        <button onclick="toggleInviteForm()" class="btn-small waves-effect waves-light" style="background: #7e57c2;">
+                            <i class="material-icons left" style="margin-right: 4px;">person_add</i> Invite
+                        </button>
+                    </div>
+
+                    <!-- Invite Form (hidden by default) -->
+                    <div id="invite-form" style="display: none; background: #fafafa; border-radius: 8px; padding: 16px; margin-bottom: 16px; border: 1px solid #e0e0e0;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                            <span style="font-weight: 600; font-size: 0.9rem; color: #455a64;">Send Invitation</span>
+                            <button onclick="toggleInviteForm()" style="border: none; background: none; cursor: pointer; color: #9e9e9e; padding: 2px;">
+                                <i class="material-icons" style="font-size: 1.1rem;">close</i>
+                            </button>
+                        </div>
+                        <div class="row" style="margin-bottom: 0;">
+                            <div class="col s6">
+                                <div class="trip-field">
+                                    <label>First Name</label>
+                                    <input type="text" id="invite-first-name" placeholder="First name">
+                                </div>
+                            </div>
+                            <div class="col s6">
+                                <div class="trip-field">
+                                    <label>Last Name</label>
+                                    <input type="text" id="invite-last-name" placeholder="Last name">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="trip-field">
+                            <label>Email Address</label>
+                            <input type="email" id="invite-email" placeholder="email@example.com">
+                        </div>
+                        <div class="trip-field">
+                            <label>Personal Message</label>
+                            <textarea id="invite-message" placeholder="Add a personal note to your invitation..." style="min-height: 70px;">Join us for an amazing wine tasting adventure! We'd love to have you along for the trip.</textarea>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+                            <div id="invite-msg" style="font-size: 0.78rem;"></div>
+                            <button onclick="sendInvite()" class="btn waves-effect waves-light" style="background: #7e57c2;">
+                                <i class="material-icons left">send</i> Send Invitation
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="members-list">
+                        {% for tm in members %}
+                        <div class="member-card" id="member-{{ tm.pk }}" data-member-id="{{ tm.pk }}">
+                            <div class="member-row">
+                                <div class="member-avatar {% if tm.role == 'organizer' %}deep-purple lighten-4{% else %}blue-grey lighten-4{% endif %}">
+                                    <span class="{% if tm.role == 'organizer' %}deep-purple-text{% else %}blue-grey-text{% endif %} member-initial">
+                                        {{ tm.display_initial }}
+                                    </span>
+                                </div>
+                                <div style="flex: 1; min-width: 0;">
+                                    <div class="member-name" style="font-weight: 600; font-size: 0.88rem;">{{ tm.display_name }}</div>
+                                    <div class="member-role-line" style="font-size: 0.72rem; color: #9e9e9e;">
+                                        <span class="member-role-text">{{ tm.get_role_display }}</span>{% if tm.invite_email %} &middot; {{ tm.invite_email }}{% endif %}
+                                    </div>
+                                    {% if tm.invited_at %}
+                                    <div class="invite-timestamps" style="font-size: 0.68rem; color: #bdbdbd; margin-top: 2px;">
+                                        <i class="material-icons" style="font-size: 0.68rem; vertical-align: middle;">send</i> Invited {{ tm.invited_at|date:"M j, Y g:i A" }}
+                                        {% if tm.responded_at %}
+                                        &middot; <span class="rsvp-responded"><i class="material-icons" style="font-size: 0.68rem; vertical-align: middle;">reply</i> Responded {{ tm.responded_at|date:"M j, Y g:i A" }}</span>
+                                        {% endif %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                <span class="rsvp-chip {{ tm.rsvp_status }} member-rsvp-chip">{{ tm.rsvp_status }}</span>
+                                {% if tm.role != 'organizer' %}
+                                <div class="stop-actions">
+                                    <button onclick="toggleMemberDetails(this)" title="Edit details">
+                                        <i class="material-icons" style="font-size: 1.1rem;">edit</i>
+                                    </button>
+                                    <button class="remove-btn" onclick="removeMember('{{ tm.pk }}')" title="Delete">
+                                        <i class="material-icons" style="font-size: 1.1rem;">delete</i>
+                                    </button>
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% if tm.role != 'organizer' %}
+                            <div class="member-details">
+                                <div class="row" style="margin-bottom: 0;">
+                                    <div class="col s4">
+                                        <div class="stop-field">
+                                            <label>First Name</label>
+                                            <input type="text" data-field="invite_first_name" value="{{ tm.invite_first_name }}">
+                                        </div>
+                                    </div>
+                                    <div class="col s4">
+                                        <div class="stop-field">
+                                            <label>Last Name</label>
+                                            <input type="text" data-field="invite_last_name" value="{{ tm.invite_last_name }}">
+                                        </div>
+                                    </div>
+                                    <div class="col s4">
+                                        <div class="stop-field">
+                                            <label>Email</label>
+                                            <input type="email" data-field="invite_email" value="{{ tm.invite_email }}">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row" style="margin-bottom: 0;">
+                                    <div class="col s4">
+                                        <div class="stop-field">
+                                            <label>RSVP Status</label>
+                                            <select class="browser-default" data-field="rsvp_status" style="width: 100%; border: 1px solid #e0e0e0; border-radius: 4px; padding: 6px 10px; font-size: 0.88rem; background: #fff; cursor: pointer; height: auto;">
+                                                <option value="pending" {% if tm.rsvp_status == 'pending' %}selected{% endif %}>Pending</option>
+                                                <option value="accepted" {% if tm.rsvp_status == 'accepted' %}selected{% endif %}>Accepted</option>
+                                                <option value="declined" {% if tm.rsvp_status == 'declined' %}selected{% endif %}>Declined</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col s4">
+                                        <div class="stop-field">
+                                            <label>Role</label>
+                                            <select class="browser-default" data-field="role" style="width: 100%; border: 1px solid #e0e0e0; border-radius: 4px; padding: 6px 10px; font-size: 0.88rem; background: #fff; cursor: pointer; height: auto;">
+                                                <option value="invited" {% if tm.role == 'invited' %}selected{% endif %}>Invited</option>
+                                                <option value="member" {% if tm.role == 'member' %}selected{% endif %}>Member</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row" style="margin-bottom: 0;">
+                                    <div class="col s12">
+                                        <div class="stop-field">
+                                            <label>Notes</label>
+                                            <textarea data-field="notes" placeholder="Dietary restrictions, travel preferences, anything to note...">{{ tm.notes }}</textarea>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row" style="margin-bottom: 0;">
+                                    <div class="col s12">
+                                        <div class="stop-field">
+                                            <label>Invitation Message</label>
+                                            <textarea data-field="invite_message" placeholder="Personalised invitation text...">{{ tm.invite_message }}</textarea>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row" style="margin-bottom: 0;">
+                                    <div class="col s12">
+                                        <div style="display: flex; align-items: center; margin-top: 6px;">
+                                            <div style="display: flex; gap: 8px;">
+                                                <button onclick="saveMemberDetails('{{ tm.pk }}')" style="padding: 6px 16px; border-radius: 4px; border: none; background: #7e57c2; color: #fff; font-size: 0.82rem; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+                                                    <i class="material-icons" style="font-size: 0.95rem;">save</i> Save
+                                                </button>
+                                                <button onclick="cancelMemberDetails(this)" style="padding: 6px 16px; border-radius: 4px; border: 1px solid #e0e0e0; background: #fff; color: #757575; font-size: 0.82rem; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+                                                    <i class="material-icons" style="font-size: 0.95rem;">close</i> Cancel
+                                                </button>
+                                            </div>
+                                            <button onclick="removeMember('{{ tm.pk }}')" style="margin-left: auto; padding: 6px 16px; border-radius: 4px; border: 1px solid #e0e0e0; background: #fff; color: #c62828; font-size: 0.82rem; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" onmouseover="this.style.background='#fce4ec';this.style.borderColor='#c62828'" onmouseout="this.style.background='#fff';this.style.borderColor='#e0e0e0'">
+                                                <i class="material-icons" style="font-size: 0.95rem;">delete</i> Delete
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+var tripId = '{{ trip.pk }}';
+var csrfToken = '{{ csrf_token }}';
+
+function api(url, body) {
+    return fetch(url, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body || {})
+    }).then(function(r) { return r.json(); });
+}
+
+// ── Trip Header ──
+var saveTimer = null;
+function deleteTrip() {
+    if (!confirm('Delete this trip? This cannot be undone.')) return;
+    api('/trips/' + tripId + '/delete/').then(function(data) {
+        if (data.ok) window.location.href = '/trips/';
+    });
+}
+
+function getVal(id) { var el = document.getElementById(id); return el ? el.value : ''; }
+
+function saveTripField() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(function() {
+        api('/trips/' + tripId + '/update/', {
+            name: getVal('trip-name'),
+            status: getVal('trip-status'),
+            scheduled_date: getVal('trip-date'),
+            end_date: getVal('trip-end-date'),
+            description: getVal('trip-description'),
+            meeting_location: getVal('trip-meeting-location'),
+            meeting_time: getVal('trip-meeting-time'),
+            meeting_notes: getVal('trip-meeting-notes'),
+            transportation: getVal('trip-transportation'),
+            budget_notes: getVal('trip-budget-notes'),
+            notes: getVal('trip-notes')
+        }).then(function() {
+            var hint = document.getElementById('save-hint');
+            hint.style.display = 'inline';
+            setTimeout(function() { hint.style.display = 'none'; }, 1500);
+        });
+    }, 400);
+}
+
+// ── Drag & Drop Reorder (SortableJS) ──
+var sortableInstance = null;
+
+function setupDragAndDrop() {
+    var list = document.getElementById('stops-list');
+    if (!list) return;
+
+    // Destroy previous instance if re-initializing
+    if (sortableInstance) sortableInstance.destroy();
+
+    sortableInstance = new Sortable(list, {
+        handle: '.drag-handle',
+        animation: 200,
+        ghostClass: 'sortable-ghost',
+        chosenClass: 'sortable-chosen',
+        onEnd: function() {
+            // Renumber and save after drop
+            var cards = list.querySelectorAll('.stop-card');
+            var order = [];
+            cards.forEach(function(card, idx) {
+                var num = idx + 1;
+                var numEl = card.querySelector('.stop-number');
+                if (numEl) numEl.textContent = num;
+                var orderInput = card.querySelector('[data-field="order"]');
+                if (orderInput) orderInput.value = num;
+                order.push({ stop_id: card.dataset.stopId, order: num });
+            });
+            api('/trips/' + tripId + '/reorder/', { stops: order });
+        }
+    });
+}
+
+// ── Stops ──
+function snapshotFields(container) {
+    var snap = {};
+    container.querySelectorAll('[data-field]').forEach(function(el) { snap[el.dataset.field] = el.value; });
+    return snap;
+}
+
+function restoreFields(container, snap) {
+    container.querySelectorAll('[data-field]').forEach(function(el) {
+        if (snap.hasOwnProperty(el.dataset.field)) el.value = snap[el.dataset.field];
+    });
+}
+
+function toggleStopDetails(btn) {
+    var card = btn.closest('.stop-card');
+    var details = card.querySelector('.stop-details');
+    if (!details.classList.contains('open')) {
+        details._snapshot = snapshotFields(details);
+        var actions = card.querySelectorAll('.stop-actions button');
+        actions.forEach(function(b) { b.style.display = 'none'; });
+    }
+    details.classList.toggle('open');
+}
+
+function cancelStopDetails(btn) {
+    var card = btn.closest('.stop-card');
+    var details = card.querySelector('.stop-details');
+    if (details._snapshot) restoreFields(details, details._snapshot);
+    details.classList.remove('open');
+    var actions = card.querySelectorAll('.stop-actions button');
+    actions.forEach(function(b) { b.style.display = ''; });
+}
+
+function saveStopDetails(stopId) {
+    var card = document.querySelector('[data-stop-id="' + stopId + '"]');
+    var body = {};
+    card.querySelectorAll('[data-field]').forEach(function(el) {
+        body[el.dataset.field] = el.value;
+    });
+    api('/trips/' + tripId + '/stops/' + stopId + '/update/', body).then(function(data) {
+        if (data.ok) {
+            var details = card.querySelector('.stop-details');
+            details.classList.remove('open');
+            // Reload to reflect changes in header
+            location.reload();
+        }
+    });
+}
+
+function removeStop(stopId) {
+    if (!confirm('Remove this stop?')) return;
+    api('/trips/' + tripId + '/stops/' + stopId + '/remove/').then(function(data) {
+        if (data.ok) {
+            var card = document.querySelector('[data-stop-id="' + stopId + '"]');
+            if (card) card.remove();
+            // Re-number remaining stops
+            var cards = document.querySelectorAll('#stops-list .stop-card');
+            cards.forEach(function(c, idx) {
+                var numEl = c.querySelector('.stop-number');
+                if (numEl) numEl.textContent = idx + 1;
+                var orderInput = c.querySelector('[data-field="order"]');
+                if (orderInput) orderInput.value = idx + 1;
+            });
+        }
+    });
+}
+
+function addStop(wineryId, el) {
+    api('/trips/' + tripId + '/stops/add/', { winery_id: wineryId }).then(function(data) {
+        if (data.ok) {
+            if (el) { el.classList.add('disabled'); el.innerHTML += '<span class="pi-added">Added</span>'; }
+            // Add stop card
+            var noMsg = document.getElementById('no-stops-msg');
+            if (noMsg) noMsg.remove();
+            var loc = data.city ? data.city + (data.state ? ', ' + data.state : '') : '';
+            var card = document.createElement('div');
+            card.className = 'stop-card';
+            card.dataset.stopId = data.stop_id;
+            card.dataset.wineryId = data.winery_id;
+            var imgHtml = data.image_url
+                ? '<img src="' + data.image_url + '" alt="" style="width:48px;height:48px;border-radius:6px;object-fit:cover;flex-shrink:0;">'
+                : '<div style="width:48px;height:48px;border-radius:6px;background:#ede7f6;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="material-icons" style="color:#7e57c2;font-size:1.3rem;">local_bar</i></div>';
+            card.innerHTML =
+                '<div class="stop-header">' +
+                '<div class="drag-handle" title="Drag to reorder"><i class="material-icons">drag_indicator</i></div>' +
+                '<div class="stop-number">' + data.order + '</div>' +
+                imgHtml +
+                '<div style="flex:1;"><div style="font-weight:600;color:#333;">' + data.name + '</div>' +
+                (loc ? '<div style="font-size:0.78rem;color:#9e9e9e;">' + loc + '</div>' : '') +
+                '</div>' +
+                '<div class="stop-actions">' +
+                '<button onclick="toggleStopDetails(this)" title="Edit"><i class="material-icons" style="font-size:1.1rem;">edit</i></button>' +
+                '<button class="remove-btn" onclick="removeStop(\'' + data.stop_id + '\')" title="Delete"><i class="material-icons" style="font-size:1.1rem;">delete</i></button>' +
+                '</div></div>' +
+                '<div class="stop-details" id="details-' + data.stop_id + '">' +
+                '<div class="row" style="margin-bottom:0;"><div class="col s6"><div class="stop-field"><label>Arrival Date & Time</label><input type="datetime-local" data-field="arrival_time"></div></div>' +
+                '<div class="col s3"><div class="stop-field"><label>Duration (min)</label><input type="number" data-field="duration_minutes" placeholder="60"></div></div>' +
+                '<div class="col s3"><div class="stop-field"><label>Order</label><input type="number" data-field="order" value="' + data.order + '" min="1"></div></div></div>' +
+                '<div class="stop-field"><label>Description</label><textarea data-field="description" placeholder="What\'s planned?"></textarea></div>' +
+                '<div class="stop-field"><label>Notes</label><textarea data-field="notes" placeholder="Personal notes..."></textarea></div>' +
+                '<div class="stop-field"><label>Meeting Details</label><textarea data-field="meeting_details" placeholder="Where to meet..."></textarea></div>' +
+                '<div class="stop-field"><label>Travel Details</label><textarea data-field="travel_details" placeholder="Directions, parking..."></textarea></div>' +
+                '<div style="display:flex;align-items:center;margin-top:6px;"><div style="display:flex;gap:8px;"><button onclick="saveStopDetails(\'' + data.stop_id + '\')" style="padding:6px 16px;border-radius:4px;border:none;background:#7e57c2;color:#fff;font-size:0.82rem;cursor:pointer;display:inline-flex;align-items:center;gap:4px;"><i class="material-icons" style="font-size:0.95rem;">save</i> Save</button><button onclick="cancelStopDetails(this)" style="padding:6px 16px;border-radius:4px;border:1px solid #e0e0e0;background:#fff;color:#757575;font-size:0.82rem;cursor:pointer;display:inline-flex;align-items:center;gap:4px;"><i class="material-icons" style="font-size:0.95rem;">close</i> Cancel</button></div><button onclick="removeStop(\'' + data.stop_id + '\')" style="margin-left:auto;padding:6px 16px;border-radius:4px;border:1px solid #e0e0e0;background:#fff;color:#c62828;font-size:0.82rem;cursor:pointer;display:inline-flex;align-items:center;gap:4px;" onmouseover="this.style.background=\'#fce4ec\';this.style.borderColor=\'#c62828\'" onmouseout="this.style.background=\'#fff\';this.style.borderColor=\'#e0e0e0\'"><i class="material-icons" style="font-size:0.95rem;">delete</i> Delete</button></div>' +
+                '</div>';
+            document.getElementById('stops-list').appendChild(card);
+            setupDragAndDrop();  // Re-attach drag listeners
+        }
+    });
+}
+
+// Init drag & drop
+setupDragAndDrop();
+
+// ── Members ──
+function toggleInviteForm() {
+    var form = document.getElementById('invite-form');
+    form.style.display = form.style.display === 'none' ? 'block' : 'none';
+    if (form.style.display === 'block') document.getElementById('invite-first-name').focus();
+}
+
+function toggleMemberDetails(btn) {
+    var card = btn.closest('.member-card');
+    if (!card) return;
+    var details = card.querySelector('.member-details');
+    if (!details) return;
+    if (!details.classList.contains('open')) {
+        details._snapshot = snapshotFields(details);
+        var actions = card.querySelectorAll('.stop-actions button');
+        actions.forEach(function(b) { b.style.display = 'none'; });
+    }
+    details.classList.toggle('open');
+}
+
+function cancelMemberDetails(btn) {
+    var card = btn.closest('.member-card');
+    if (!card) return;
+    var details = card.querySelector('.member-details');
+    if (!details) return;
+    if (details._snapshot) restoreFields(details, details._snapshot);
+    details.classList.remove('open');
+    var actions = card.querySelectorAll('.stop-actions button');
+    actions.forEach(function(b) { b.style.display = ''; });
+}
+
+function sendInvite() {
+    var msgEl = document.getElementById('invite-msg');
+    var email = document.getElementById('invite-email').value.trim();
+    var firstName = document.getElementById('invite-first-name').value.trim();
+    var lastName = document.getElementById('invite-last-name').value.trim();
+    var message = document.getElementById('invite-message').value.trim();
+
+    if (!email) { msgEl.innerHTML = '<span style="color:#c62828;">Email is required</span>'; return; }
+    if (!firstName) { msgEl.innerHTML = '<span style="color:#c62828;">First name is required</span>'; return; }
+
+    api('/trips/' + tripId + '/invite/', {
+        email: email, first_name: firstName, last_name: lastName, message: message
+    }).then(function(data) {
+        if (data.error) {
+            msgEl.innerHTML = '<span style="color:#c62828;">' + data.error + '</span>';
+            return;
+        }
+        document.getElementById('invite-email').value = '';
+        document.getElementById('invite-first-name').value = '';
+        document.getElementById('invite-last-name').value = '';
+        document.getElementById('invite-message').value = 'Join us for an amazing wine tasting adventure! We\'d love to have you along for the trip.';
+        msgEl.innerHTML = '<span style="color:#43a047;"><i class="material-icons tiny" style="vertical-align:middle;">check_circle</i> Invitation sent to ' + data.name + '!</span>';
+        setTimeout(function() { msgEl.innerHTML = ''; }, 4000);
+
+        var list = document.getElementById('members-list');
+        var card = document.createElement('div');
+        card.className = 'member-card';
+        card.id = 'member-' + data.member_id;
+        card.dataset.memberId = data.member_id;
+        card.innerHTML =
+            '<div class="member-row">' +
+            '<div class="member-avatar blue-grey lighten-4"><span class="blue-grey-text member-initial">' + data.initial + '</span></div>' +
+            '<div style="flex:1;min-width:0;">' +
+            '<div class="member-name" style="font-weight:600;font-size:0.88rem;">' + data.name + '</div>' +
+            '<div class="member-role-line" style="font-size:0.72rem;color:#9e9e9e;"><span class="member-role-text">' + data.role + '</span> &middot; ' + data.email + '</div>' +
+            '<div class="invite-timestamps" style="font-size:0.68rem;color:#bdbdbd;margin-top:2px;"><i class="material-icons" style="font-size:0.68rem;vertical-align:middle;">send</i> Invited ' + data.invited_at + '</div>' +
+            '</div>' +
+            '<span class="rsvp-chip pending member-rsvp-chip">pending</span>' +
+            '<div class="stop-actions">' +
+            '<button onclick="toggleMemberDetails(this)" title="Edit details"><i class="material-icons" style="font-size:1.1rem;">edit</i></button>' +
+            '<button class="remove-btn" onclick="removeMember(\'' + data.member_id + '\')" title="Delete"><i class="material-icons" style="font-size:1.1rem;">delete</i></button>' +
+            '</div></div>' +
+            '<div class="member-details">' +
+            '<div class="row" style="margin-bottom:0;">' +
+            '<div class="col s4"><div class="stop-field"><label>First Name</label><input type="text" data-field="invite_first_name" value="' + (data.name.split(' ')[0] || '') + '"></div></div>' +
+            '<div class="col s4"><div class="stop-field"><label>Last Name</label><input type="text" data-field="invite_last_name" value="' + (data.name.split(' ').slice(1).join(' ') || '') + '"></div></div>' +
+            '<div class="col s4"><div class="stop-field"><label>Email</label><input type="email" data-field="invite_email" value="' + data.email + '"></div></div>' +
+            '</div>' +
+            '<div class="row" style="margin-bottom:0;">' +
+            '<div class="col s4"><div class="stop-field"><label>RSVP Status</label><select class="browser-default" data-field="rsvp_status" style="width:100%;border:1px solid #e0e0e0;border-radius:4px;padding:6px 10px;font-size:0.88rem;background:#fff;cursor:pointer;height:auto;"><option value="pending" selected>Pending</option><option value="accepted">Accepted</option><option value="declined">Declined</option></select></div></div>' +
+            '<div class="col s4"><div class="stop-field"><label>Role</label><select class="browser-default" data-field="role" style="width:100%;border:1px solid #e0e0e0;border-radius:4px;padding:6px 10px;font-size:0.88rem;background:#fff;cursor:pointer;height:auto;"><option value="invited" selected>Invited</option><option value="member">Member</option></select></div></div>' +
+            '</div>' +
+            '<div class="row" style="margin-bottom:0;"><div class="col s12"><div class="stop-field"><label>Notes</label><textarea data-field="notes" placeholder="Dietary restrictions, travel preferences..."></textarea></div></div></div>' +
+            '<div class="row" style="margin-bottom:0;"><div class="col s12"><div class="stop-field"><label>Invitation Message</label><textarea data-field="invite_message" placeholder="Personalised invitation text..."></textarea></div></div></div>' +
+            '<div class="row" style="margin-bottom:0;"><div class="col s12"><div style="display:flex;align-items:center;margin-top:6px;"><div style="display:flex;gap:8px;"><button onclick="saveMemberDetails(\'' + data.member_id + '\')" style="padding:6px 16px;border-radius:4px;border:none;background:#7e57c2;color:#fff;font-size:0.82rem;cursor:pointer;display:inline-flex;align-items:center;gap:4px;"><i class="material-icons" style="font-size:0.95rem;">save</i> Save</button><button onclick="cancelMemberDetails(this)" style="padding:6px 16px;border-radius:4px;border:1px solid #e0e0e0;background:#fff;color:#757575;font-size:0.82rem;cursor:pointer;display:inline-flex;align-items:center;gap:4px;"><i class="material-icons" style="font-size:0.95rem;">close</i> Cancel</button></div><button onclick="removeMember(\'' + data.member_id + '\')" style="margin-left:auto;padding:6px 16px;border-radius:4px;border:1px solid #e0e0e0;background:#fff;color:#c62828;font-size:0.82rem;cursor:pointer;display:inline-flex;align-items:center;gap:4px;" onmouseover="this.style.background=\'#fce4ec\';this.style.borderColor=\'#c62828\'" onmouseout="this.style.background=\'#fff\';this.style.borderColor=\'#e0e0e0\'"><i class="material-icons" style="font-size:0.95rem;">delete</i> Delete</button></div></div></div>' +
+            '</div>';
+        list.appendChild(card);
+
+        var count = document.getElementById('member-count');
+        count.textContent = parseInt(count.textContent) + 1;
+    }).catch(function() {
+        msgEl.innerHTML = '<span style="color:#c62828;">Failed to send invitation.</span>';
+    });
+}
+
+function saveMemberDetails(memberId) {
+    var card = document.getElementById('member-' + memberId);
+    var body = {};
+    card.querySelectorAll('[data-field]').forEach(function(el) {
+        body[el.dataset.field] = el.value;
+    });
+    api('/trips/' + tripId + '/members/' + memberId + '/update/', body).then(function(data) {
+        if (data.ok) {
+            // Update header display
+            var nameEl = card.querySelector('.member-name');
+            if (nameEl) nameEl.textContent = data.name;
+            var initialEl = card.querySelector('.member-initial');
+            if (initialEl) initialEl.textContent = data.initial;
+            var roleEl = card.querySelector('.member-role-text');
+            if (roleEl) roleEl.textContent = data.role;
+            var chipEl = card.querySelector('.member-rsvp-chip');
+            if (chipEl) { chipEl.className = 'rsvp-chip ' + data.rsvp + ' member-rsvp-chip'; chipEl.textContent = data.rsvp; }
+            // Update responded timestamp
+            if (data.responded_at) {
+                var tsEl = card.querySelector('.rsvp-responded');
+                if (tsEl) {
+                    tsEl.innerHTML = '<i class="material-icons" style="font-size:0.68rem;vertical-align:middle;">reply</i> Responded ' + data.responded_at;
+                } else {
+                    var infoDiv = card.querySelector('.invite-timestamps');
+                    if (infoDiv) infoDiv.innerHTML += ' &middot; <span class="rsvp-responded"><i class="material-icons" style="font-size:0.68rem;vertical-align:middle;">reply</i> Responded ' + data.responded_at + '</span>';
+                }
+            }
+            // Close the details panel and restore action buttons
+            var details = card.querySelector('.member-details');
+            if (details) details.classList.remove('open');
+            var actions = card.querySelectorAll('.stop-actions button');
+            actions.forEach(function(b) { b.style.display = ''; });
+        }
+    });
+}
+
+function removeMember(memberId) {
+    if (!confirm('Remove this member?')) return;
+    api('/trips/' + tripId + '/members/' + memberId + '/remove/').then(function(data) {
+        if (data.ok) {
+            var card = document.getElementById('member-' + memberId);
+            if (card) card.remove();
+            var count = document.getElementById('member-count');
+            count.textContent = Math.max(0, parseInt(count.textContent) - 1);
+        } else if (data.error) {
+            alert(data.error);
+        }
+    });
+}
+</script>
+{% endblock %}

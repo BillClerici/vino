@@ -1,0 +1,406 @@
+{% extends "base.html" %}
+
+{% block title %}VinoVoyage{% endblock %}
+
+{% block extra_css %}
+<style>
+    .hero-section {
+        background: linear-gradient(135deg, #4a148c 0%, #7e57c2 50%, #ab47bc 100%);
+        padding: 60px 0 50px;
+        color: #fff;
+        text-align: center;
+    }
+    .hero-section h2 { font-weight: 300; margin-bottom: 8px; }
+    .hero-section p { font-size: 1.15rem; opacity: 0.9; max-width: 500px; margin: 0 auto; }
+    .feature-card {
+        text-align: center;
+        padding: 28px 20px;
+        border-radius: 8px;
+        transition: transform 0.15s;
+    }
+    .feature-card:hover { transform: translateY(-3px); }
+    .feature-card i { font-size: 2.5rem; }
+    .feature-card h5 { font-size: 1.15rem; font-weight: 600; margin: 12px 0 6px; }
+    .feature-card p { font-size: 0.88rem; color: #757575; }
+
+    {% if user.is_authenticated %}
+    .stat-card {
+        text-align: center;
+        padding: 20px 15px;
+        border-radius: 8px;
+        transition: transform 0.15s;
+    }
+    .stat-card:hover { transform: translateY(-2px); }
+    .stat-card .stat-number {
+        font-size: 2.4rem;
+        font-weight: 700;
+        line-height: 1.1;
+    }
+    .stat-card .stat-label {
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-top: 4px;
+    }
+    .quick-action {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 20px;
+        border-radius: 8px;
+        background: #fff;
+        margin-bottom: 8px;
+        transition: box-shadow 0.15s, transform 0.15s;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        color: #333;
+    }
+    .quick-action:hover {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+        transform: translateY(-1px);
+        color: #333;
+    }
+    .quick-action i { font-size: 1.6rem; }
+    .quick-action .action-text .action-title { font-weight: 600; font-size: 0.95rem; }
+    .quick-action .action-text .action-sub { font-size: 0.8rem; color: #9e9e9e; }
+    .section-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #455a64;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .visit-timeline-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 14px;
+        padding: 12px 0;
+        border-bottom: 1px solid #f5f5f5;
+    }
+    .visit-timeline-item:last-child { border-bottom: none; }
+    .visit-timeline-item .visit-icon {
+        width: 40px; height: 40px;
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0;
+    }
+    .visit-timeline-item .visit-info .visit-winery { font-weight: 600; font-size: 0.95rem; }
+    .visit-timeline-item .visit-info .visit-date { font-size: 0.8rem; color: #9e9e9e; }
+    .discover-card {
+        border-radius: 8px;
+        overflow: hidden;
+        transition: transform 0.15s;
+    }
+    .discover-card:hover { transform: translateY(-3px); }
+    .discover-card .card-content { padding: 16px; }
+    .star-display { color: #ffb300; font-size: 0.9rem; letter-spacing: -1px; }
+    .trip-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    .trip-chip.draft { background: #e0e0e0; color: #616161; }
+    .trip-chip.planning { background: #fff3e0; color: #e65100; }
+    .trip-chip.confirmed { background: #e8f5e9; color: #2e7d32; }
+    .trip-chip.in_progress { background: #e3f2fd; color: #1565c0; }
+    {% endif %}
+</style>
+{% endblock %}
+
+{% block content %}
+{% if user.is_authenticated %}
+{# ── Authenticated: Full Dashboard ── #}
+<div>
+    <!-- Compact Hero Banner -->
+    <div class="hero-section" style="padding: 28px 0 24px;">
+        <div class="container">
+            <div style="display: flex; align-items: center; justify-content: center; gap: 12px;">
+                <span style="font-size: 2.2rem;">&#127863;</span>
+                <h4 style="margin: 0; font-weight: 300;">Welcome back, {% firstof user.first_name user.email %}</h4>
+            </div>
+            <p style="font-size: 0.95rem; margin-top: 6px;">Here's what's happening in your wine world.</p>
+        </div>
+    </div>
+
+    <div class="container" style="margin-top: -20px; padding-bottom: 30px;">
+        <!-- Stats Row -->
+        <div class="row">
+            <div class="col s6 m3">
+                <div class="card-panel stat-card hoverable">
+                    <div class="stat-number deep-purple-text text-darken-1">{{ visit_count }}</div>
+                    <div class="stat-label grey-text">Check-ins</div>
+                </div>
+            </div>
+            <div class="col s6 m3">
+                <div class="card-panel stat-card hoverable">
+                    <div class="stat-number teal-text text-darken-1">{{ unique_wineries }}</div>
+                    <div class="stat-label grey-text">Wineries Visited</div>
+                </div>
+            </div>
+            <div class="col s6 m3">
+                <div class="card-panel stat-card hoverable">
+                    <div class="stat-number amber-text text-darken-2">{% if avg_rating %}{{ avg_rating|floatformat:1 }}{% else %}&mdash;{% endif %}</div>
+                    <div class="stat-label grey-text">Avg Rating</div>
+                </div>
+            </div>
+            <div class="col s6 m3">
+                <div class="card-panel stat-card hoverable">
+                    <div class="stat-number blue-grey-text">{{ total_wineries }}</div>
+                    <div class="stat-label grey-text">Total Wineries</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Left Column -->
+            <div class="col s12 m8">
+                <!-- Quick Actions -->
+                <div style="margin-bottom: 24px;">
+                    <div class="section-title"><i class="material-icons">flash_on</i> Quick Actions</div>
+                    <div class="row" style="margin-bottom: 0;">
+                        <div class="col s12 m6">
+                            <a href="{% url 'checkin' %}" class="quick-action">
+                                <i class="material-icons deep-purple-text text-lighten-1">add_location</i>
+                                <div class="action-text">
+                                    <div class="action-title">Check In</div>
+                                    <div class="action-sub">Log a winery visit</div>
+                                </div>
+                            </a>
+                        </div>
+                        <div class="col s12 m6">
+                            <a href="{% url 'winery_list' %}" class="quick-action">
+                                <i class="material-icons teal-text text-lighten-1">explore</i>
+                                <div class="action-text">
+                                    <div class="action-title">Explore</div>
+                                    <div class="action-sub">Discover new wineries</div>
+                                </div>
+                            </a>
+                        </div>
+                        <div class="col s12 m6">
+                            <a href="{% url 'trip_create' %}" class="quick-action">
+                                <i class="material-icons orange-text text-lighten-1">map</i>
+                                <div class="action-text">
+                                    <div class="action-title">Plan Trip</div>
+                                    <div class="action-sub">Create a wine adventure</div>
+                                </div>
+                            </a>
+                        </div>
+                        <div class="col s12 m6">
+                            <a href="{% url 'palate_profile' %}" class="quick-action">
+                                <i class="material-icons red-text text-lighten-2">wine_bar</i>
+                                <div class="action-text">
+                                    <div class="action-title">My Palate</div>
+                                    <div class="action-sub">View taste profile</div>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Visits -->
+                <div class="card" style="border-radius: 8px;">
+                    <div class="card-content">
+                        <div class="section-title" style="margin-top: 0;">
+                            <i class="material-icons">history</i> Recent Check-ins
+                            <a href="{% url 'visit_list' %}" class="right" style="font-size: 0.85rem;">View All</a>
+                        </div>
+                        {% for visit in recent_visits %}
+                        <a href="{% url 'visit_detail' pk=visit.pk %}" style="color: inherit;">
+                            <div class="visit-timeline-item">
+                                <div class="visit-icon deep-purple lighten-5">
+                                    <i class="material-icons deep-purple-text text-lighten-1" style="font-size: 1.2rem;">place</i>
+                                </div>
+                                <div class="visit-info" style="flex: 1;">
+                                    <div class="visit-winery">{{ visit.winery.name }}</div>
+                                    <div class="visit-date">{{ visit.visited_at|date:"M j, Y" }}{% if visit.winery.city %} &middot; {{ visit.winery.city }}{% if visit.winery.state %}, {{ visit.winery.state }}{% endif %}{% endif %}</div>
+                                </div>
+                                {% if visit.rating_overall %}
+                                <div class="star-display">
+                                    {% for i in "12345" %}{% if forloop.counter <= visit.rating_overall %}&#9733;{% else %}&#9734;{% endif %}{% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </a>
+                        {% empty %}
+                        <div class="center-align" style="padding: 30px 0;">
+                            <i class="material-icons medium grey-text text-lighten-1">wine_bar</i>
+                            <p class="grey-text">No check-ins yet. Visit a winery to get started!</p>
+                            <a href="{% url 'checkin' %}" class="btn deep-purple lighten-1 waves-effect waves-light" style="margin-top: 8px;">
+                                <i class="material-icons left">add_location</i>First Check-in
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column -->
+            <div class="col s12 m4">
+                <!-- Active Trips -->
+                <div class="card" style="border-radius: 8px;">
+                    <div class="card-content">
+                        <div class="section-title" style="margin-top: 0;">
+                            <i class="material-icons">map</i> Active Trips
+                        </div>
+                        {% for trip in active_trips %}
+                        <div style="padding: 10px 0; border-bottom: 1px solid #f5f5f5;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <strong style="font-size: 0.95rem;">{{ trip.name }}</strong>
+                                <span class="trip-chip {{ trip.status }}">{{ trip.get_status_display }}</span>
+                            </div>
+                            {% if trip.scheduled_date %}
+                            <div style="font-size: 0.8rem; color: #9e9e9e; margin-top: 2px;">
+                                <i class="material-icons tiny">event</i> {{ trip.scheduled_date|date:"M j, Y" }}
+                                {% if trip.is_today %}<span style="background:#e8f5e9;color:#2e7d32;padding:1px 8px;border-radius:8px;font-size:0.72rem;font-weight:600;margin-left:6px;">TODAY</span>{% endif %}
+                            </div>
+                            {% endif %}
+                            <div style="font-size: 0.8rem; color: #9e9e9e; margin-top: 2px;">
+                                {{ trip.trip_members.count }} member{{ trip.trip_members.count|pluralize }}
+                                {% if trip.trip_wineries.count %} · {{ trip.trip_wineries.count }} stop{{ trip.trip_wineries.count|pluralize }}{% endif %}
+                            </div>
+                            <div style="display: flex; gap: 8px; margin-top: 8px;">
+                                <a href="{% url 'trip_detail' pk=trip.pk %}" style="display:inline-flex;align-items:center;gap:4px;padding:5px 12px;border-radius:14px;border:1.5px solid #e0e0e0;background:#fff;color:#616161;font-size:0.78rem;font-weight:600;text-decoration:none;transition:all 0.15s;" onmouseover="this.style.borderColor='#7e57c2';this.style.color='#7e57c2'" onmouseout="this.style.borderColor='#e0e0e0';this.style.color='#616161'">
+                                    <i class="material-icons" style="font-size:0.9rem;">edit</i> Trip Details
+                                </a>
+                                {% if trip.show_start_button %}
+                                <a href="{% url 'trip_live' pk=trip.pk %}" style="display:inline-flex;align-items:center;gap:4px;padding:5px 12px;border-radius:14px;border:none;background:#7e57c2;color:#fff;font-size:0.78rem;font-weight:600;text-decoration:none;transition:all 0.15s;box-shadow:0 2px 6px rgba(126,87,194,0.3);" onmouseover="this.style.background='#6a3fb5'" onmouseout="this.style.background='#7e57c2'">
+                                    <i class="material-icons" style="font-size:0.9rem;">play_arrow</i> {% if trip.status == 'in_progress' %}Continue Trip{% else %}Start Trip{% endif %}
+                                </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="center-align" style="padding: 20px 0;">
+                            <p class="grey-text" style="font-size: 0.9rem;">No trips planned yet.</p>
+                            <a href="{% url 'trip_create' %}" class="btn-small orange lighten-1 waves-effect waves-light">
+                                <i class="material-icons left">add</i>Plan One
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Top Rated -->
+                {% if top_wineries %}
+                <div class="card" style="border-radius: 8px;">
+                    <div class="card-content">
+                        <div class="section-title" style="margin-top: 0;">
+                            <i class="material-icons">emoji_events</i> Your Top Rated
+                        </div>
+                        {% for w in top_wineries %}
+                        <div style="display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f5f5f5;">
+                            <span style="font-size: 1.2rem; font-weight: 700; color: #bdbdbd; width: 24px;">{{ forloop.counter }}</span>
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; font-size: 0.9rem;">{{ w.winery__name }}</div>
+                                <div style="font-size: 0.75rem; color: #9e9e9e;">
+                                    {{ w.winery__city }}{% if w.winery__state %}, {{ w.winery__state }}{% endif %}
+                                    &middot; {{ w.times_visited }} visit{{ w.times_visited|pluralize }}
+                                </div>
+                            </div>
+                            {% if w.avg_overall %}
+                            <div class="star-display">{{ w.avg_overall|floatformat:1 }} &#9733;</div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Discover Section -->
+        {% if discover %}
+        <div style="margin-top: 8px;">
+            <div class="section-title"><i class="material-icons">local_fire_department</i> Discover New Wineries</div>
+            <div class="row">
+                {% for w in discover %}
+                <div class="col s12 m6 l3">
+                    <a href="{% url 'winery_detail' pk=w.pk %}" style="color: inherit;">
+                        <div class="card discover-card hoverable">
+                            <div class="card-content">
+                                <div style="font-size: 2rem; margin-bottom: 8px;">&#127863;</div>
+                                <div style="font-weight: 600;">{{ w.name }}</div>
+                                <div style="font-size: 0.8rem; color: #9e9e9e;">
+                                    {% if w.city %}{{ w.city }}{% if w.state %}, {{ w.state }}{% endif %}{% else %}Location TBD{% endif %}
+                                </div>
+                                {% if w.avg_rating %}
+                                <div class="star-display" style="margin-top: 6px;">
+                                    {% for i in "12345" %}{% if forloop.counter <= w.avg_rating %}&#9733;{% else %}&#9734;{% endif %}{% endfor %}
+                                    <span style="color: #9e9e9e; font-size: 0.75rem;">({{ w.visit_count }})</span>
+                                </div>
+                                {% else %}
+                                <div style="margin-top: 6px; font-size: 0.8rem; color: #bdbdbd;">No reviews yet</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% else %}
+{# ── Unauthenticated: Marketing Landing ── #}
+<div>
+    <!-- Hero -->
+    <div class="hero-section">
+        <div class="container">
+            <div style="font-size: 3.5rem; margin-bottom: 8px;">&#127863;</div>
+            <h2>VinoVoyage</h2>
+            <p>Your personal wine companion. Discover wineries, log tastings, and plan unforgettable trips with friends.</p>
+            <div style="margin-top: 28px;">
+                <a href="{% url 'register' %}" class="btn-large white purple-text text-darken-3 waves-effect" style="margin-right: 8px;">
+                    <i class="material-icons left">person_add</i>Get Started
+                </a>
+                <a href="{% url 'login' %}" class="btn-large white-text waves-effect" style="border: 1px solid rgba(255,255,255,0.5); background: transparent;">
+                    <i class="material-icons left">login</i>Sign In
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Features -->
+    <div class="container" style="margin-top: -30px;">
+        <div class="row">
+            <div class="col s12 m3">
+                <div class="card-panel feature-card hoverable">
+                    <i class="material-icons deep-purple-text text-lighten-1">add_location</i>
+                    <h5>Check In</h5>
+                    <p>Log visits with multi-factor ratings for staff, ambience, and food.</p>
+                </div>
+            </div>
+            <div class="col s12 m3">
+                <div class="card-panel feature-card hoverable">
+                    <i class="material-icons teal-text">explore</i>
+                    <h5>Discover</h5>
+                    <p>Browse wineries, read reviews, and find your next favorite spot.</p>
+                </div>
+            </div>
+            <div class="col s12 m3">
+                <div class="card-panel feature-card hoverable">
+                    <i class="material-icons orange-text">map</i>
+                    <h5>Plan Trips</h5>
+                    <p>Organize wine adventures with friends and build itineraries.</p>
+                </div>
+            </div>
+            <div class="col s12 m3">
+                <div class="card-panel feature-card hoverable">
+                    <i class="material-icons red-text text-lighten-2">wine_bar</i>
+                    <h5>My Palate</h5>
+                    <p>AI-powered taste profile built from your tasting history.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

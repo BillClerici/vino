@@ -1,0 +1,369 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Vino{% endblock %}</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+    <style>
+        /* Page layout — fixed navbar, scrollable main, compact footer at bottom */
+        html, body {
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+        }
+        body {
+            display: flex;
+            flex-direction: column;
+        }
+        main {
+            flex: 1;
+            overflow-y: auto;
+        }
+        footer.page-footer {
+            flex-shrink: 0;
+            padding-top: 4px !important;
+            padding-bottom: 4px !important;
+        }
+        footer.page-footer .row {
+            margin-bottom: 0;
+        }
+
+        /* Navbar is always 64px tall */
+        nav { height: 64px; line-height: 64px; }
+
+        /* Sidenav sits below the fixed navbar */
+        #app-sidenav {
+            top: 64px !important;
+            height: calc(100vh - 64px) !important;
+            overflow-y: auto;
+            width: 250px !important;
+        }
+
+        /* When pinned: lock open, shift content, kill overlay */
+        .sidenav-pinned #app-sidenav {
+            transform: translateX(0%) !important;
+            position: fixed !important;
+            left: 0 !important;
+            width: 250px !important;
+            z-index: 999;
+        }
+        .sidenav-pinned main,
+        .sidenav-pinned footer {
+            margin-left: 250px;
+        }
+        body.sidenav-pinned > .sidenav-overlay {
+            display: none !important;
+            pointer-events: none !important;
+        }
+        @media only screen and (max-width: 992px) {
+            .sidenav-pinned main,
+            .sidenav-pinned footer {
+                margin-left: 0;
+            }
+        }
+
+        /* Reset the <li> that wraps the header so Materialize doesn't interfere */
+        #app-sidenav > li:first-child {
+            line-height: normal !important;
+            padding: 0 !important;
+            float: none !important;
+        }
+        /* Sidenav header — brand + pin icon side by side */
+        #app-sidenav .sidenav-header,
+        .sidenav-pinned #app-sidenav .sidenav-header {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            padding: 12px 16px !important;
+            background: #455a64;
+            min-height: 48px;
+            box-sizing: border-box;
+            width: 100% !important;
+            max-width: 250px !important;
+        }
+        #app-sidenav .sidenav-header .brand-text {
+            color: #fff;
+            font-size: 1.1rem;
+            font-weight: 500;
+            white-space: nowrap;
+            flex: 1;
+        }
+        #app-sidenav .sidenav-header .pin-btn,
+        .sidenav-pinned #app-sidenav .sidenav-header .pin-btn {
+            color: #b0bec5;
+            cursor: pointer;
+            display: flex !important;
+            align-items: center !important;
+            flex-shrink: 0;
+            margin-left: auto;
+            margin-right: 8px;
+            position: static !important;
+            float: none !important;
+        }
+        #app-sidenav .sidenav-header .pin-btn:hover { color: #fff; }
+        #app-sidenav .sidenav-header .pin-btn.pinned { color: #ffab40; }
+
+        /* Menu items */
+        #app-sidenav li > a {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        #app-sidenav li > a > i.material-icons { margin-right: 0; }
+
+        /* Collapsible admin menu */
+        #app-sidenav .collapsible {
+            border: none;
+            box-shadow: none;
+            margin: 0;
+        }
+        #app-sidenav .collapsible-header {
+            padding: 0 32px;
+            height: 48px;
+            line-height: 48px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        #app-sidenav .collapsible-body li > a {
+            padding-left: 56px;
+        }
+
+        /* Bottom section pinned to bottom of sidenav */
+        #app-sidenav .nav-bottom {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            border-top: 1px solid #e0e0e0;
+            background: #fff;
+        }
+        #app-sidenav .nav-bottom > a {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 0 32px;
+            height: 48px;
+            line-height: 48px;
+            color: #333;
+        }
+        #app-sidenav .nav-bottom > a > i.material-icons {
+            margin-right: 0;
+        }
+        #app-sidenav .user-info {
+            padding: 10px 32px;
+            color: #607d8b;
+            font-size: 0.85rem;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Top Navbar — always visible, fixed at top -->
+    <div style="position: fixed; top: 0; width: 100%; z-index: 1000;">
+        <nav class="blue-grey darken-3">
+            <div class="nav-wrapper" style="padding: 0 10px;">
+                {% if user.is_authenticated %}
+                <a href="#" id="nav-toggle-btn" class="left">
+                    <i class="material-icons">menu</i>
+                </a>
+                {% endif %}
+                <a href="{% url 'landing' %}" class="brand-logo center">&#127863; VinoVoyage</a>
+                <ul class="right">
+                    {% if user.is_authenticated %}
+                    <li><a class="grey-text text-lighten-2">{% firstof user.first_name user.email %}</a></li>
+                    <li><a href="{% url 'logout' %}" title="Log Out"><i class="material-icons">logout</i></a></li>
+                    {% else %}
+                    <li><a href="{% url 'login' %}">Sign In</a></li>
+                    {% endif %}
+                </ul>
+            </div>
+        </nav>
+    </div>
+
+    <!-- Spacer for fixed navbar -->
+    <div style="height: 64px;"></div>
+
+    {% if user.is_authenticated %}
+    <!-- Left Sidenav — below navbar, only for logged-in users -->
+    <ul id="app-sidenav" class="sidenav">
+        <li>
+            <div class="sidenav-header">
+                <span class="brand-text">Vino</span>
+                <a class="pin-btn" id="pin-nav-btn" title="Pin navigation">
+                    <i class="material-icons">push_pin</i>
+                </a>
+            </div>
+        </li>
+        <li><div class="divider"></div></li>
+
+        <!-- Main Navigation -->
+        <li class="{% if request.resolver_match.url_name == 'landing' %}active{% endif %}">
+            <a href="{% url 'landing' %}"><i class="material-icons">dashboard</i>Dashboard</a>
+        </li>
+        <li class="{% if 'winery' in request.resolver_match.url_name %}active{% endif %}">
+            <a href="{% url 'winery_list' %}"><i class="material-icons">explore</i>Wineries</a>
+        </li>
+        <li class="{% if request.resolver_match.url_name == 'checkin' or 'visit' in request.resolver_match.url_name %}active{% endif %}">
+            <a href="{% url 'visit_list' %}"><i class="material-icons">add_location</i>My Visits</a>
+        </li>
+        <li class="{% if 'trip' in request.resolver_match.url_name %}active{% endif %}">
+            <a href="{% url 'trip_list' %}"><i class="material-icons">map</i>Trips</a>
+        </li>
+        <li class="{% if 'palate' in request.resolver_match.url_name %}active{% endif %}">
+            <a href="{% url 'palate_profile' %}"><i class="material-icons">wine_bar</i>My Palate</a>
+        </li>
+
+        {% if user.is_superuser %}
+        <!-- Admin section — superusers only, expanded by default -->
+        <li><div class="divider"></div></li>
+        <li class="no-padding">
+            <ul class="collapsible collapsible-accordion">
+                <li class="admin-collapsible active">
+                    <a class="collapsible-header">
+                        <i class="material-icons">admin_panel_settings</i>Admin
+                        <i class="material-icons right" style="margin-left:auto;">expand_more</i>
+                    </a>
+                    <div class="collapsible-body" style="display: block;">
+                        <ul>
+                            <li class="{% if request.resolver_match.url_name == 'app_settings' %}active{% endif %}">
+                                <a href="{% url 'app_settings' %}"><i class="material-icons">settings</i>App Settings</a>
+                            </li>
+                            <li class="{% if request.resolver_match.url_name == 'admin_users_list' %}active{% endif %}">
+                                <a href="{% url 'admin_users_list' %}"><i class="material-icons">people</i>Users</a>
+                            </li>
+                            <li class="{% if request.resolver_match.url_name == 'admin_roles_list' %}active{% endif %}">
+                                <a href="{% url 'admin_roles_list' %}"><i class="material-icons">badge</i>Roles</a>
+                            </li>
+                            <li class="{% if request.resolver_match.url_name == 'admin_controlpoints_list' %}active{% endif %}">
+                                <a href="{% url 'admin_controlpoints_list' %}"><i class="material-icons">security</i>Control Points</a>
+                            </li>
+                            <li class="{% if request.resolver_match.url_name == 'admin_cpgroups_list' %}active{% endif %}">
+                                <a href="{% url 'admin_cpgroups_list' %}"><i class="material-icons">folder</i>CP Groups</a>
+                            </li>
+                            <li class="{% if request.resolver_match.url_name == 'admin_lookups_list' %}active{% endif %}">
+                                <a href="{% url 'admin_lookups_list' %}"><i class="material-icons">list</i>Lookup Items</a>
+                            </li>
+                        </ul>
+                    </div>
+                </li>
+            </ul>
+        </li>
+        {% endif %}
+
+        <!-- Bottom — user info + logout -->
+        <li>
+            <div class="nav-bottom">
+                <div class="user-info">
+                    <i class="material-icons tiny">account_circle</i>
+                    {% firstof user.full_name user.email %}
+                </div>
+                <a href="{% url 'logout' %}"><i class="material-icons">logout</i>Log Out</a>
+            </div>
+        </li>
+    </ul>
+    {% endif %}
+
+    <!-- Main Content -->
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="page-footer blue-grey darken-3">
+        <div class="container">
+            <div class="row">
+                <div class="col s12">
+                    <p class="grey-text text-lighten-4" style="margin: 0; font-size: 0.85rem;">&copy; {% now "Y" %} Vino. Built with the GSD Framework.</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var sidenavEl = document.getElementById('app-sidenav');
+            if (!sidenavEl) return;
+
+            // Initialize sidenav
+            var sidenavInstance = M.Sidenav.init(sidenavEl);
+
+            // Initialize collapsible + force admin open
+            M.Collapsible.init(document.querySelectorAll('.collapsible'));
+            var adminColl = document.querySelector('.admin-collapsible');
+            if (adminColl) {
+                var ci = M.Collapsible.getInstance(adminColl.closest('.collapsible'));
+                if (ci) ci.open(0);
+            }
+
+            // State
+            var pinBtn = document.getElementById('pin-nav-btn');
+            var toggleBtn = document.getElementById('nav-toggle-btn');
+            var isPinned = localStorage.getItem('gsd_nav_pinned') === 'true';
+
+            function removeOverlay() {
+                var ov = document.querySelector('.sidenav-overlay');
+                if (ov) ov.remove();
+            }
+
+            function applyPinState(pinned) {
+                if (pinned) {
+                    document.body.classList.add('sidenav-pinned');
+                    pinBtn.classList.add('pinned');
+                    // Force sidenav open via Materialize, then kill overlay
+                    sidenavInstance.open();
+                    setTimeout(removeOverlay, 100);
+                } else {
+                    document.body.classList.remove('sidenav-pinned');
+                    pinBtn.classList.remove('pinned');
+                    sidenavInstance.close();
+                }
+            }
+
+            // Apply saved pin state on page load
+            applyPinState(isPinned);
+
+            // Pin button
+            pinBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                isPinned = !isPinned;
+                localStorage.setItem('gsd_nav_pinned', isPinned);
+                applyPinState(isPinned);
+            });
+
+            // Hamburger toggle
+            if (toggleBtn) {
+                toggleBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    if (isPinned) {
+                        // When pinned, toggle the pin off (close + unpin)
+                        isPinned = false;
+                        localStorage.setItem('gsd_nav_pinned', 'false');
+                        applyPinState(false);
+                    } else if (sidenavInstance.isOpen) {
+                        sidenavInstance.close();
+                    } else {
+                        sidenavInstance.open();
+                    }
+                });
+            }
+        });
+    </script>
+    <script>
+        // htmx CSRF config
+        document.body.addEventListener('htmx:configRequest', function(e) {
+            e.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
+        });
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

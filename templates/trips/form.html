@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }} — VinoVoyage{% endblock %}
+
+{% block content %}
+<div class="container" style="margin-top: 20px;">
+    <div class="row">
+        <div class="col s12 m8 offset-m2">
+            <div class="card" style="border-radius: 8px;">
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="card-content">
+                        <div class="center-align" style="padding-bottom: 16px;">
+                            <i class="material-icons" style="font-size: 3rem; color: #ffa726;">map</i>
+                            <h5 style="font-weight: 600; color: #455a64; margin: 8px 0 4px;">{{ page_title }}</h5>
+                            <p class="grey-text" style="font-size: 0.9rem;">Create a wine adventure for you and your friends</p>
+                        </div>
+
+                        {% if form.errors %}
+                        <div class="card-panel red lighten-4" style="padding: 10px;">
+                            <ul class="browser-default">
+                                {% for field, errors in form.errors.items %}
+                                {% for error in errors %}
+                                <li><strong>{{ field }}:</strong> {{ error }}</li>
+                                {% endfor %}
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %}
+
+                        {% for field in form %}
+                        <div class="row" style="margin-bottom: 0;">
+                            <div class="input-field col s12">
+                                {{ field }}
+                                <label for="{{ field.id_for_label }}" class="{% if field.value %}active{% endif %}">{{ field.label }}</label>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="card-action right-align">
+                        <a href="{% url 'trip_list' %}" class="btn-flat waves-effect">Cancel</a>
+                        <button type="submit" class="btn orange lighten-1 waves-effect waves-light">
+                            <i class="material-icons left">map</i>Create Trip
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        M.updateTextFields();
+    });
+</script>
+{% endblock %}
