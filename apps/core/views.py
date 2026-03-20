@@ -1,5 +1,10 @@
+import json
+import zoneinfo
+
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.db.models import Avg, Count
+from django.http import JsonResponse
+from django.views import View
 from django.views.generic import TemplateView
 
 from apps.trips.models import Trip
@@ -68,6 +73,32 @@ class LandingPageView(TemplateView):
         )
 
         return ctx
+
+
+class SetTimezoneView(LoginRequiredMixin, View):
+    """AJAX: save the user's browser-detected timezone."""
+
+    def post(self, request):
+        try:
+            body = json.loads(request.body)
+        except (ValueError, TypeError):
+            return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+        tz_name = body.get("timezone", "").strip()
+        if not tz_name:
+            return JsonResponse({"error": "timezone required"}, status=400)
+
+        # Validate it's a real timezone
+        try:
+            zoneinfo.ZoneInfo(tz_name)
+        except (KeyError, Exception):
+            return JsonResponse({"error": "Invalid timezone"}, status=400)
+
+        if request.user.timezone != tz_name:
+            request.user.timezone = tz_name
+            request.user.save(update_fields=["timezone", "updated_at"])
+
+        return JsonResponse({"ok": True, "timezone": tz_name})
 
 
 class AppSettingsView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):

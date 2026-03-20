@@ -298,7 +298,7 @@
                             <td>{% if w.city %}{{ w.city }}{% if w.state %}, {{ w.state }}{% endif %}{% else %}—{% endif %}</td>
                             <td>{{ w.user_visit_count }}</td>
                             <td>{{ w.last_visited|date:"M j, Y" }}</td>
-                            <td><button class="grid-trip-btn" onclick="startTripFromPlace('{{ w.pk }}',this)"><i class="material-icons" style="font-size:0.85rem;">{% if adding_to_trip %}add_location{% else %}map{% endif %}</i> {% if adding_to_trip %}Add{% else %}Trip{% endif %}</button></td>
+                            <td><button class="grid-trip-btn" onclick="startTripFromExistingPlace('{{ w.pk }}',this)"><i class="material-icons" style="font-size:0.85rem;">{% if adding_to_trip %}add_location{% else %}map{% endif %}</i> {% if adding_to_trip %}Add{% else %}Trip{% endif %}</button></td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -375,7 +375,7 @@ function renderFavoritesTable() {
             '<td><i class="material-icons fav-heart" style="cursor:pointer;font-size:1.1rem;" onclick="toggleFavorite(\'' + id + '\',null)" title="Unfavorite">favorite</i></td>' +
             '<td><a href="/places/' + id + '/" style="font-weight:600;">' + w.name + '</a></td>' +
             '<td>' + loc + '</td>' +
-            '<td><button class="grid-trip-btn" onclick="startTripFromPlace(\'' + id + '\',this)"><i class="material-icons" style="font-size:0.85rem;">' + (addingToTripId ? 'add_location' : 'map') + '</i> ' + (addingToTripId ? 'Add' : 'Trip') + '</button></td>' +
+            '<td><button class="grid-trip-btn" onclick="startTripFromExistingPlace(\'' + id + '\',this)"><i class="material-icons" style="font-size:0.85rem;">' + (addingToTripId ? 'add_location' : 'map') + '</i> ' + (addingToTripId ? 'Add' : 'Trip') + '</button></td>' +
             '</tr>';
     });
     html += '</tbody></table></div>';
@@ -567,7 +567,7 @@ function addPlaceStopToTrip(name, addr, lat, lng, website, photoUrl, btnEl) {
     }).catch(function(e) { console.error('Add place stop error:', e); });
 }
 
-function startTripFromPlace(placeId, btnEl) {
+function startTripFromExistingPlace(placeId, btnEl) {
     if (addingToTripId) { addStopToTrip(placeId, btnEl); return; }
     fetch('/trips/quick/', {
         method: 'POST', headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
@@ -591,7 +591,7 @@ function startTripFromPlace(name, addr, lat, lng, website, photoUrl, btnEl) {
 function buildTripButton(placeId) {
     var label = addingToTripId ? 'Add to Trip' : 'Start Trip';
     var icon = addingToTripId ? 'add_location' : 'map';
-    return '<button class="trip-btn" onclick="startTripFromPlace(\'' + placeId + '\',this)"><i class="material-icons" style="font-size:0.9rem;">' + icon + '</i> ' + label + '</button>';
+    return '<button class="trip-btn" onclick="startTripFromExistingPlace(\'' + placeId + '\',this)"><i class="material-icons" style="font-size:0.9rem;">' + icon + '</i> ' + label + '</button>';
 }
 
 function buildPlaceTripButton(name, addr, lat, lng, website, photoUrl) {

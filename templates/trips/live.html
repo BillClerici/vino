@@ -200,6 +200,11 @@
         <div class="stat-item" id="next-stop-info" style="display:none;">
             <i class="material-icons">directions_car</i> Next: <span id="next-stop-dist"></span>
         </div>
+        <div id="countdown-timer" style="display:none;align-items:center;gap:6px;padding:4px 14px;border-radius:14px;font-weight:700;font-size:0.85rem;">
+            <i class="material-icons" style="font-size:1rem;">timer</i>
+            <span id="countdown-text"></span>
+            <span id="countdown-label" style="font-weight:400;font-size:0.75rem;color:#9e9e9e;">until departure</span>
+        </div>
         <span style="flex: 1; text-align: center; font-weight: 700; font-size: 1.1rem; color: #455a64;">{{ trip.name }}</span>
         <button id="btn-route-map" onclick="toggleRouteMap()" style="display:inline-flex;align-items:center;gap:4px;padding:4px 12px;border-radius:14px;border:1.5px solid #7e57c2;background:#fff;color:#7e57c2;font-size:0.75rem;font-weight:600;cursor:pointer;transition:all 0.15s;" onmouseover="this.style.background='#ede7f6'" onmouseout="this.style.background='#fff'">
             <i class="material-icons" style="font-size:0.85rem;">map</i> Show Route Map
@@ -502,6 +507,73 @@ var currentIndex = {{ current_index }};
 var totalStops = {{ stops|length }};
 var visitIds = {};
 var formState = {};  // stopIndex -> {type, serving, rating}
+
+// Stop schedule for countdown timer
+var stopSchedule = [
+    {% for stop in stops %}
+    {
+        arrival: {% if stop.arrival_time %}'{{ stop.arrival_time|date:"c" }}'{% else %}null{% endif %},
+        duration: {{ stop.duration_minutes|default_if_none:"90" }},
+        name: '{{ stop.place.name|escapejs }}'
+    }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+];
+
+var countdownInterval = null;
+
+function startCountdown() {
+    if (countdownInterval) clearInterval(countdownInterval);
+    updateCountdown();
+    countdownInterval = setInterval(updateCountdown, 1000);
+}
+
+function updateCountdown() {
+    var timerEl = document.getElementById('countdown-timer');
+    var textEl = document.getElementById('countdown-text');
+    var labelEl = document.getElementById('countdown-label');
+    var stop = stopSchedule[currentIndex];
+
+    if (!stop || !stop.arrival) {
+        timerEl.style.display = 'none';
+        return;
+    }
+
+    var arrival = new Date(stop.arrival);
+    var departure = new Date(arrival.getTime() + stop.duration * 60000);
+    var now = new Date();
+    var diff = departure.getTime() - now.getTime();
+
+    timerEl.style.display = 'inline-flex';
+
+    var isLastStop = (currentIndex >= totalStops - 1);
+    var departLabel = isLastStop ? 'remaining here' : 'until departure';
+
+    function fmtHMS(ms) {
+        var totalSec = Math.floor(ms / 1000);
+        var h = Math.floor(totalSec / 3600);
+        var m = Math.floor((totalSec % 3600) / 60);
+        var s = totalSec % 60;
+        var pad = function(n) { return n < 10 ? '0' + n : '' + n; };
+        return h > 0 ? h + ':' + pad(m) + ':' + pad(s) : m + ':' + pad(s);
+    }
+
+    if (diff <= 0) {
+        textEl.textContent = '+' + fmtHMS(Math.abs(diff));
+        labelEl.textContent = isLastStop ? 'over planned time' : 'over time';
+        timerEl.style.background = '#fce4ec';
+        timerEl.style.color = '#c62828';
+    } else if (diff <= 600000) {
+        textEl.textContent = fmtHMS(diff);
+        labelEl.textContent = departLabel;
+        timerEl.style.background = '#fff3e0';
+        timerEl.style.color = '#e65100';
+    } else {
+        textEl.textContent = fmtHMS(diff);
+        labelEl.textContent = departLabel;
+        timerEl.style.background = '#e8f5e9';
+        timerEl.style.color = '#2e7d32';
+    }
+}
 
 function api(url, body) {
     return fetch(url, {
@@ -1181,6 +1253,7 @@ function showStop(index) {
         btnNext.onclick = function() { navigate('next'); };
     }
     currentIndex = index;
+    startCountdown();
 }
 
 function navigate(direction) {
@@ -1247,6 +1320,9 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     });
+
+    // Start countdown timer
+    startCountdown();
 });
 
 // ── Route Map & Distance ──

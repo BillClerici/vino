@@ -193,8 +193,8 @@
             {% if place_stats.total_visits > 1 %}
             <span class="hero-badge"><i class="material-icons" style="font-size: 0.9rem;">repeat</i> Visit #{{ place_stats.total_visits }}</span>
             {% endif %}
-            {% if visit.wines_tasted.count %}
-            <span class="hero-badge"><i class="material-icons" style="font-size: 0.9rem;">wine_bar</i> {{ visit.wines_tasted.count }} wine{{ visit.wines_tasted.count|pluralize }} tasted</span>
+            {% if wine_stats.total_tasted %}
+            <span class="hero-badge"><i class="material-icons" style="font-size: 0.9rem;">wine_bar</i> {{ wine_stats.total_tasted }} drink{{ wine_stats.total_tasted|pluralize }} tasted</span>
             {% endif %}
         </div>
         {% if visit.rating_overall %}
@@ -220,7 +220,7 @@
         </div>
         <div class="stat-pill">
             <div class="sp-icon" style="color: #e91e63;"><i class="material-icons">wine_bar</i></div>
-            <div class="sp-num">{{ wine_stats.total_tasted }}</div>
+            <div class="sp-num">{{ wine_stats.unique_wines }}</div>
             <div class="sp-label">Wines Tried</div>
         </div>
         <div class="stat-pill">
@@ -393,7 +393,7 @@
         <div class="card-content">
             <div class="section-head">
                 <i class="material-icons">local_bar</i> My Drinks at {{ visit.place.name }}
-                <span style="font-size: 0.78rem; font-weight: 400; color: #9e9e9e; margin-left: 8px;">{{ all_wines_here|length }} drink{{ all_wines_here|length|pluralize }}</span>
+                <span style="font-size: 0.78rem; font-weight: 400; color: #9e9e9e; margin-left: 8px;">{{ wine_stats.total_tasted }} drink{{ wine_stats.total_tasted|pluralize }}</span>
             </div>
             <div class="drinks-grid">
                 {% for vw in all_wines_here %}
@@ -420,7 +420,7 @@
                         <div class="dt-notes">"{{ vw.tasting_notes }}"</div>
                         {% endif %}
                         <div class="dt-footer">
-                            <span class="dt-tag" style="background: #ede7f6; color: #4a148c;">{{ vw.get_serving_type_display }}</span>
+                            <span class="dt-tag" style="background: #ede7f6; color: #4a148c;">{{ vw.get_serving_type_display }}{% if vw.quantity > 1 %} &times;{{ vw.quantity }}{% endif %}</span>
                             {% if vw.is_favorite %}
                             <span class="dt-tag" style="background: #fce4ec; color: #c2185b;"><i class="material-icons" style="font-size: 0.7rem;">favorite</i> Fave</span>
                             {% endif %}

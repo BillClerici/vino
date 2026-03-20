@@ -411,6 +411,21 @@
             e.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
         });
     </script>
+    {% if user.is_authenticated %}
+    <script>
+    (function() {
+        var tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        var serverTz = '{{ user.timezone|default:""|escapejs }}';
+        if (tz && tz !== serverTz) {
+            fetch('/api/set-timezone/', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json' },
+                body: JSON.stringify({ timezone: tz })
+            });
+        }
+    })();
+    </script>
+    {% endif %}
     {% block extra_js %}{% endblock %}
 </body>
 </html>

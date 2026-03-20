@@ -159,8 +159,11 @@ class VisitDetailView(LoginRequiredMixin, View):
         )
 
         # Wine stats
+        from django.db.models import Sum
+        total_qty = all_wines_here.aggregate(total=Sum("quantity"))["total"] or 0
         wine_stats = {
-            "total_tasted": all_wines_here.count(),
+            "total_tasted": total_qty,
+            "unique_wines": all_wines_here.count(),
             "favorites": all_wines_here.filter(is_favorite=True).count(),
             "purchased": all_wines_here.filter(purchased=True).count(),
             "top_rated": all_wines_here.filter(rating__gte=4).count(),

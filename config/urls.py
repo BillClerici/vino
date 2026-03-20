@@ -3,7 +3,7 @@ from django.urls import include, path
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from apps.api.views import auth_callback, health_check
-from apps.core.views import AppSettingsView, LandingPageView
+from apps.core.views import AppSettingsView, LandingPageView, SetTimezoneView
 from apps.rbac.views import (
     ControlPointCreateView,
     ControlPointDeleteView,
@@ -48,6 +48,7 @@ urlpatterns = [
     path('auth/jwt-callback/', auth_callback, name='auth_jwt_callback'),
     path('', LandingPageView.as_view(), name='landing'),
     path('settings/', AppSettingsView.as_view(), name='app_settings'),
+    path('api/set-timezone/', SetTimezoneView.as_view(), name='set_timezone'),
     path('login/', LoginView.as_view(), name='login'),
     path('register/', RegisterView.as_view(), name='register'),
     path('logout/', LogoutView.as_view(), name='logout'),

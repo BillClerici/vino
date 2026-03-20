@@ -24,6 +24,16 @@ from apps.wineries.models import FavoritePlace, Place
 User = get_user_model()
 
 
+def _user_tz(user):
+    """Return the user's ZoneInfo timezone, falling back to UTC."""
+    import zoneinfo
+    tz_name = getattr(user, "timezone", "") or "UTC"
+    try:
+        return zoneinfo.ZoneInfo(tz_name)
+    except (KeyError, Exception):
+        return timezone.utc
+
+
 class TripListView(LoginRequiredMixin, ListView):
     model = Trip
     template_name = "trips/list.html"
@@ -228,7 +238,7 @@ class TripCopyView(LoginRequiredMixin, View):
             source.trip_stops.select_related("place").order_by("order")
         )
         base_arrival = datetime.combine(
-            new_trip.scheduled_date or today, default_meeting, tzinfo=timezone.utc,
+            new_trip.scheduled_date or today, default_meeting, tzinfo=_user_tz(request.user),
         )
         prev_stop = None
         for idx, src in enumerate(source_stops):
@@ -496,7 +506,7 @@ class TripAddStopView(LoginRequiredMixin, View):
             # by cumulative durations + travel times of all existing stops
             meeting = trip.meeting_time or time(0, 0)
             base = datetime.combine(
-                trip.scheduled_date, meeting, tzinfo=timezone.utc,
+                trip.scheduled_date, meeting, tzinfo=_user_tz(request.user),
             )
             offset = sum(
                 (s.duration_minutes or default_duration) + (s.travel_minutes or 0)
@@ -580,7 +590,11 @@ class TripUpdateStopView(LoginRequiredMixin, View):
                 if field == "order":
                     val = int(val) if val else stop.order
                 if field == "arrival_time":
-                    val = val or None
+                    if val:
+                        naive = datetime.fromisoformat(val)
+                        val = naive.replace(tzinfo=_user_tz(request.user))
+                    else:
+                        val = None
                 setattr(stop, field, val)
 
         stop.save()
@@ -622,7 +636,7 @@ class TripRemoveStopView(LoginRequiredMixin, View):
         )
         meeting = trip.meeting_time or time(0, 0)
         base_arrival = (
-            datetime.combine(trip.scheduled_date, meeting, tzinfo=timezone.utc)
+            datetime.combine(trip.scheduled_date, meeting, tzinfo=_user_tz(request.user))
             if trip.scheduled_date
             else None
         )
@@ -938,7 +952,7 @@ class QuickTripView(LoginRequiredMixin, View):
             trip=trip, user=request.user,
             role=TripMember.Role.ORGANIZER, rsvp_status="accepted",
         )
-        default_arrival = datetime.combine(today, default_meeting, tzinfo=timezone.utc)
+        default_arrival = datetime.combine(today, default_meeting, tzinfo=_user_tz(request.user))
         TripStop.objects.create(
             trip=trip, place=place, order=1,
             arrival_time=default_arrival,
@@ -1005,7 +1019,7 @@ class QuickCheckinView(LoginRequiredMixin, View):
         )
 
         # Add the place as the first stop
-        arrival = datetime.combine(today, default_meeting, tzinfo=timezone.utc)
+        arrival = datetime.combine(today, default_meeting, tzinfo=_user_tz(request.user))
         TripStop.objects.create(
             trip=trip,
             place=place,

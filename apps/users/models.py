@@ -49,6 +49,10 @@ class User(AbstractBaseUser, PermissionsMixin, BaseModel):
     last_login_provider = models.CharField(max_length=50, blank=True)
     roles = models.ManyToManyField('rbac.Role', blank=True, related_name='users')
 
+    # Preferences
+    timezone = models.CharField(max_length=63, blank=True, default="America/New_York",
+                                help_text="IANA timezone (e.g. America/New_York)")
+
     # Stripe subscription
     stripe_customer_id = models.CharField(max_length=255, blank=True, db_index=True)
     subscription_status = models.CharField(
