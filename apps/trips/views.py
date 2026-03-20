@@ -1180,7 +1180,7 @@ class LiveTripCheckinView(LoginRequiredMixin, View):
             "ok": True,
             "visit_id": str(visit.pk),
             "place_name": stop.place.name,
-            "checked_in_at": visit.visited_at.strftime("%I:%M %p"),
+            "checked_in_at": visit.visited_at.astimezone(_user_tz(request.user)).strftime("%I:%M %p"),
         })
 
 
