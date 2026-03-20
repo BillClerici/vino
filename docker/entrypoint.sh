@@ -1,9 +1,9 @@
-#!/bin/bash
+#\!/bin/bash
 set -e
 
 # Wait for database to be ready
 echo "Waiting for database..."
-while ! python -c "
+while \! python -c "
 import os, django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.local')
 django.setup()

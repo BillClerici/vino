@@ -550,16 +550,13 @@ function addStopToTrip(placeId, btnEl) {
 }
 
 function addPlaceStopToTrip(name, addr, lat, lng, website, photoUrl, btnEl) {
-    // First create/find the place, then add as stop
+    // First create/find the place (without favoriting), then add as stop
     var extra = getPlaceExtra(lat, lng);
-    fetch('/places/favorite-place/', {
+    fetch('/places/find-or-create/', {
         method: 'POST', headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: name, address: addr, lat: lat, lng: lng, website: website, photo_url: photoUrl || '', place_type: getPlaceType(), phone: extra.phone || '', description: extra.description || '' })
     }).then(function(r) { return r.json(); }).then(function(data) {
         if (data.place_id) {
-            // Unfavorite it if we just auto-favorited (we only want to create the place, not fav)
-            // Actually the favorite-place toggles, so if it was created fresh it's now favorited.
-            // That's fine — just add the stop.
             addStopToTrip(data.place_id, btnEl);
         }
     }).catch(function(e) { console.error('Add place stop error:', e); });

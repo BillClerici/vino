@@ -1,6 +1,9 @@
 import json as _json
+import logging
+from datetime import datetime, time, timedelta, timezone
 from decimal import Decimal
 
+import httpx
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
@@ -10,6 +13,8 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views import View
 from django.views.generic import ListView
+
+logger = logging.getLogger(__name__)
 
 from apps.trips.forms import TripForm
 from apps.trips.models import Trip, TripMember, TripStop
@@ -135,6 +140,20 @@ class TripDetailView(LoginRequiredMixin, View):
         })
 
 
+class TripStopsPartialView(LoginRequiredMixin, View):
+    """Return the stops list partial HTML for htmx swap."""
+
+    def get(self, request, pk):
+        trip = get_object_or_404(Trip, pk=pk)
+        stops = list(trip.trip_stops.select_related("place").order_by("order"))
+        for stop in stops:
+            stop.has_cached_wines = stop.place.menu_items.exists()
+        return render(request, "trips/_stops_list.html", {
+            "stops": stops,
+            "trip": trip,
+        })
+
+
 class TripUpdateView(LoginRequiredMixin, View):
     """AJAX: update trip fields."""
 
@@ -182,6 +201,54 @@ class TripDeleteView(LoginRequiredMixin, View):
         return JsonResponse({"ok": True})
 
 
+def _get_drive_info(origin_lat, origin_lng, dest_lat, dest_lng):
+    """Fetch driving time (minutes) and distance (miles) via Google Routes API.
+
+    Returns (travel_minutes, travel_miles) or (None, None).
+    """
+    api_key = getattr(settings, "GOOGLE_MAPS_API_KEY", "")
+    if not api_key or None in (origin_lat, origin_lng, dest_lat, dest_lng):
+        return None, None
+    try:
+        resp = httpx.post(
+            "https://routes.googleapis.com/directions/v2:computeRoutes",
+            headers={
+                "X-Goog-Api-Key": api_key,
+                "X-Goog-FieldMask": "routes.duration,routes.distanceMeters",
+            },
+            json={
+                "origin": {
+                    "location": {
+                        "latLng": {
+                            "latitude": float(origin_lat),
+                            "longitude": float(origin_lng),
+                        }
+                    }
+                },
+                "destination": {
+                    "location": {
+                        "latLng": {
+                            "latitude": float(dest_lat),
+                            "longitude": float(dest_lng),
+                        }
+                    }
+                },
+                "travelMode": "DRIVE",
+            },
+            timeout=10,
+        )
+        data = resp.json()
+        route = data["routes"][0]
+        duration_str = route["duration"]  # e.g. "1523s"
+        seconds = int(duration_str.rstrip("s"))
+        meters = route.get("distanceMeters", 0)
+        miles = round(meters / 1609.344, 1)
+        return max(1, round(seconds / 60)), miles
+    except Exception:
+        logger.exception("Google Routes API error")
+    return None, None
+
+
 class TripAddStopView(LoginRequiredMixin, View):
     """AJAX: add a place stop to a trip."""
 
@@ -201,15 +268,65 @@ class TripAddStopView(LoginRequiredMixin, View):
 
         place = get_object_or_404(Place, pk=place_id)
 
-        # Check if already added
+        # Calculate arrival_time based on existing stops and trip schedule
+        default_duration = 90
+        default_arrival = None
+        travel_minutes = None
+        existing_stops = list(
+            trip.trip_stops.select_related("place").order_by("order")
+        )
+        last_stop = existing_stops[-1] if existing_stops else None
+
+        # Get drive info from previous stop to this place
+        travel_miles = None
+        if last_stop:
+            travel_minutes, travel_miles = _get_drive_info(
+                last_stop.place.latitude, last_stop.place.longitude,
+                place.latitude, place.longitude,
+            )
+
+        if last_stop and last_stop.arrival_time:
+            # Next stop starts after previous stop's duration + drive time
+            prev_duration = last_stop.duration_minutes or default_duration
+            drive = travel_minutes or 0
+            default_arrival = last_stop.arrival_time + timedelta(
+                minutes=prev_duration + drive
+            )
+        elif trip.scheduled_date:
+            # Build from trip's scheduled_date + meeting_time, then offset
+            # by cumulative durations + travel times of all existing stops
+            meeting = trip.meeting_time or time(0, 0)
+            base = datetime.combine(
+                trip.scheduled_date, meeting, tzinfo=timezone.utc,
+            )
+            offset = sum(
+                (s.duration_minutes or default_duration) + (s.travel_minutes or 0)
+                for s in existing_stops
+            )
+            drive = travel_minutes or 0
+            default_arrival = base + timedelta(minutes=offset + drive)
+
+        # Check if already added (reactivate if soft-deleted)
+        max_order = last_stop.order if last_stop else 0
         if TripStop.all_objects.filter(trip=trip, place=place).exists():
             tw = TripStop.all_objects.get(trip=trip, place=place)
             tw.is_active = True
-            tw.save(update_fields=["is_active", "updated_at"])
+            tw.order = max_order + 1
+            tw.arrival_time = default_arrival
+            tw.duration_minutes = tw.duration_minutes or default_duration
+            tw.travel_minutes = travel_minutes
+            tw.travel_miles = travel_miles
+            tw.save(update_fields=[
+                "is_active", "order", "arrival_time", "duration_minutes",
+                "travel_minutes", "travel_miles", "updated_at",
+            ])
         else:
-            max_order = trip.trip_stops.order_by("-order").values_list("order", flat=True).first() or 0
             tw = TripStop.objects.create(
-                trip=trip, place=place, order=max_order + 1
+                trip=trip, place=place, order=max_order + 1,
+                arrival_time=default_arrival,
+                duration_minutes=default_duration,
+                travel_minutes=travel_minutes,
+                travel_miles=travel_miles,
             )
 
         return JsonResponse({
@@ -221,6 +338,9 @@ class TripAddStopView(LoginRequiredMixin, View):
             "state": place.state,
             "order": tw.order,
             "image_url": place.image_url or "",
+            "arrival_time": tw.arrival_time.strftime("%Y-%m-%dT%H:%M") if tw.arrival_time else "",
+            "duration_minutes": tw.duration_minutes or "",
+            "travel_minutes": tw.travel_minutes or "",
         })
 
 
@@ -236,14 +356,16 @@ class TripUpdateStopView(LoginRequiredMixin, View):
             return JsonResponse({"error": "Invalid JSON"}, status=400)
 
         editable_fields = [
-            "arrival_time", "duration_minutes", "description",
-            "notes", "meeting_details", "travel_details", "order",
+            "arrival_time", "duration_minutes", "travel_minutes", "travel_miles",
+            "description", "notes", "meeting_details", "travel_details", "order",
         ]
         for field in editable_fields:
             if field in body:
                 val = body[field]
-                if field == "duration_minutes":
+                if field in ("duration_minutes", "travel_minutes"):
                     val = int(val) if val else None
+                if field == "travel_miles":
+                    val = Decimal(val) if val else None
                 if field == "order":
                     val = int(val) if val else stop.order
                 if field == "arrival_time":
@@ -274,7 +396,7 @@ class TripReorderStopsView(LoginRequiredMixin, View):
 
 
 class TripRemoveStopView(LoginRequiredMixin, View):
-    """AJAX: remove a stop from a trip (soft delete)."""
+    """AJAX: remove a stop from a trip (soft delete) and recalculate itinerary."""
 
     def post(self, request, pk, stop_pk):
         trip = get_object_or_404(Trip, pk=pk)
@@ -282,12 +404,43 @@ class TripRemoveStopView(LoginRequiredMixin, View):
         stop.is_active = False
         stop.save(update_fields=["is_active", "updated_at"])
 
-        # Re-sequence remaining stops
-        remaining = list(trip.trip_stops.order_by("order"))
-        for idx, tw in enumerate(remaining, start=1):
-            if tw.order != idx:
-                tw.order = idx
-                tw.save(update_fields=["order", "updated_at"])
+        # Re-sequence remaining stops and recalculate travel/arrival times
+        default_duration = 90
+        remaining = list(
+            trip.trip_stops.select_related("place").order_by("order")
+        )
+        meeting = trip.meeting_time or time(0, 0)
+        base_arrival = (
+            datetime.combine(trip.scheduled_date, meeting, tzinfo=timezone.utc)
+            if trip.scheduled_date
+            else None
+        )
+
+        for idx, tw in enumerate(remaining):
+            tw.order = idx + 1
+
+            if idx == 0:
+                tw.travel_minutes = None
+                tw.travel_miles = None
+                tw.arrival_time = base_arrival
+            else:
+                prev = remaining[idx - 1]
+                tw.travel_minutes, tw.travel_miles = _get_drive_info(
+                    prev.place.latitude, prev.place.longitude,
+                    tw.place.latitude, tw.place.longitude,
+                )
+                if prev.arrival_time:
+                    prev_dur = prev.duration_minutes or default_duration
+                    drive = tw.travel_minutes or 0
+                    tw.arrival_time = prev.arrival_time + timedelta(
+                        minutes=prev_dur + drive
+                    )
+
+            tw.duration_minutes = tw.duration_minutes or default_duration
+            tw.save(update_fields=[
+                "order", "arrival_time", "duration_minutes",
+                "travel_minutes", "travel_miles", "updated_at",
+            ])
 
         # Fix current_stop_index if it's now out of bounds
         meta = trip.metadata or {}

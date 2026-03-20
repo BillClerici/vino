@@ -244,6 +244,89 @@ class FavoritePlaceView(LoginRequiredMixin, View):
         })
 
 
+class FindOrCreatePlaceView(LoginRequiredMixin, View):
+    """AJAX endpoint: find-or-create a place from Google Places data (no favorite toggle)."""
+
+    def post(self, request):
+        import json as _json
+        try:
+            body = _json.loads(request.body)
+        except (ValueError, TypeError):
+            return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+        name = body.get("name", "").strip()
+        if not name:
+            return JsonResponse({"error": "Name is required"}, status=400)
+
+        addr = body.get("address", "")
+        lat = body.get("lat")
+        lng = body.get("lng")
+        website = body.get("website", "")
+        photo_url = body.get("photo_url", "")
+
+        # Try to find existing place by name + coordinates (within ~100m)
+        place = None
+        if lat and lng:
+            from decimal import Decimal
+            lat_d, lng_d = Decimal(str(lat)), Decimal(str(lng))
+            place = (
+                Place.objects.filter(
+                    name__iexact=name,
+                    latitude__range=(lat_d - Decimal("0.001"), lat_d + Decimal("0.001")),
+                    longitude__range=(lng_d - Decimal("0.001"), lng_d + Decimal("0.001")),
+                )
+                .first()
+            )
+
+        if not place:
+            city, state = "", ""
+            if addr:
+                parts = [p.strip() for p in addr.split(",")]
+                if len(parts) >= 3:
+                    city = parts[-3]
+                    state_zip = parts[-2].strip().split(" ")
+                    state = state_zip[0] if state_zip else ""
+                elif len(parts) == 2:
+                    city = parts[0]
+
+            place_type = body.get("place_type", "winery")
+            if place_type not in dict(Place.PlaceType.choices):
+                place_type = "winery"
+            place = Place.objects.create(
+                name=name,
+                address=addr,
+                city=city,
+                state=state,
+                latitude=lat,
+                longitude=lng,
+                website=website,
+                image_url=photo_url,
+                place_type=place_type,
+                phone=body.get("phone", ""),
+                description=body.get("description", ""),
+            )
+        else:
+            changed = []
+            if photo_url and not place.image_url:
+                place.image_url = photo_url
+                changed.append("image_url")
+            if body.get("phone") and not place.phone:
+                place.phone = body["phone"]
+                changed.append("phone")
+            if body.get("description") and not place.description:
+                place.description = body["description"]
+                changed.append("description")
+            if changed:
+                place.save(update_fields=changed + ["updated_at"])
+
+        return JsonResponse({
+            "place_id": str(place.pk),
+            "name": place.name,
+            "city": place.city,
+            "state": place.state,
+        })
+
+
 class PlaceDetailView(LoginRequiredMixin, View):
     def get(self, request, pk):
         place = get_object_or_404(Place, pk=pk)

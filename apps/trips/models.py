@@ -105,6 +105,8 @@ class TripStop(BaseModel):
     order = models.PositiveIntegerField(default=0)
     arrival_time = models.DateTimeField(null=True, blank=True)
     duration_minutes = models.PositiveIntegerField(null=True, blank=True)
+    travel_minutes = models.PositiveIntegerField(null=True, blank=True, help_text="Drive time from previous stop")
+    travel_miles = models.DecimalField(max_digits=6, decimal_places=1, null=True, blank=True, help_text="Distance from previous stop in miles")
     description = models.TextField(blank=True)
     notes = models.TextField(blank=True)
     meeting_details = models.TextField(blank=True)

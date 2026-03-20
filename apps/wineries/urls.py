@@ -2,6 +2,7 @@ from django.urls import path
 
 from apps.wineries.views import (
     FavoritePlaceView,
+    FindOrCreatePlaceView,
     MenuItemCreateView,
     PlaceAdminFetchGoogleView,
     PlaceAdminMenuView,
@@ -16,6 +17,7 @@ urlpatterns = [
     path("", PlaceListView.as_view(), name="place_list"),
     path("add/", PlaceCreateView.as_view(), name="place_create"),
     path("favorite-place/", FavoritePlaceView.as_view(), name="place_favorite_place"),
+    path("find-or-create/", FindOrCreatePlaceView.as_view(), name="place_find_or_create"),
     path("<uuid:pk>/", PlaceDetailView.as_view(), name="place_detail"),
     path("<uuid:pk>/edit/", PlaceEditView.as_view(), name="place_edit"),
     path("<uuid:pk>/favorite/", ToggleFavoriteView.as_view(), name="place_toggle_favorite"),
