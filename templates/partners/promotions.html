@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}Promotions — Vino{% endblock %}
+
+{% block extra_css %}
+<style>
+    .status-badge {
+        display: inline-block; padding: 2px 10px; border-radius: 10px;
+        font-size: 0.75rem; font-weight: 600; text-transform: capitalize;
+    }
+    .status-pending { background: #fff3e0; color: #e65100; }
+    .status-pending_review { background: #fff3e0; color: #e65100; }
+    .status-approved { background: #e8f5e9; color: #2e7d32; }
+    .status-active { background: #e8f5e9; color: #2e7d32; }
+    .status-draft { background: #e3f2fd; color: #1565c0; }
+    .status-paused { background: #fff3e0; color: #e65100; }
+    .status-expired { background: #efebe9; color: #5d4037; }
+    .status-rejected { background: #fce4ec; color: #c62828; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container" style="margin-top: 20px;">
+    <div class="row">
+        <div class="col s12">
+            <div class="card">
+                <div class="card-content">
+                    <div class="row" style="margin-bottom: 0;">
+                        <div class="col s6">
+                            <span class="card-title">
+                                <i class="material-icons">campaign</i> Promotions
+                            </span>
+                        </div>
+                        <div class="col s6 right-align">
+                            <a href="{% url 'partner_promotion_create' %}" class="btn blue-grey darken-1 waves-effect waves-light">
+                                <i class="material-icons left">add</i>New Promotion
+                            </a>
+                        </div>
+                    </div>
+
+                    {% if messages %}
+                    {% for message in messages %}
+                    <div class="card-panel {{ message.tags }} lighten-4" style="padding: 10px;">
+                        {{ message }}
+                    </div>
+                    {% endfor %}
+                    {% endif %}
+
+                    <table class="striped highlight responsive-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Place</th>
+                                <th>Type</th>
+                                <th>Status</th>
+                                <th>Dates</th>
+                                <th class="right-align">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for promo in promotions %}
+                            <tr>
+                                <td><strong>{{ promo.name }}</strong></td>
+                                <td>{{ promo.place.name }}</td>
+                                <td>{{ promo.promotion_type.label|default:"—" }}</td>
+                                <td><span class="status-badge status-{{ promo.status }}">{{ promo.get_status_display }}</span></td>
+                                <td>{{ promo.start_date|date:"M d" }} — {{ promo.end_date|date:"M d, Y" }}</td>
+                                <td class="right-align">
+                                    <a href="{% url 'partner_promotion_edit' promo.pk %}" class="btn-small btn-flat waves-effect" title="Edit">
+                                        <i class="material-icons">edit</i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="6" class="center-align grey-text" style="padding: 30px;">
+                                    No promotions yet. <a href="{% url 'partner_promotion_create' %}">Create your first promotion</a>.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

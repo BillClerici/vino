@@ -40,6 +40,8 @@ from apps.wineries.views import (
     PlaceAdminEditView,
     PlaceAdminListView,
 )
+from apps.partners.urls import admin_patterns as partner_admin_patterns
+from apps.partners.urls import partner_portal_patterns
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -64,6 +66,7 @@ urlpatterns = [
     path('visits/', include('apps.visits.urls')),
     path('trips/', include('apps.trips.urls')),
     path('palate/', include('apps.palate.urls')),
+    path('partners/', include(partner_portal_patterns)),
     # Admin CRUD (HTML views)
     path('manage/users/', UserListView.as_view(), name='admin_users_list'),
     path('manage/users/create/', UserCreateView.as_view(), name='admin_users_create'),
@@ -90,5 +93,7 @@ urlpatterns = [
     path('manage/places/create/', PlaceAdminCreateView.as_view(), name='admin_places_create'),
     path('manage/places/<uuid:pk>/edit/', PlaceAdminEditView.as_view(), name='admin_places_edit'),
     path('manage/places/<uuid:pk>/delete/', PlaceAdminDeleteView.as_view(), name='admin_places_delete'),
+    # Partner admin
+    path('manage/', include(partner_admin_patterns)),
     path('auth/', include('social_django.urls', namespace='social')),
 ]

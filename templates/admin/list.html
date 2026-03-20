@@ -97,9 +97,11 @@
                             </span>
                         </div>
                         <div class="col s6 right-align">
+                            {% if create_url %}
                             <a href="{{ create_url }}" class="btn blue-grey darken-1 waves-effect waves-light">
                                 <i class="material-icons left">add</i>Add New
                             </a>
+                            {% endif %}
                         </div>
                     </div>
 

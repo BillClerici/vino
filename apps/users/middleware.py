@@ -19,6 +19,7 @@ ALLOWED_PATHS = [
     "/api/",
     "/manage/",
     "/static/",
+    "/partners/",
 ]
 
 

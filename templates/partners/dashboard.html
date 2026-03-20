@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block title %}Partner Dashboard — Vino{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-pills { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; }
+    .stat-pill {
+        flex: 1; min-width: 160px; padding: 20px; border-radius: 12px;
+        background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+        text-align: center;
+    }
+    .stat-pill .sp-icon { font-size: 1.5rem; margin-bottom: 6px; }
+    .stat-pill .sp-num { font-size: 2rem; font-weight: 800; color: #333; }
+    .stat-pill .sp-label {
+        font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px;
+        color: #9e9e9e; font-weight: 600; margin-top: 2px;
+    }
+    .status-badge {
+        display: inline-block; padding: 2px 10px; border-radius: 10px;
+        font-size: 0.75rem; font-weight: 600; text-transform: capitalize;
+    }
+    .status-pending { background: #fff3e0; color: #e65100; }
+    .status-approved { background: #e8f5e9; color: #2e7d32; }
+    .status-rejected { background: #fce4ec; color: #c62828; }
+    .status-revoked { background: #efebe9; color: #5d4037; }
+    .status-active { background: #e8f5e9; color: #2e7d32; }
+    .status-draft { background: #e3f2fd; color: #1565c0; }
+    .status-paused { background: #fff3e0; color: #e65100; }
+    .status-expired { background: #efebe9; color: #5d4037; }
+    .status-pending_review { background: #fff3e0; color: #e65100; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container" style="margin-top: 20px;">
+    <!-- Header -->
+    <div class="row" style="margin-bottom: 10px;">
+        <div class="col s12">
+            <h5 style="margin: 0; font-weight: 700;">
+                <i class="material-icons" style="vertical-align: middle;">dashboard</i>
+                Partner Dashboard
+            </h5>
+            <p class="grey-text" style="margin: 4px 0 0;">Welcome back, {{ partner.business_name }}</p>
+        </div>
+    </div>
+
+    <!-- Stat Pills -->
+    <div class="stat-pills">
+        <div class="stat-pill">
+            <div class="sp-icon"><i class="material-icons blue-grey-text">store</i></div>
+            <div class="sp-num">{{ claimed_places_count }}</div>
+            <div class="sp-label">Claimed Places</div>
+        </div>
+        <div class="stat-pill">
+            <div class="sp-icon"><i class="material-icons purple-text">campaign</i></div>
+            <div class="sp-num">{{ active_promotions_count }}</div>
+            <div class="sp-label">Active Promotions</div>
+        </div>
+        <div class="stat-pill">
+            <div class="sp-icon"><i class="material-icons teal-text">visibility</i></div>
+            <div class="sp-num">{{ total_impressions }}</div>
+            <div class="sp-label">Total Impressions</div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Recent Claims -->
+        <div class="col s12 m6">
+            <div class="card">
+                <div class="card-content">
+                    <span class="card-title" style="font-size: 1.1rem; font-weight: 600;">
+                        <i class="material-icons" style="vertical-align: middle;">store</i> Recent Claims
+                    </span>
+                    {% if recent_claims %}
+                    <table class="striped">
+                        <tbody>
+                            {% for claim in recent_claims %}
+                            <tr>
+                                <td>{{ claim.place.name }}</td>
+                                <td class="right-align">
+                                    <span class="status-badge status-{{ claim.status }}">{{ claim.get_status_display }}</span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p class="grey-text">No claims yet.</p>
+                    {% endif %}
+                </div>
+                <div class="card-action">
+                    <a href="{% url 'partner_claims' %}">View All Claims</a>
+                    <a href="{% url 'partner_claim_create' %}">Claim a Place</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Promotions -->
+        <div class="col s12 m6">
+            <div class="card">
+                <div class="card-content">
+                    <span class="card-title" style="font-size: 1.1rem; font-weight: 600;">
+                        <i class="material-icons" style="vertical-align: middle;">campaign</i> Recent Promotions
+                    </span>
+                    {% if recent_promotions %}
+                    <table class="striped">
+                        <tbody>
+                            {% for promo in recent_promotions %}
+                            <tr>
+                                <td>{{ promo.name }}</td>
+                                <td class="right-align">
+                                    <span class="status-badge status-{{ promo.status }}">{{ promo.get_status_display }}</span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p class="grey-text">No promotions yet.</p>
+                    {% endif %}
+                </div>
+                <div class="card-action">
+                    <a href="{% url 'partner_promotions' %}">View All Promotions</a>
+                    <a href="{% url 'partner_promotion_create' %}">Create Promotion</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

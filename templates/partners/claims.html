@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}My Places — Vino{% endblock %}
+
+{% block extra_css %}
+<style>
+    .status-badge {
+        display: inline-block; padding: 2px 10px; border-radius: 10px;
+        font-size: 0.75rem; font-weight: 600; text-transform: capitalize;
+    }
+    .status-pending { background: #fff3e0; color: #e65100; }
+    .status-approved { background: #e8f5e9; color: #2e7d32; }
+    .status-rejected { background: #fce4ec; color: #c62828; }
+    .status-revoked { background: #efebe9; color: #5d4037; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container" style="margin-top: 20px;">
+    <div class="row">
+        <div class="col s12">
+            <div class="card">
+                <div class="card-content">
+                    <div class="row" style="margin-bottom: 0;">
+                        <div class="col s6">
+                            <span class="card-title">
+                                <i class="material-icons">store</i> My Places
+                            </span>
+                        </div>
+                        <div class="col s6 right-align">
+                            <a href="{% url 'partner_claim_create' %}" class="btn blue-grey darken-1 waves-effect waves-light">
+                                <i class="material-icons left">add</i>Claim a Place
+                            </a>
+                        </div>
+                    </div>
+
+                    {% if messages %}
+                    {% for message in messages %}
+                    <div class="card-panel {{ message.tags }} lighten-4" style="padding: 10px;">
+                        {{ message }}
+                    </div>
+                    {% endfor %}
+                    {% endif %}
+
+                    <table class="striped highlight responsive-table">
+                        <thead>
+                            <tr>
+                                <th>Place</th>
+                                <th>Type</th>
+                                <th>City</th>
+                                <th>Status</th>
+                                <th>Claimed</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for claim in claims %}
+                            <tr>
+                                <td><strong>{{ claim.place.name }}</strong></td>
+                                <td>{{ claim.place.get_place_type_display }}</td>
+                                <td>{{ claim.place.city }}{% if claim.place.state %}, {{ claim.place.state }}{% endif %}</td>
+                                <td><span class="status-badge status-{{ claim.status }}">{{ claim.get_status_display }}</span></td>
+                                <td>{{ claim.claimed_at|date:"M d, Y" }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="center-align grey-text" style="padding: 30px;">
+                                    No places claimed yet. <a href="{% url 'partner_claim_create' %}">Claim your first place</a>.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

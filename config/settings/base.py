@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'apps.visits',
     'apps.trips',
     'apps.palate',
+    'apps.partners',
 ]
 
 MIDDLEWARE = [

@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}Become a Partner — Vino{% endblock %}
+
+{% block extra_css %}
+<style>
+    .partner-apply-hero {
+        background: linear-gradient(135deg, #455a64 0%, #607d8b 50%, #90a4ae 100%);
+        color: #fff; padding: 32px 28px; border-radius: 12px; margin-bottom: 24px;
+        position: relative; overflow: hidden;
+    }
+    .partner-apply-hero h4 { font-weight: 700; margin: 0 0 8px; }
+    .partner-apply-hero p { margin: 0; opacity: 0.9; font-size: 1rem; }
+    .status-badge {
+        display: inline-block; padding: 4px 14px; border-radius: 12px;
+        font-size: 0.85rem; font-weight: 600; text-transform: capitalize;
+    }
+    .status-pending { background: #fff3e0; color: #e65100; }
+    .status-approved { background: #e8f5e9; color: #2e7d32; }
+    .status-rejected { background: #fce4ec; color: #c62828; }
+    .status-suspended { background: #efebe9; color: #5d4037; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container" style="margin-top: 20px;">
+    <div class="row">
+        <div class="col s12 m8 offset-m2">
+            <!-- Hero -->
+            <div class="partner-apply-hero">
+                <h4>Partner with Vino</h4>
+                <p>Claim your winery, brewery, or restaurant and reach wine enthusiasts with targeted promotions.</p>
+            </div>
+
+            {% if messages %}
+            {% for message in messages %}
+            <div class="card-panel {{ message.tags }} lighten-4" style="padding: 10px;">
+                {{ message }}
+            </div>
+            {% endfor %}
+            {% endif %}
+
+            {% if partner %}
+            <!-- Already applied — show status -->
+            <div class="card">
+                <div class="card-content">
+                    <span class="card-title">
+                        <i class="material-icons">info</i> Application Status
+                    </span>
+                    <p style="margin-bottom: 12px;">
+                        Your partner application for <strong>{{ partner.business_name }}</strong> is currently:
+                    </p>
+                    <span class="status-badge status-{{ partner.status }}">{{ partner.get_status_display }}</span>
+                    {% if partner.status == 'pending' %}
+                    <p class="grey-text" style="margin-top: 16px;">
+                        Our team is reviewing your application. You will be notified once it is processed.
+                    </p>
+                    {% elif partner.status == 'rejected' %}
+                    <p class="grey-text" style="margin-top: 16px;">
+                        Unfortunately your application was not approved. Please contact us if you have questions.
+                    </p>
+                    {% elif partner.status == 'suspended' %}
+                    <p class="grey-text" style="margin-top: 16px;">
+                        Your partner account has been suspended. Please contact us for more information.
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+            {% else %}
+            <!-- Application form -->
+            <div class="card">
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="card-content">
+                        <span class="card-title">
+                            <i class="material-icons">assignment</i> Partner Application
+                        </span>
+
+                        {% if form.errors %}
+                        <div class="card-panel red lighten-4" style="padding: 10px;">
+                            <ul class="browser-default">
+                                {% for field, errors in form.errors.items %}
+                                {% for error in errors %}
+                                <li><strong>{{ field }}:</strong> {{ error }}</li>
+                                {% endfor %}
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %}
+
+                        {% for field in form %}
+                        <div class="row" style="margin-bottom: 0;">
+                            <div class="input-field col s12">
+                                {% if field.field.widget.attrs.class == 'materialize-textarea' %}
+                                {{ field }}
+                                <label for="{{ field.id_for_label }}" class="{% if field.value %}active{% endif %}">{{ field.label }}</label>
+                                {% else %}
+                                {{ field }}
+                                <label for="{{ field.id_for_label }}" class="{% if field.value %}active{% endif %}">{{ field.label }}</label>
+                                {% endif %}
+                                {% if field.help_text %}
+                                <span class="helper-text">{{ field.help_text }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="card-action right-align">
+                        <a href="{% url 'landing' %}" class="btn-flat waves-effect">Cancel</a>
+                        <button type="submit" class="btn blue-grey darken-1 waves-effect waves-light">
+                            <i class="material-icons left">send</i>Submit Application
+                        </button>
+                    </div>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        M.updateTextFields();
+        M.CharacterCounter.init(document.querySelectorAll('.materialize-textarea'));
+    });
+</script>
+{% endblock %}

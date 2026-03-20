@@ -103,4 +103,5 @@ OAuth2 only (Google + Microsoft) — normal users have `set_unusable_password()`
 ## Critical Rules
 
 - **NEVER** modify, blank out, or replace values in `.env`, `.env.docker`, or `.env.example` — these contain pre-configured working credentials
+- **ALWAYS** use `LookupValue` (parent-child hierarchy in `apps.lookup`) for dropdown/select lists instead of hardcoded `TextChoices` on models. This allows admins to manage list values through the Lookup Items admin UI without code changes. Use FK to `LookupValue` on the model, and filter by `parent__code` in forms. Status/workflow fields that drive code logic (e.g., `pending`/`approved`) are the exception — those stay as `TextChoices`.
 - CI runs on every push: ruff check → mypy → pytest (see `.github/workflows/ci.yml`)
