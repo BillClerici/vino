@@ -1,0 +1,929 @@
+[
+{
+  "model": "rbac.controlpointgroup",
+  "pk": "301b6125-c6cb-48b7-8415-6c8f523f9faf",
+  "fields": {
+    "created_at": "2026-03-18T19:46:17.111Z",
+    "updated_at": "2026-03-18T19:46:17.111Z",
+    "is_active": true,
+    "name": "User Management",
+    "description": "Manage user management",
+    "sort_order": 0
+  }
+},
+{
+  "model": "rbac.controlpointgroup",
+  "pk": "56f415a2-e891-45f0-be57-d81cc4bbfcc7",
+  "fields": {
+    "created_at": "2026-03-18T19:46:17.175Z",
+    "updated_at": "2026-03-18T19:46:17.175Z",
+    "is_active": true,
+    "name": "Lookup Item Management",
+    "description": "Manage lookup item management",
+    "sort_order": 0
+  }
+},
+{
+  "model": "rbac.controlpointgroup",
+  "pk": "60b9a74e-f14a-41fc-b872-99ab8654f4ce",
+  "fields": {
+    "created_at": "2026-03-18T19:46:17.146Z",
+    "updated_at": "2026-03-18T19:46:17.146Z",
+    "is_active": true,
+    "name": "Control Point Management",
+    "description": "Manage control point management",
+    "sort_order": 0
+  }
+},
+{
+  "model": "rbac.controlpointgroup",
+  "pk": "8b35dd30-f8ae-4ea1-9be5-69f6a6716512",
+  "fields": {
+    "created_at": "2026-03-18T19:46:17.130Z",
+    "updated_at": "2026-03-18T19:46:17.130Z",
+    "is_active": true,
+    "name": "Role Management",
+    "description": "Manage role management",
+    "sort_order": 0
+  }
+},
+{
+  "model": "rbac.controlpointgroup",
+  "pk": "f4401529-e26d-474f-91aa-b4ef62e27762",
+  "fields": {
+    "created_at": "2026-03-20T01:45:13.671Z",
+    "updated_at": "2026-03-20T01:45:13.671Z",
+    "is_active": true,
+    "name": "Subscriber",
+    "description": "Control points for subscriber features",
+    "sort_order": 10
+  }
+},
+{
+  "model": "rbac.controlpointgroup",
+  "pk": "fef3a6a5-5701-4120-bc40-0a05ddf56d64",
+  "fields": {
+    "created_at": "2026-03-18T19:46:17.160Z",
+    "updated_at": "2026-03-18T19:46:17.160Z",
+    "is_active": true,
+    "name": "Control Point Group Management",
+    "description": "Manage control point group management",
+    "sort_order": 0
+  }
+},
+{
+  "model": "rbac.controlpoint",
+  "pk": "0171b6af-e9db-4feb-b6c9-2b6d7e14895e",
+  "fields": {
+    "created_at": "2026-03-18T19:46:17.186Z",
+    "updated_at": "2026-03-18T19:46:17.186Z",
+    "is_active": true,
+    "group": "56f415a2-e891-45f0-be57-d81cc4bbfcc7",
+    "code": "LOOKUP_VIEW",
+    "label": "Can View Lookup Item",
+    "description": "Can View Lookup Item in the system"
+  }
+},
+{
+  "model": "rbac.controlpoint",
+  "pk": "216b1499-1abb-4019-938a-435db954e32d",
+  "fields": {
+    "created_at": "2026-03-18T19:46:17.151Z",
+    "updated_at": "2026-03-18T19:46:17.151Z",
+    "is_active": true,
+    "group": "60b9a74e-f14a-41fc-b872-99ab8654f4ce",
+    "code": "CONTROL_POINT_UPDATE",
+    "label": "Can Update Control Point",
+    "description": "Can Update Control Point in the system"
+  }
+},
+{
+  "model": "rbac.controlpoint",
+  "pk": "24201a55-f636-4042-894d-625780704295",
+  "fields": {
+    "created_at": "2026-03-18T19:46:17.125Z",
+    "updated_at": "2026-03-18T19:46:17.125Z",
+    "is_active": true,
+    "group": "301b6125-c6cb-48b7-8415-6c8f523f9faf",
+    "code": "USER_DELETE",
+    "label": "Can Delete User",
+    "description": "Can Delete User in the system"
+  }
+},
+{
+  "model": "rbac.controlpoint",
+  "pk": "2ea74296-3a47-4f73-9110-48186c0fb681",
+  "fields": {
+    "created_at": "2026-03-18T19:46:17.168Z",
+    "updated_at": "2026-03-18T19:46:17.168Z",
+    "is_active": true,
+    "group": "fef3a6a5-5701-4120-bc40-0a05ddf56d64",
+    "code": "CP_GROUP_DELETE",
+    "label": "Can Delete Control Point Group",
+    "description": "Can Delete Control Point Group in the system"
+  }
+},
+{
+  "model": "rbac.controlpoint",
+  "pk": "48f6b562-055f-49b4-a6aa-ace67062cdf7",
+  "fields": {
+    "created_at": "2026-03-18T19:46:17.154Z",
+    "updated_at": "2026-03-18T19:46:17.154Z",
+    "is_active": true,
+    "group": "60b9a74e-f14a-41fc-b872-99ab8654f4ce",
+    "code": "CONTROL_POINT_DELETE",
+    "label": "Can Delete Control Point",
+    "description": "Can Delete Control Point in the system"
+  }
+},
+{
+  "model": "rbac.controlpoint",
+  "pk": "49f20e72-371d-4f2f-a667-1c8b4de2283b",
+  "fields": {
+    "created_at": "2026-03-18T19:46:17.128Z",
+    "updated_at": "2026-03-18T19:46:17.128Z",
+    "is_active": true,
+    "group": "301b6125-c6cb-48b7-8415-6c8f523f9faf",
+    "code": "USER_VIEW",
+    "label": "Can View User",
+    "description": "Can View User in the system"
+  }
+},
+{
+  "model": "rbac.controlpoint",
+  "pk": "4d23eb94-7370-417f-a255-e7197e38b96c",
+  "fields": {
+    "created_at": "2026-03-20T01:45:13.677Z",
+    "updated_at": "2026-03-20T01:45:13.677Z",
+    "is_active": true,
+    "group": "f4401529-e26d-474f-91aa-b4ef62e27762",
+    "code": "SUB_DASHBOARD",
+    "label": "Can Access Dashboard",
+    "description": "Access to Dashboard feature"
+  }
+},
+{
+  "model": "rbac.controlpoint",
+  "pk": "68e3c8aa-a543-45d3-848f-8f028e7d9927",
+  "fields": {
+    "created_at": "2026-03-18T19:46:17.178Z",
+    "updated_at": "2026-03-18T19:46:17.178Z",
+    "is_active": true,
+    "group": "56f415a2-e891-45f0-be57-d81cc4bbfcc7",
+    "code": "LOOKUP_ADD",
+    "label": "Can Add Lookup Item",
+    "description": "Can Add Lookup Item in the system"
+  }
+},
+{
+  "model": "rbac.controlpoint",
+  "pk": "778ac52a-7d34-48a9-a4fe-aa05a505c9c3",
+  "fields": {
+    "created_at": "2026-03-20T01:45:13.685Z",
+    "updated_at": "2026-03-20T01:45:13.685Z",
+    "is_active": true,
+    "group": "f4401529-e26d-474f-91aa-b4ef62e27762",
+    "code": "SUB_MY_VISITS",
+    "label": "Can Access My Visits",
+    "description": "Access to My Visits feature"
+  }
+},
+{
+  "model": "rbac.controlpoint",
+  "pk": "8b062c1d-ab44-47ba-9883-5661ed076151",
+  "fields": {
+    "created_at": "2026-03-18T19:46:17.165Z",
+    "updated_at": "2026-03-18T19:46:17.165Z",
+    "is_active": true,
+    "group": "fef3a6a5-5701-4120-bc40-0a05ddf56d64",
+    "code": "CP_GROUP_UPDATE",
+    "label": "Can Update Control Point Group",
+    "description": "Can Update Control Point Group in the system"
+  }
+},
+{
+  "model": "rbac.controlpoint",
+  "pk": "8ba8a76d-6eb0-45aa-95a6-ef87366c7a4e",
+  "fields": {
+    "created_at": "2026-03-20T01:45:13.701Z",
+    "updated_at": "2026-03-20T01:45:13.701Z",
+    "is_active": true,
+    "group": "f4401529-e26d-474f-91aa-b4ef62e27762",
+    "code": "SUB_MY_SUBSCRIPTION",
+    "label": "Can Access My Subscription",
+    "description": "Access to My Subscription feature"
+  }
+},
+{
+  "model": "rbac.controlpoint",
+  "pk": "8cf28061-e56c-48e3-8ca2-7ff3cfd09ad6",
+  "fields": {
+    "created_at": "2026-03-18T19:46:17.183Z",
+    "updated_at": "2026-03-18T19:46:17.183Z",
+    "is_active": true,
+    "group": "56f415a2-e891-45f0-be57-d81cc4bbfcc7",
+    "code": "LOOKUP_DELETE",
+    "label": "Can Delete Lookup Item",
+    "description": "Can Delete Lookup Item in the system"
+  }
+},
+{
+  "model": "rbac.controlpoint",
+  "pk": "9f44157a-c3a7-4f4c-b652-306f32f7ba0d",
+  "fields": {
+    "created_at": "2026-03-18T19:46:17.163Z",
+    "updated_at": "2026-03-18T19:46:17.163Z",
+    "is_active": true,
+    "group": "fef3a6a5-5701-4120-bc40-0a05ddf56d64",
+    "code": "CP_GROUP_ADD",
+    "label": "Can Add Control Point Group",
+    "description": "Can Add Control Point Group in the system"
+  }
+},
+{
+  "model": "rbac.controlpoint",
+  "pk": "a331ff6f-e15d-4e46-b5bf-b8cc274c1333",
+  "fields": {
+    "created_at": "2026-03-18T19:46:17.117Z",
+    "updated_at": "2026-03-18T19:46:17.117Z",
+    "is_active": true,
+    "group": "301b6125-c6cb-48b7-8415-6c8f523f9faf",
+    "code": "USER_ADD",
+    "label": "Can Add User",
+    "description": "Can Add User in the system"
+  }
+},
+{
+  "model": "rbac.controlpoint",
+  "pk": "a58000e0-03ae-4b0f-a2d3-7819227a5c82",
+  "fields": {
+    "created_at": "2026-03-18T19:46:17.140Z",
+    "updated_at": "2026-03-18T19:46:17.140Z",
+    "is_active": true,
+    "group": "8b35dd30-f8ae-4ea1-9be5-69f6a6716512",
+    "code": "ROLE_DELETE",
+    "label": "Can Delete Role",
+    "description": "Can Delete Role in the system"
+  }
+},
+{
+  "model": "rbac.controlpoint",
+  "pk": "ad5df07b-427e-49fa-b76f-d469d9f502cc",
+  "fields": {
+    "created_at": "2026-03-18T19:46:17.121Z",
+    "updated_at": "2026-03-18T19:46:17.121Z",
+    "is_active": true,
+    "group": "301b6125-c6cb-48b7-8415-6c8f523f9faf",
+    "code": "USER_UPDATE",
+    "label": "Can Update User",
+    "description": "Can Update User in the system"
+  }
+},
+{
+  "model": "rbac.controlpoint",
+  "pk": "b9b0dacc-113d-4973-97f4-c1fa9f6aac63",
+  "fields": {
+    "created_at": "2026-03-18T19:46:17.181Z",
+    "updated_at": "2026-03-18T19:46:17.181Z",
+    "is_active": true,
+    "group": "56f415a2-e891-45f0-be57-d81cc4bbfcc7",
+    "code": "LOOKUP_UPDATE",
+    "label": "Can Update Lookup Item",
+    "description": "Can Update Lookup Item in the system"
+  }
+},
+{
+  "model": "rbac.controlpoint",
+  "pk": "bf4f47cf-667b-42d4-b516-361464060efd",
+  "fields": {
+    "created_at": "2026-03-18T19:46:17.133Z",
+    "updated_at": "2026-03-18T19:46:17.133Z",
+    "is_active": true,
+    "group": "8b35dd30-f8ae-4ea1-9be5-69f6a6716512",
+    "code": "ROLE_ADD",
+    "label": "Can Add Role",
+    "description": "Can Add Role in the system"
+  }
+},
+{
+  "model": "rbac.controlpoint",
+  "pk": "c299aef9-bfd0-4a4e-b246-42bc6b047d51",
+  "fields": {
+    "created_at": "2026-03-18T19:46:17.143Z",
+    "updated_at": "2026-03-18T19:46:17.143Z",
+    "is_active": true,
+    "group": "8b35dd30-f8ae-4ea1-9be5-69f6a6716512",
+    "code": "ROLE_VIEW",
+    "label": "Can View Role",
+    "description": "Can View Role in the system"
+  }
+},
+{
+  "model": "rbac.controlpoint",
+  "pk": "c91bcf67-b79c-497e-9543-025e5d4a30bc",
+  "fields": {
+    "created_at": "2026-03-20T01:45:13.681Z",
+    "updated_at": "2026-03-20T01:45:13.681Z",
+    "is_active": true,
+    "group": "f4401529-e26d-474f-91aa-b4ef62e27762",
+    "code": "SUB_PLACES",
+    "label": "Can Access Places",
+    "description": "Access to Places feature"
+  }
+},
+{
+  "model": "rbac.controlpoint",
+  "pk": "ce87dbaf-6928-4504-9e0f-716f743aa316",
+  "fields": {
+    "created_at": "2026-03-18T19:46:17.157Z",
+    "updated_at": "2026-03-18T19:46:17.157Z",
+    "is_active": true,
+    "group": "60b9a74e-f14a-41fc-b872-99ab8654f4ce",
+    "code": "CONTROL_POINT_VIEW",
+    "label": "Can View Control Point",
+    "description": "Can View Control Point in the system"
+  }
+},
+{
+  "model": "rbac.controlpoint",
+  "pk": "d26f8c5b-e7f8-4b93-beb9-56aae7e967a7",
+  "fields": {
+    "created_at": "2026-03-20T01:45:13.697Z",
+    "updated_at": "2026-03-20T01:45:13.697Z",
+    "is_active": true,
+    "group": "f4401529-e26d-474f-91aa-b4ef62e27762",
+    "code": "SUB_MY_PROFILE",
+    "label": "Can Access My Profile",
+    "description": "Access to My Profile feature"
+  }
+},
+{
+  "model": "rbac.controlpoint",
+  "pk": "d64770b4-41f9-4eab-b711-30b747c92361",
+  "fields": {
+    "created_at": "2026-03-18T19:46:17.136Z",
+    "updated_at": "2026-03-18T19:46:17.136Z",
+    "is_active": true,
+    "group": "8b35dd30-f8ae-4ea1-9be5-69f6a6716512",
+    "code": "ROLE_UPDATE",
+    "label": "Can Update Role",
+    "description": "Can Update Role in the system"
+  }
+},
+{
+  "model": "rbac.controlpoint",
+  "pk": "d68f05e7-dae7-49b0-bb0b-853e63e17bb1",
+  "fields": {
+    "created_at": "2026-03-18T19:46:17.149Z",
+    "updated_at": "2026-03-18T19:46:17.149Z",
+    "is_active": true,
+    "group": "60b9a74e-f14a-41fc-b872-99ab8654f4ce",
+    "code": "CONTROL_POINT_ADD",
+    "label": "Can Add Control Point",
+    "description": "Can Add Control Point in the system"
+  }
+},
+{
+  "model": "rbac.controlpoint",
+  "pk": "d6cec7b0-8c65-4c73-a073-081e3c816dee",
+  "fields": {
+    "created_at": "2026-03-20T01:45:13.690Z",
+    "updated_at": "2026-03-20T01:45:13.690Z",
+    "is_active": true,
+    "group": "f4401529-e26d-474f-91aa-b4ef62e27762",
+    "code": "SUB_TRIPS",
+    "label": "Can Access Trips",
+    "description": "Access to Trips feature"
+  }
+},
+{
+  "model": "rbac.controlpoint",
+  "pk": "fdc06e80-4bb1-48ec-82d2-afab659dec79",
+  "fields": {
+    "created_at": "2026-03-18T19:46:17.172Z",
+    "updated_at": "2026-03-18T19:46:17.172Z",
+    "is_active": true,
+    "group": "fef3a6a5-5701-4120-bc40-0a05ddf56d64",
+    "code": "CP_GROUP_VIEW",
+    "label": "Can View Control Point Group",
+    "description": "Can View Control Point Group in the system"
+  }
+},
+{
+  "model": "rbac.controlpoint",
+  "pk": "fe0cf469-189a-4be7-a73e-7796daa04e8e",
+  "fields": {
+    "created_at": "2026-03-20T01:45:13.693Z",
+    "updated_at": "2026-03-20T01:45:13.693Z",
+    "is_active": true,
+    "group": "f4401529-e26d-474f-91aa-b4ef62e27762",
+    "code": "SUB_MY_PALATE",
+    "label": "Can Access My Palate",
+    "description": "Access to My Palate feature"
+  }
+},
+{
+  "model": "rbac.role",
+  "pk": "24e4dcdc-d8b9-4460-bff5-86c8106e1df2",
+  "fields": {
+    "created_at": "2026-03-18T19:46:17.200Z",
+    "updated_at": "2026-03-18T19:46:17.200Z",
+    "is_active": true,
+    "name": "Power User",
+    "description": "Power User role",
+    "control_points": [
+      "4d23eb94-7370-417f-a255-e7197e38b96c",
+      "fe0cf469-189a-4be7-a73e-7796daa04e8e",
+      "d26f8c5b-e7f8-4b93-beb9-56aae7e967a7",
+      "8ba8a76d-6eb0-45aa-95a6-ef87366c7a4e",
+      "778ac52a-7d34-48a9-a4fe-aa05a505c9c3",
+      "c91bcf67-b79c-497e-9543-025e5d4a30bc",
+      "d6cec7b0-8c65-4c73-a073-081e3c816dee"
+    ]
+  }
+},
+{
+  "model": "rbac.role",
+  "pk": "2506082e-b5c8-4bae-8279-82a04c69b5de",
+  "fields": {
+    "created_at": "2026-03-20T01:38:10.533Z",
+    "updated_at": "2026-03-20T01:38:10.533Z",
+    "is_active": true,
+    "name": "Subscriber",
+    "description": "Standard User",
+    "control_points": [
+      "4d23eb94-7370-417f-a255-e7197e38b96c",
+      "fe0cf469-189a-4be7-a73e-7796daa04e8e",
+      "d26f8c5b-e7f8-4b93-beb9-56aae7e967a7",
+      "8ba8a76d-6eb0-45aa-95a6-ef87366c7a4e",
+      "778ac52a-7d34-48a9-a4fe-aa05a505c9c3",
+      "c91bcf67-b79c-497e-9543-025e5d4a30bc",
+      "d6cec7b0-8c65-4c73-a073-081e3c816dee"
+    ]
+  }
+},
+{
+  "model": "rbac.role",
+  "pk": "498d8929-ca19-4df9-b0a7-32ed8378c254",
+  "fields": {
+    "created_at": "2026-03-18T19:46:17.203Z",
+    "updated_at": "2026-03-18T19:46:17.203Z",
+    "is_active": true,
+    "name": "Guest",
+    "description": "Guest role",
+    "control_points": []
+  }
+},
+{
+  "model": "rbac.role",
+  "pk": "4d4a3592-f9ee-4a50-93d7-4f17b5fa275d",
+  "fields": {
+    "created_at": "2026-03-18T19:46:17.189Z",
+    "updated_at": "2026-03-18T19:46:17.189Z",
+    "is_active": true,
+    "name": "Admin",
+    "description": "Admin role",
+    "control_points": [
+      "9f44157a-c3a7-4f4c-b652-306f32f7ba0d",
+      "2ea74296-3a47-4f73-9110-48186c0fb681",
+      "8b062c1d-ab44-47ba-9883-5661ed076151",
+      "fdc06e80-4bb1-48ec-82d2-afab659dec79",
+      "d68f05e7-dae7-49b0-bb0b-853e63e17bb1",
+      "48f6b562-055f-49b4-a6aa-ace67062cdf7",
+      "216b1499-1abb-4019-938a-435db954e32d",
+      "ce87dbaf-6928-4504-9e0f-716f743aa316",
+      "68e3c8aa-a543-45d3-848f-8f028e7d9927",
+      "8cf28061-e56c-48e3-8ca2-7ff3cfd09ad6",
+      "b9b0dacc-113d-4973-97f4-c1fa9f6aac63",
+      "0171b6af-e9db-4feb-b6c9-2b6d7e14895e",
+      "bf4f47cf-667b-42d4-b516-361464060efd",
+      "a58000e0-03ae-4b0f-a2d3-7819227a5c82",
+      "d64770b4-41f9-4eab-b711-30b747c92361",
+      "c299aef9-bfd0-4a4e-b246-42bc6b047d51",
+      "a331ff6f-e15d-4e46-b5bf-b8cc274c1333",
+      "24201a55-f636-4042-894d-625780704295",
+      "ad5df07b-427e-49fa-b76f-d469d9f502cc",
+      "49f20e72-371d-4f2f-a667-1c8b4de2283b",
+      "4d23eb94-7370-417f-a255-e7197e38b96c",
+      "fe0cf469-189a-4be7-a73e-7796daa04e8e",
+      "d26f8c5b-e7f8-4b93-beb9-56aae7e967a7",
+      "8ba8a76d-6eb0-45aa-95a6-ef87366c7a4e",
+      "778ac52a-7d34-48a9-a4fe-aa05a505c9c3",
+      "c91bcf67-b79c-497e-9543-025e5d4a30bc",
+      "d6cec7b0-8c65-4c73-a073-081e3c816dee"
+    ]
+  }
+},
+{
+  "model": "users.user",
+  "pk": "004d98c3-a02a-475c-bac7-ed5706926496",
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$4bx4GEQvLFG3tnDEOWgE3w$r9oFXqNSKShZsbtKXJUG52nZeaNoBOC2JObrr1YUnsI=",
+    "last_login": "2026-03-20T02:16:10.807Z",
+    "is_superuser": true,
+    "created_at": "2026-03-18T19:46:14.014Z",
+    "updated_at": "2026-03-20T02:16:19.196Z",
+    "is_active": true,
+    "email": "wildbill.clerici@gmail.com",
+    "first_name": "Bill",
+    "last_name": "Clerici",
+    "avatar_url": "",
+    "is_staff": true,
+    "last_login_provider": "google-oauth2",
+    "stripe_customer_id": "cus_UBERhe6L5e0VU9",
+    "subscription_status": "canceled",
+    "subscription_plan": "",
+    "stripe_subscription_id": "",
+    "trial_end": null,
+    "groups": [],
+    "user_permissions": [],
+    "roles": [
+      "4d4a3592-f9ee-4a50-93d7-4f17b5fa275d"
+    ]
+  }
+},
+{
+  "model": "users.user",
+  "pk": "1ed8da2b-bc4b-4457-b615-4191e8a15ea7",
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$jIgIXjbzhsQoHKdnrhkrmn$Gu0FxcP6E9RtGeLoJBCkW6BZIy4n0Mq7HOgnYZLHOn8=",
+    "last_login": "2026-03-20T02:15:48.235Z",
+    "is_superuser": false,
+    "created_at": "2026-03-18T19:46:14.513Z",
+    "updated_at": "2026-03-20T02:15:48.227Z",
+    "is_active": true,
+    "email": "bill@1200investing.com",
+    "first_name": "Bill",
+    "last_name": "Clerici",
+    "avatar_url": "",
+    "is_staff": false,
+    "last_login_provider": "google-oauth2",
+    "stripe_customer_id": "cus_UBEfR8j8Dhko6q",
+    "subscription_status": "canceled",
+    "subscription_plan": "",
+    "stripe_subscription_id": "sub_1TCsM30T8gwAlVXybTCklnWF",
+    "trial_end": "2026-04-03T02:13:30.785Z",
+    "groups": [],
+    "user_permissions": [],
+    "roles": [
+      "2506082e-b5c8-4bae-8279-82a04c69b5de"
+    ]
+  }
+},
+{
+  "model": "users.user",
+  "pk": "3850a8e7-25bf-4960-af68-3c6d774947e2",
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$gxyziGqGVazV1vqrN0s6I7$Nq1InGJPDZpJwcusW8Dd3yDM1k4tKZmqegNwAKHsaII=",
+    "last_login": null,
+    "is_superuser": true,
+    "created_at": "2026-03-18T19:46:14.265Z",
+    "updated_at": "2026-03-20T01:47:38.113Z",
+    "is_active": true,
+    "email": "micah.minarik@gmail.com",
+    "first_name": "Micah",
+    "last_name": "Minarik",
+    "avatar_url": "",
+    "is_staff": true,
+    "last_login_provider": "",
+    "stripe_customer_id": "",
+    "subscription_status": "active",
+    "subscription_plan": "",
+    "stripe_subscription_id": "",
+    "trial_end": null,
+    "groups": [],
+    "user_permissions": [],
+    "roles": [
+      "2506082e-b5c8-4bae-8279-82a04c69b5de"
+    ]
+  }
+},
+{
+  "model": "users.user",
+  "pk": "4f91f38d-07d0-44d6-8fa0-962b2175050b",
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$Eb1aVVB16FRnSvtC5rNs9Y$H0C6iGqp/hzjT+Y7ZXNrTT5h3rFTasAlGppwrtSC79o=",
+    "last_login": null,
+    "is_superuser": false,
+    "created_at": "2026-03-18T19:46:14.760Z",
+    "updated_at": "2026-03-20T01:37:37.300Z",
+    "is_active": true,
+    "email": "micah@1200investing.com",
+    "first_name": "Micah",
+    "last_name": "Minarik",
+    "avatar_url": "",
+    "is_staff": false,
+    "last_login_provider": "",
+    "stripe_customer_id": "",
+    "subscription_status": "active",
+    "subscription_plan": "",
+    "stripe_subscription_id": "",
+    "trial_end": "2026-04-03T02:13:41.773Z",
+    "groups": [],
+    "user_permissions": [],
+    "roles": [
+      "24e4dcdc-d8b9-4460-bff5-86c8106e1df2"
+    ]
+  }
+},
+{
+  "model": "lookup.lookupvalue",
+  "pk": "0d045d98-7a5a-40f2-b363-fe031bb2f084",
+  "fields": {
+    "created_at": "2026-03-18T19:46:11.776Z",
+    "updated_at": "2026-03-18T19:46:11.776Z",
+    "is_active": true,
+    "parent": null,
+    "code": "EMPLOYEE_TYPE",
+    "label": "Employee Type",
+    "description": "",
+    "sort_order": 0,
+    "metadata": {}
+  }
+},
+{
+  "model": "lookup.lookupvalue",
+  "pk": "1d5c784a-fa62-4652-ba63-d81076cd0427",
+  "fields": {
+    "created_at": "2026-03-18T19:46:11.821Z",
+    "updated_at": "2026-03-18T19:46:11.821Z",
+    "is_active": true,
+    "parent": "533ad81a-8cb2-4fd4-a39a-3c72760a478a",
+    "code": "PENDING",
+    "label": "Pending",
+    "description": "",
+    "sort_order": 2,
+    "metadata": {}
+  }
+},
+{
+  "model": "lookup.lookupvalue",
+  "pk": "2901cc02-4580-4785-a140-f7ff79560800",
+  "fields": {
+    "created_at": "2026-03-18T19:46:11.808Z",
+    "updated_at": "2026-03-18T19:46:11.808Z",
+    "is_active": true,
+    "parent": "96198d55-2e3d-494d-aa14-fd11b498c6e2",
+    "code": "RETAIL",
+    "label": "Retail",
+    "description": "",
+    "sort_order": 3,
+    "metadata": {}
+  }
+},
+{
+  "model": "lookup.lookupvalue",
+  "pk": "2ca1315b-4768-4306-b5b8-5ab5b3346e3b",
+  "fields": {
+    "created_at": "2026-03-18T19:46:11.797Z",
+    "updated_at": "2026-03-18T19:46:11.797Z",
+    "is_active": true,
+    "parent": "96198d55-2e3d-494d-aa14-fd11b498c6e2",
+    "code": "FINANCIAL_SERVICES",
+    "label": "Financial Services",
+    "description": "",
+    "sort_order": 0,
+    "metadata": {}
+  }
+},
+{
+  "model": "lookup.lookupvalue",
+  "pk": "3115fc26-a7a4-438e-87ef-74ffadaea05b",
+  "fields": {
+    "created_at": "2026-03-18T19:46:11.787Z",
+    "updated_at": "2026-03-18T19:46:11.787Z",
+    "is_active": true,
+    "parent": "0d045d98-7a5a-40f2-b363-fe031bb2f084",
+    "code": "CONTRACTOR",
+    "label": "Contractor",
+    "description": "",
+    "sort_order": 2,
+    "metadata": {}
+  }
+},
+{
+  "model": "lookup.lookupvalue",
+  "pk": "4dc438cf-9cab-426d-9794-98fb455ad826",
+  "fields": {
+    "created_at": "2026-03-18T19:46:11.779Z",
+    "updated_at": "2026-03-18T19:46:11.779Z",
+    "is_active": true,
+    "parent": "0d045d98-7a5a-40f2-b363-fe031bb2f084",
+    "code": "FULL_TIME",
+    "label": "Full-time",
+    "description": "",
+    "sort_order": 0,
+    "metadata": {}
+  }
+},
+{
+  "model": "lookup.lookupvalue",
+  "pk": "533ad81a-8cb2-4fd4-a39a-3c72760a478a",
+  "fields": {
+    "created_at": "2026-03-18T19:46:11.811Z",
+    "updated_at": "2026-03-18T19:46:11.811Z",
+    "is_active": true,
+    "parent": null,
+    "code": "STATUS",
+    "label": "Status",
+    "description": "",
+    "sort_order": 0,
+    "metadata": {}
+  }
+},
+{
+  "model": "lookup.lookupvalue",
+  "pk": "57cfc4d5-3d27-46a6-b806-8b9574caa0cc",
+  "fields": {
+    "created_at": "2026-03-18T19:46:11.824Z",
+    "updated_at": "2026-03-18T19:46:11.824Z",
+    "is_active": true,
+    "parent": "533ad81a-8cb2-4fd4-a39a-3c72760a478a",
+    "code": "SUSPENDED",
+    "label": "Suspended",
+    "description": "",
+    "sort_order": 3,
+    "metadata": {}
+  }
+},
+{
+  "model": "lookup.lookupvalue",
+  "pk": "5d905e6c-b7b8-4e9f-8f16-ebcd90bdfaa8",
+  "fields": {
+    "created_at": "2026-03-18T19:46:11.755Z",
+    "updated_at": "2026-03-18T19:46:11.755Z",
+    "is_active": true,
+    "parent": null,
+    "code": "CUSTOMER_TYPE",
+    "label": "Customer Type",
+    "description": "",
+    "sort_order": 0,
+    "metadata": {}
+  }
+},
+{
+  "model": "lookup.lookupvalue",
+  "pk": "6621ee8a-c210-469f-9f62-46bf4784e725",
+  "fields": {
+    "created_at": "2026-03-18T19:46:11.765Z",
+    "updated_at": "2026-03-18T19:46:11.765Z",
+    "is_active": true,
+    "parent": "5d905e6c-b7b8-4e9f-8f16-ebcd90bdfaa8",
+    "code": "SMB",
+    "label": "SMB",
+    "description": "",
+    "sort_order": 1,
+    "metadata": {}
+  }
+},
+{
+  "model": "lookup.lookupvalue",
+  "pk": "6ad7b9ce-321e-4418-9e18-088e4f13f3ed",
+  "fields": {
+    "created_at": "2026-03-18T19:46:11.814Z",
+    "updated_at": "2026-03-18T19:46:11.814Z",
+    "is_active": true,
+    "parent": "533ad81a-8cb2-4fd4-a39a-3c72760a478a",
+    "code": "ACTIVE",
+    "label": "Active",
+    "description": "",
+    "sort_order": 0,
+    "metadata": {}
+  }
+},
+{
+  "model": "lookup.lookupvalue",
+  "pk": "81b5ff75-2b6e-4ea3-a1fe-8ad1d74df82c",
+  "fields": {
+    "created_at": "2026-03-18T19:46:11.773Z",
+    "updated_at": "2026-03-18T19:46:11.773Z",
+    "is_active": true,
+    "parent": "5d905e6c-b7b8-4e9f-8f16-ebcd90bdfaa8",
+    "code": "INDIVIDUAL",
+    "label": "Individual",
+    "description": "",
+    "sort_order": 3,
+    "metadata": {}
+  }
+},
+{
+  "model": "lookup.lookupvalue",
+  "pk": "86b92652-20f1-459c-a105-258660cfae5c",
+  "fields": {
+    "created_at": "2026-03-18T19:46:11.804Z",
+    "updated_at": "2026-03-18T19:46:11.804Z",
+    "is_active": true,
+    "parent": "96198d55-2e3d-494d-aa14-fd11b498c6e2",
+    "code": "TECHNOLOGY",
+    "label": "Technology",
+    "description": "",
+    "sort_order": 2,
+    "metadata": {}
+  }
+},
+{
+  "model": "lookup.lookupvalue",
+  "pk": "96198d55-2e3d-494d-aa14-fd11b498c6e2",
+  "fields": {
+    "created_at": "2026-03-18T19:46:11.794Z",
+    "updated_at": "2026-03-18T19:46:11.794Z",
+    "is_active": true,
+    "parent": null,
+    "code": "BUSINESS_CATEGORY",
+    "label": "Business Category",
+    "description": "",
+    "sort_order": 0,
+    "metadata": {}
+  }
+},
+{
+  "model": "lookup.lookupvalue",
+  "pk": "aa463888-8e05-49c8-ba59-5dad608340bc",
+  "fields": {
+    "created_at": "2026-03-18T19:46:11.801Z",
+    "updated_at": "2026-03-18T19:46:11.801Z",
+    "is_active": true,
+    "parent": "96198d55-2e3d-494d-aa14-fd11b498c6e2",
+    "code": "HEALTHCARE",
+    "label": "Healthcare",
+    "description": "",
+    "sort_order": 1,
+    "metadata": {}
+  }
+},
+{
+  "model": "lookup.lookupvalue",
+  "pk": "aaca400e-5d78-4100-a69b-8146d7d88955",
+  "fields": {
+    "created_at": "2026-03-18T19:46:11.817Z",
+    "updated_at": "2026-03-18T19:46:11.817Z",
+    "is_active": true,
+    "parent": "533ad81a-8cb2-4fd4-a39a-3c72760a478a",
+    "code": "INACTIVE",
+    "label": "Inactive",
+    "description": "",
+    "sort_order": 1,
+    "metadata": {}
+  }
+},
+{
+  "model": "lookup.lookupvalue",
+  "pk": "b4550055-4c08-48f8-88cd-5009748b0f8c",
+  "fields": {
+    "created_at": "2026-03-18T19:46:11.790Z",
+    "updated_at": "2026-03-18T19:46:11.790Z",
+    "is_active": true,
+    "parent": "0d045d98-7a5a-40f2-b363-fe031bb2f084",
+    "code": "INTERN",
+    "label": "Intern",
+    "description": "",
+    "sort_order": 3,
+    "metadata": {}
+  }
+},
+{
+  "model": "lookup.lookupvalue",
+  "pk": "b9ac8abd-e54b-4104-8588-278cb1530533",
+  "fields": {
+    "created_at": "2026-03-18T19:46:11.769Z",
+    "updated_at": "2026-03-18T19:46:11.769Z",
+    "is_active": true,
+    "parent": "5d905e6c-b7b8-4e9f-8f16-ebcd90bdfaa8",
+    "code": "STARTUP",
+    "label": "Startup",
+    "description": "",
+    "sort_order": 2,
+    "metadata": {}
+  }
+},
+{
+  "model": "lookup.lookupvalue",
+  "pk": "d1afcff1-715c-4a87-b009-320e4a670cc3",
+  "fields": {
+    "created_at": "2026-03-18T19:46:11.761Z",
+    "updated_at": "2026-03-18T19:46:11.761Z",
+    "is_active": true,
+    "parent": "5d905e6c-b7b8-4e9f-8f16-ebcd90bdfaa8",
+    "code": "ENTERPRISE",
+    "label": "Enterprise",
+    "description": "",
+    "sort_order": 0,
+    "metadata": {}
+  }
+},
+{
+  "model": "lookup.lookupvalue",
+  "pk": "f8e3fe14-db54-4787-91a3-dad73bb6678e",
+  "fields": {
+    "created_at": "2026-03-18T19:46:11.783Z",
+    "updated_at": "2026-03-18T19:46:11.783Z",
+    "is_active": true,
+    "parent": "0d045d98-7a5a-40f2-b363-fe031bb2f084",
+    "code": "PART_TIME",
+    "label": "Part-time",
+    "description": "",
+    "sort_order": 1,
+    "metadata": {}
+  }
+}
+]

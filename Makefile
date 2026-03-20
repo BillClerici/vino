@@ -1,4 +1,4 @@
-.PHONY: up down build migrate seed shell test lint
+.PHONY: up down build migrate seed load-seed shell test lint
 
 up:
 	docker-compose up -d
@@ -16,6 +16,9 @@ seed:
 	docker-compose exec web python manage.py seed_lookups
 	docker-compose exec web python manage.py seed_superusers
 	docker-compose exec web python manage.py seed_rbac
+
+load-seed:
+	docker-compose exec web python manage.py load_seed
 
 shell:
 	docker-compose exec web python manage.py shell_plus
