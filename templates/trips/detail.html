@@ -247,20 +247,6 @@
                         </div>
                     </div>
 
-                    <div class="row" style="margin-bottom: 0;">
-                        <div class="col s6">
-                            <div class="trip-field">
-                                <label>Budget / Cost Notes</label>
-                                <textarea id="trip-budget-notes" placeholder="Tasting fees, food budget, split info..." onblur="saveTripField()">{{ trip.budget_notes }}</textarea>
-                            </div>
-                        </div>
-                        <div class="col s6">
-                            <div class="trip-field">
-                                <label>General Notes</label>
-                                <textarea id="trip-notes" placeholder="Anything else..." onblur="saveTripField()">{{ trip.notes }}</textarea>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>
 
@@ -492,9 +478,7 @@ function saveTripField() {
             meeting_location: getVal('trip-meeting-location'),
             meeting_time: getVal('trip-meeting-time'),
             meeting_notes: getVal('trip-meeting-notes'),
-            transportation: getVal('trip-transportation'),
-            budget_notes: getVal('trip-budget-notes'),
-            notes: getVal('trip-notes')
+            transportation: getVal('trip-transportation')
         }).then(function() {
             var hint = document.getElementById('save-hint');
             hint.style.display = 'inline';
@@ -617,6 +601,7 @@ function refreshStopsList() {
     }).then(function(r) { return r.text(); }).then(function(html) {
         document.getElementById('stops-list').innerHTML = html;
         setupDragAndDrop();
+        refreshRouteMap();
     });
 }
 

@@ -51,11 +51,68 @@ class TripListView(LoginRequiredMixin, ListView):
 
 
 class TripCreateView(LoginRequiredMixin, View):
-    def get(self, request):
-        return render(request, "trips/form.html", {
-            "form": TripForm(),
+    def _build_context(self, request, form):
+        user = request.user
+        # Previous trips for "copy" tab
+        past_trips = (
+            Trip.objects.filter(members=user)
+            .prefetch_related("trip_stops__place")
+            .distinct()
+            .order_by("-created_at")[:20]
+        )
+
+        # Recommendations: top-rated unvisited places near places user liked
+        from django.db.models import Avg, Count, Q
+        fav_place_ids = set(
+            FavoritePlace.objects.filter(user=user, is_active=True)
+            .values_list("place_id", flat=True)
+        )
+        visited_place_ids = set(
+            VisitLog.objects.filter(user=user, is_active=True)
+            .values_list("place_id", flat=True)
+            .distinct()
+        )
+        # Find highly-rated places user hasn't visited, prioritizing
+        # ones near their favorites and visited spots
+        known_ids = fav_place_ids | visited_place_ids
+        recommended = (
+            Place.objects.exclude(pk__in=known_ids)
+            .annotate(
+                visit_count=Count("visits", filter=Q(visits__is_active=True)),
+                avg_rating=Avg("visits__rating_overall", filter=Q(visits__is_active=True)),
+            )
+            .filter(visit_count__gt=0, avg_rating__isnull=False)
+            .order_by("-avg_rating", "-visit_count")[:10]
+        )
+        # If not enough rated places, fill with popular places user hasn't been to
+        if recommended.count() < 5:
+            popular = (
+                Place.objects.exclude(pk__in=known_ids)
+                .annotate(
+                    visit_count=Count("visits", filter=Q(visits__is_active=True)),
+                )
+                .order_by("-visit_count", "name")[:10]
+            )
+            recommended = list(recommended) + [
+                p for p in popular if p not in recommended
+            ]
+
+        from datetime import date as _date
+        today = _date.today()
+
+        return {
+            "form": form,
             "page_title": "Plan a Trip",
-        })
+            "past_trips": past_trips,
+            "recommended_places": recommended,
+            "default_start_date": today.isoformat(),
+            "default_end_date": today.isoformat(),
+            "default_start_time": "12:00",
+        }
+
+    def get(self, request):
+        ctx = self._build_context(request, TripForm())
+        return render(request, "trips/form.html", ctx)
 
     def post(self, request):
         form = TripForm(request.POST)
@@ -71,9 +128,96 @@ class TripCreateView(LoginRequiredMixin, View):
             )
             messages.success(request, f'Trip "{trip.name}" created!')
             return redirect("trip_detail", pk=trip.pk)
-        return render(request, "trips/form.html", {
-            "form": form,
-            "page_title": "Plan a Trip",
+        ctx = self._build_context(request, form)
+        return render(request, "trips/form.html", ctx)
+
+
+class TripCopyView(LoginRequiredMixin, View):
+    """Copy a previous trip with new dates."""
+
+    def post(self, request, pk):
+        source = get_object_or_404(Trip, pk=pk)
+        try:
+            body = _json.loads(request.body)
+        except (ValueError, TypeError):
+            body = {}
+
+        from datetime import date as _date
+        from django.utils import timezone as _tz
+        today = _tz.localdate()
+        default_meeting = time(12, 0)
+
+        start_str = body.get("scheduled_date")
+        end_str = body.get("end_date")
+        start_date = _date.fromisoformat(start_str) if start_str else today
+        end_date = _date.fromisoformat(end_str) if end_str else today
+
+        new_trip = Trip.objects.create(
+            name=body.get("name", f"{source.name} (Copy)"),
+            created_by=request.user,
+            status=Trip.Status.DRAFT,
+            description=source.description,
+            scheduled_date=start_date,
+            end_date=end_date,
+            meeting_time=default_meeting,
+            meeting_location=source.meeting_location,
+            meeting_notes=source.meeting_notes,
+            transportation=source.transportation,
+        )
+        TripMember.objects.create(
+            trip=new_trip,
+            user=request.user,
+            role=TripMember.Role.ORGANIZER,
+            rsvp_status="accepted",
+        )
+
+        # Copy stops with recalculated arrival times
+        source_stops = list(
+            source.trip_stops.select_related("place").order_by("order")
+        )
+        base_arrival = datetime.combine(
+            new_trip.scheduled_date or today, default_meeting, tzinfo=timezone.utc,
+        )
+        prev_stop = None
+        for idx, src in enumerate(source_stops):
+            travel_minutes = None
+            travel_miles = None
+            if prev_stop:
+                travel_minutes, travel_miles = _get_drive_info(
+                    prev_stop.place.latitude, prev_stop.place.longitude,
+                    src.place.latitude, src.place.longitude,
+                )
+            duration = src.duration_minutes or 90
+            if idx == 0:
+                arrival = base_arrival
+            elif prev_stop:
+                prev_dur = prev_stop.duration_minutes or 90
+                drive = travel_minutes or 0
+                arrival = prev_stop.arrival_time + timedelta(
+                    minutes=prev_dur + drive
+                ) if prev_stop.arrival_time else None
+            else:
+                arrival = None
+
+            new_stop = TripStop.objects.create(
+                trip=new_trip,
+                place=src.place,
+                order=idx + 1,
+                arrival_time=arrival,
+                duration_minutes=duration,
+                travel_minutes=travel_minutes,
+                travel_miles=travel_miles,
+                description=src.description,
+                notes=src.notes,
+            )
+            # Update prev_stop reference for next iteration
+            new_stop.arrival_time = arrival
+            prev_stop = new_stop
+
+        return JsonResponse({
+            "ok": True,
+            "trip_url": f"/trips/{new_trip.pk}/",
+            "trip_id": str(new_trip.pk),
         })
 
 
@@ -306,10 +450,22 @@ class TripAddStopView(LoginRequiredMixin, View):
             drive = travel_minutes or 0
             default_arrival = base + timedelta(minutes=offset + drive)
 
-        # Check if already added (reactivate if soft-deleted)
+        # Prevent adding the same place if it's already an active stop
         max_order = last_stop.order if last_stop else 0
-        if TripStop.all_objects.filter(trip=trip, place=place).exists():
-            tw = TripStop.all_objects.get(trip=trip, place=place)
+        if TripStop.objects.filter(trip=trip, place=place).exists():
+            return JsonResponse(
+                {"error": "This place is already on the itinerary."},
+                status=400,
+            )
+
+        # Reactivate soft-deleted stop, or create new
+        deleted_stop = (
+            TripStop.all_objects
+            .filter(trip=trip, place=place, is_active=False)
+            .first()
+        )
+        if deleted_stop:
+            tw = deleted_stop
             tw.is_active = True
             tw.order = max_order + 1
             tw.arrival_time = default_arrival
@@ -710,16 +866,29 @@ class QuickTripView(LoginRequiredMixin, View):
                 if changed:
                     place.save(update_fields=changed + ["updated_at"])
 
+        from django.utils import timezone as _tz
+
+        today = _tz.localdate()
+        default_meeting = time(12, 0)
+
         trip = Trip.objects.create(
             name=f"Trip to {place.name}",
             created_by=request.user,
             status=Trip.Status.DRAFT,
+            scheduled_date=today,
+            end_date=today,
+            meeting_time=default_meeting,
         )
         TripMember.objects.create(
             trip=trip, user=request.user,
             role=TripMember.Role.ORGANIZER, rsvp_status="accepted",
         )
-        TripStop.objects.create(trip=trip, place=place, order=1)
+        default_arrival = datetime.combine(today, default_meeting, tzinfo=timezone.utc)
+        TripStop.objects.create(
+            trip=trip, place=place, order=1,
+            arrival_time=default_arrival,
+            duration_minutes=90,
+        )
 
         return JsonResponse({
             "trip_id": str(trip.pk),

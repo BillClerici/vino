@@ -538,13 +538,18 @@ function addStopToTrip(placeId, btnEl) {
     fetch('/trips/' + addingToTripId + '/stops/add/', {
         method: 'POST', headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
         body: JSON.stringify({ place_id: placeId })
-    }).then(function(r) { return r.json(); }).then(function(data) {
-        if (data.ok && btnEl) {
+    }).then(function(r) { return r.json().then(function(data) { return { ok: r.ok, data: data }; }); }).then(function(result) {
+        if (result.ok && result.data.ok && btnEl) {
             btnEl.disabled = true;
             btnEl.innerHTML = '<i class="material-icons" style="font-size:0.9rem;">check</i> Added!';
             btnEl.style.background = '#e8f5e9';
             btnEl.style.color = '#2e7d32';
             btnEl.style.borderColor = '#43a047';
+        } else if (result.data.error && btnEl) {
+            btnEl.innerHTML = '<i class="material-icons" style="font-size:0.9rem;">block</i> Already added';
+            btnEl.style.color = '#f57c00';
+            btnEl.style.borderColor = '#f57c00';
+            setTimeout(function() { btnEl.innerHTML = '<i class="material-icons" style="font-size:0.9rem;">add_location</i> Add to Trip'; btnEl.style.color = ''; btnEl.style.borderColor = ''; }, 2000);
         }
     }).catch(function(e) { console.error('Add stop error:', e); });
 }
@@ -692,6 +697,9 @@ async function initPlaceMap() {
     map.addListener('idle', function() {
         if (activeFilters.size > 0 && !infoWindowOpen) { clearTimeout(filterDebounceTimer); filterDebounceTimer = setTimeout(refreshFilters, 400); }
     });
+
+    // Initial discover query so the map shows results on first load
+    if (activeFilters.size > 0) refreshFilters();
 }
 
 // ── Collection Markers ──
