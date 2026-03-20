@@ -139,8 +139,8 @@
 {% block content %}
 <div class="container" style="margin-top: 20px; padding-bottom: 30px;">
     <!-- Header -->
-    <h5 style="font-weight: 600; color: #455a64; margin-top: 0;">
-        <i class="material-icons" style="vertical-align: middle;">explore</i> Explore Places
+    <h5 style="font-weight: 600; color: #455a64; margin-top: 0; display: inline-flex; align-items: center; gap: 6px;">
+        <i class="material-icons">explore</i> Explore Places
     </h5>
 
     {% if adding_to_trip %}
@@ -254,7 +254,7 @@
     <!-- Favorites Table (JS-managed) -->
     <div class="card" style="border-radius: 8px; margin-top: 16px;" id="favorites-card">
         <div class="card-content">
-            <span class="card-title" style="font-size: 1.1rem; font-weight: 600; color: #455a64;">
+            <span class="card-title" style="font-size: 1.1rem; font-weight: 600; color: #455a64; display: inline-flex; align-items: center; gap: 6px;">
                 <i class="material-icons">favorite</i> My Favorites
             </span>
             <div id="favorites-table-wrap">
@@ -266,7 +266,7 @@
     <!-- Visited Table -->
     <div class="card" style="border-radius: 8px; margin-top: 16px;" id="visited-card">
         <div class="card-content">
-            <span class="card-title" style="font-size: 1.1rem; font-weight: 600; color: #455a64;">
+            <span class="card-title" style="font-size: 1.1rem; font-weight: 600; color: #455a64; display: inline-flex; align-items: center; gap: 6px;">
                 <i class="material-icons">place</i> All Visited
             </span>
             {% if visited_list %}

@@ -31,12 +31,58 @@ class TripListView(LoginRequiredMixin, ListView):
     paginate_by = 10
 
     def get_queryset(self):
-        return (
+        from django.db.models import Avg, Count, Q
+
+        qs = (
             Trip.objects.filter(members=self.request.user)
             .prefetch_related("trip_members__user", "trip_stops__place")
             .distinct()
-            .order_by("-created_at")
         )
+
+        # Search
+        q = self.request.GET.get("q", "").strip()
+        if q:
+            qs = qs.filter(
+                Q(name__icontains=q)
+                | Q(trip_stops__place__name__icontains=q)
+                | Q(trip_stops__place__city__icontains=q)
+                | Q(trip_stops__place__state__icontains=q)
+            ).distinct()
+
+        # Filter by status
+        status = self.request.GET.get("status", "")
+        if status:
+            qs = qs.filter(status=status)
+
+        # Filter by date range
+        date_from = self.request.GET.get("from", "")
+        date_to = self.request.GET.get("to", "")
+        if date_from:
+            qs = qs.filter(scheduled_date__gte=date_from)
+        if date_to:
+            qs = qs.filter(scheduled_date__lte=date_to)
+
+        # Filter by stop count
+        stop_min = self.request.GET.get("stops_min", "")
+        if stop_min:
+            qs = qs.annotate(_stop_count=Count("trip_stops")).filter(_stop_count__gte=int(stop_min))
+
+        # Sort
+        sort = self.request.GET.get("sort", "-scheduled_date")
+        valid_sorts = {
+            "name": "name",
+            "-name": "-name",
+            "scheduled_date": "scheduled_date",
+            "-scheduled_date": "-scheduled_date",
+            "created_at": "created_at",
+            "-created_at": "-created_at",
+            "status": "status",
+            "-status": "-status",
+        }
+        order = valid_sorts.get(sort, "-scheduled_date")
+        qs = qs.order_by(order, "-created_at")
+
+        return qs
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -47,6 +93,12 @@ class TripListView(LoginRequiredMixin, ListView):
                 trip.status == "in_progress"
                 or (trip.status == "confirmed" and trip.scheduled_date and trip.scheduled_date <= today)
             )
+        ctx["search_query"] = self.request.GET.get("q", "")
+        ctx["filter_status"] = self.request.GET.get("status", "")
+        ctx["filter_from"] = self.request.GET.get("from", "")
+        ctx["filter_to"] = self.request.GET.get("to", "")
+        ctx["current_sort"] = self.request.GET.get("sort", "-scheduled_date")
+        ctx["status_choices"] = Trip.Status.choices
         return ctx
 
 
@@ -270,10 +322,13 @@ class TripDetailView(LoginRequiredMixin, View):
                 and trip.scheduled_date <= today)
         )
 
+        is_readonly = trip.status in (Trip.Status.COMPLETED, Trip.Status.CANCELLED)
+
         return render(request, "trips/detail.html", {
             "trip": trip,
             "is_member": is_member,
             "is_organizer": is_organizer,
+            "is_readonly": is_readonly,
             "members": trip.trip_members.select_related("user").order_by("role"),
             "stops": stops,
             "favorites": favorites,
@@ -917,6 +972,58 @@ def _find_trip_visit(trip, place, user):
     return qs.order_by("-visited_at").first()
 
 
+class QuickCheckinView(LoginRequiredMixin, View):
+    """Create a confirmed trip with one stop, check in, and redirect to live trip."""
+
+    def get(self, request):
+        from django.utils import timezone as _tz
+
+        place_id = request.GET.get("place")
+        if not place_id:
+            messages.error(request, "No place specified.")
+            return redirect("place_list")
+
+        place = get_object_or_404(Place, pk=place_id)
+        today = _tz.localdate()
+        now = _tz.now()
+        default_meeting = time(12, 0)
+
+        # Create confirmed trip
+        trip = Trip.objects.create(
+            name=f"Visit to {place.name}",
+            created_by=request.user,
+            status=Trip.Status.CONFIRMED,
+            scheduled_date=today,
+            end_date=today,
+            meeting_time=default_meeting,
+        )
+        TripMember.objects.create(
+            trip=trip,
+            user=request.user,
+            role=TripMember.Role.ORGANIZER,
+            rsvp_status="accepted",
+        )
+
+        # Add the place as the first stop
+        arrival = datetime.combine(today, default_meeting, tzinfo=timezone.utc)
+        TripStop.objects.create(
+            trip=trip,
+            place=place,
+            order=1,
+            arrival_time=arrival,
+            duration_minutes=90,
+        )
+
+        # Auto check-in: create the VisitLog
+        VisitLog.objects.create(
+            user=request.user,
+            place=place,
+            visited_at=now,
+        )
+
+        return redirect("trip_live", pk=trip.pk)
+
+
 class LiveTripView(LoginRequiredMixin, View):
     """Full-page live trip wizard."""
 
@@ -980,7 +1087,7 @@ class LiveTripView(LoginRequiredMixin, View):
                             "wine_vintage", "serving_type", "quantity",
                             "tasting_notes", "rating", "is_favorite",
                             "purchased", "purchased_quantity",
-                            "purchased_price", "purchased_notes")
+                            "purchased_price", "purchased_notes", "photo")
                 )
                 # Convert UUIDs and Decimals for JSON
                 for w in wines_logged:
@@ -1163,6 +1270,8 @@ class LiveTripWineView(LoginRequiredMixin, View):
             vw.purchased_price = body["purchased_price"] if body["purchased_price"] else None
         if "purchased_notes" in body:
             vw.purchased_notes = body["purchased_notes"]
+        if "photo" in body:
+            vw.photo = body["photo"] or ""
         vw.is_active = True
         vw.save()
 
@@ -1181,6 +1290,7 @@ class LiveTripWineView(LoginRequiredMixin, View):
             "purchased_quantity": vw.purchased_quantity,
             "purchased_price": float(vw.purchased_price) if vw.purchased_price else None,
             "purchased_notes": vw.purchased_notes,
+            "photo": vw.photo or "",
         })
 
     def delete(self, request, pk):

@@ -4,70 +4,308 @@
 
 {% block extra_css %}
 <style>
-    .star-display { color: #ffb300; }
-    .detail-rating {
-        display: flex; align-items: center; gap: 10px;
-        padding: 12px 0; border-bottom: 1px solid #f5f5f5;
+    .star-display { color: #ffb300; letter-spacing: -1px; }
+
+    /* Hero */
+    .visit-hero {
+        position: relative; border-radius: 12px; overflow: hidden;
+        background: linear-gradient(135deg, #4a148c 0%, #7e57c2 50%, #ce93d8 100%);
+        color: #fff; padding: 32px 28px; margin-bottom: 20px;
     }
-    .detail-rating:last-child { border-bottom: none; }
-    .detail-rating .dr-label { min-width: 100px; font-weight: 500; color: #616161; font-size: 0.9rem; }
-    .detail-rating .dr-stars { font-size: 1.2rem; }
+    .visit-hero .hero-overlay {
+        position: absolute; inset: 0; opacity: 0.15;
+        background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><circle cx="40" cy="40" r="30" fill="none" stroke="white" stroke-width="0.5"/><circle cx="40" cy="40" r="15" fill="none" stroke="white" stroke-width="0.3"/></svg>') repeat;
+        background-size: 80px;
+    }
+    .visit-hero * { position: relative; }
+    .hero-place-name { font-size: 1.8rem; font-weight: 800; margin: 0 0 2px; line-height: 1.2; }
+    .hero-place-name a { color: #fff; text-decoration: none; }
+    .hero-place-name a:hover { text-decoration: underline; }
+    .hero-meta { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; font-size: 0.88rem; opacity: 0.9; margin-top: 8px; }
+    .hero-meta span { display: inline-flex; align-items: center; gap: 4px; }
+    .hero-meta i { font-size: 1rem; }
+    .hero-badge {
+        display: inline-flex; align-items: center; gap: 5px;
+        padding: 5px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;
+        background: rgba(255,255,255,0.2); backdrop-filter: blur(4px);
+        margin-top: 12px;
+    }
+    .hero-rating {
+        position: absolute; top: 28px; right: 28px; text-align: center;
+    }
+    .hero-rating-num { font-size: 3rem; font-weight: 800; line-height: 1; }
+    .hero-rating-stars { font-size: 1.1rem; margin-top: 2px; letter-spacing: 1px; }
+    .hero-rating-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1px; opacity: 0.7; margin-top: 2px; }
+
+    /* Stat Pill Row */
+    .stat-pills { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+    .stat-pill {
+        flex: 1; min-width: 120px; padding: 16px; border-radius: 10px;
+        background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+        text-align: center;
+    }
+    .stat-pill .sp-num { font-size: 1.6rem; font-weight: 800; color: #333; }
+    .stat-pill .sp-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; color: #9e9e9e; font-weight: 600; margin-top: 2px; }
+    .stat-pill .sp-icon { font-size: 1.3rem; margin-bottom: 4px; }
+
+    /* Rating Bars */
+    .rating-bar-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f5f5f5; }
+    .rating-bar-row:last-child { border-bottom: none; }
+    .rb-label { min-width: 80px; font-size: 0.85rem; font-weight: 500; color: #616161; }
+    .rb-bar-track { flex: 1; height: 8px; border-radius: 4px; background: #f0f0f0; overflow: hidden; }
+    .rb-bar-fill { height: 100%; border-radius: 4px; transition: width 0.6s ease; }
+    .rb-value { min-width: 28px; text-align: right; font-weight: 700; font-size: 0.9rem; color: #333; }
+
+    /* Wine Card */
+    .wine-card {
+        display: flex; align-items: flex-start; gap: 14px;
+        padding: 14px 16px; background: #fff; border-radius: 10px;
+        margin-bottom: 8px; border: 1px solid #f0f0f0;
+        transition: box-shadow 0.15s;
+    }
+    .wine-card:hover { box-shadow: 0 3px 12px rgba(0,0,0,0.08); }
+    .wine-icon {
+        width: 44px; height: 44px; border-radius: 10px;
+        display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .wine-card .wc-name { font-weight: 600; font-size: 0.95rem; color: #333; }
+    .wine-card .wc-meta { font-size: 0.78rem; color: #9e9e9e; margin-top: 2px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .wine-card .wc-notes { font-size: 0.82rem; color: #757575; margin-top: 6px; line-height: 1.5; font-style: italic; }
+    .wine-card .wc-badges { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+    .wc-badge {
+        display: inline-flex; align-items: center; gap: 3px;
+        padding: 2px 10px; border-radius: 12px; font-size: 0.7rem; font-weight: 600;
+    }
+
+    /* Comparison Chip */
+    .comparison-chip {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 6px 14px; border-radius: 20px; font-size: 0.82rem; font-weight: 600;
+    }
+
+    /* Timeline */
+    .timeline-item {
+        display: flex; gap: 12px; padding: 10px 0;
+        border-bottom: 1px solid #f5f5f5;
+    }
+    .timeline-item:last-child { border-bottom: none; }
+    .timeline-dot {
+        width: 10px; height: 10px; border-radius: 50%;
+        background: #ce93d8; margin-top: 5px; flex-shrink: 0;
+    }
+    .timeline-date { font-size: 0.78rem; color: #9e9e9e; }
+    .timeline-rating { font-size: 0.82rem; }
+
+    /* Map */
+    #visit-map { width: 100%; height: 200px; border-radius: 10px; }
+
+    /* Section header */
+    .section-head {
+        font-size: 1rem; font-weight: 700; color: #455a64;
+        display: flex; align-items: center; gap: 6px; margin-bottom: 14px;
+    }
+    .section-head i { font-size: 1.2rem; color: #7e57c2; }
+
+    /* Equal-height bottom row */
+    .bottom-row { display: flex; gap: 20px; align-items: stretch; }
+    .bottom-row > .bottom-col-main { flex: 2; min-width: 300px; display: flex; }
+    .bottom-row > .bottom-col-side { flex: 1; min-width: 280px; display: flex; flex-direction: column; gap: 20px; }
+    .bottom-row > .bottom-col-main > .card { flex: 1; margin: 0; }
+    .bottom-row > .bottom-col-side > .card { margin: 0; }
+    @media only screen and (max-width: 600px) {
+        .bottom-row { flex-direction: column; }
+    }
+
+    /* Drinks Grid */
+    .drinks-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 14px;
+    }
+    .drink-tile {
+        border-radius: 12px; overflow: hidden;
+        background: #fff; border: 1px solid #f0f0f0;
+        transition: box-shadow 0.2s, transform 0.15s;
+    }
+    .drink-tile:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.1); transform: translateY(-2px); }
+    .drink-tile .dt-img {
+        width: 100%; height: 160px; object-fit: cover;
+        background: linear-gradient(135deg, #ede7f6, #f3e5f5);
+    }
+    .drink-tile .dt-placeholder {
+        width: 100%; height: 160px;
+        background: linear-gradient(135deg, #ede7f6, #f3e5f5);
+        display: flex; align-items: center; justify-content: center;
+    }
+    .drink-tile .dt-placeholder i { font-size: 3rem; color: #ce93d8; }
+    .drink-tile .dt-body { padding: 12px 14px; }
+    .drink-tile .dt-name { font-weight: 700; font-size: 0.95rem; color: #333; }
+    .drink-tile .dt-varietal { font-size: 0.78rem; color: #9e9e9e; margin-top: 2px; }
+    .drink-tile .dt-rating { margin-top: 6px; font-size: 1rem; }
+    .drink-tile .dt-notes {
+        margin-top: 8px; font-size: 0.8rem; color: #757575;
+        line-height: 1.5; font-style: italic;
+        display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .drink-tile .dt-footer {
+        display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+        margin-top: 8px; padding-top: 8px; border-top: 1px solid #f5f5f5;
+    }
+    .drink-tile .dt-tag {
+        display: inline-flex; align-items: center; gap: 2px;
+        padding: 2px 8px; border-radius: 10px; font-size: 0.68rem; font-weight: 600;
+    }
+    .drink-tile .dt-date { font-size: 0.72rem; color: #bdbdbd; margin-top: 6px; }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container" style="margin-top: 20px; padding-bottom: 30px;">
     <div style="margin-bottom: 16px;">
-        <a href="{% url 'visit_list' %}" class="grey-text" style="font-size: 0.85rem;">
-            <i class="material-icons tiny">arrow_back</i> My Visits
+        <a href="{% url 'visit_list' %}" class="grey-text" style="font-size: 0.85rem; display: inline-flex; align-items: center; gap: 4px;">
+            <i class="material-icons" style="font-size: 1rem;">arrow_back</i> My Visits
         </a>
     </div>
 
+    <!-- Hero Banner -->
+    <div class="visit-hero">
+        <div class="hero-overlay"></div>
+        {% if visit.place.image_url %}
+        <div style="position: absolute; inset: 0; background: url('{{ visit.place.image_url }}') center/cover; opacity: 0.25;"></div>
+        {% endif %}
+        <div class="hero-place-name">
+            <a href="{% url 'place_detail' pk=visit.place.pk %}">{{ visit.place.name }}</a>
+        </div>
+        <div class="hero-meta">
+            <span><i class="material-icons">event</i> {{ visit.visited_at|date:"l, F j, Y" }}</span>
+            <span><i class="material-icons">schedule</i> {{ visit.visited_at|date:"g:i A" }}</span>
+            {% if visit.place.city %}
+            <span><i class="material-icons">place</i> {{ visit.place.city }}{% if visit.place.state %}, {{ visit.place.state }}{% endif %}</span>
+            {% endif %}
+            {% if visit.place.place_type %}
+            <span><i class="material-icons">{% if visit.place.place_type == 'brewery' %}sports_bar{% elif visit.place.place_type == 'restaurant' %}restaurant{% else %}wine_bar{% endif %}</i> {{ visit.place.get_place_type_display }}</span>
+            {% endif %}
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; margin-top: 12px;">
+            {% if is_favorite %}
+            <span class="hero-badge"><i class="material-icons" style="font-size: 0.9rem; color: #ff80ab;">favorite</i> Favorite Place</span>
+            {% endif %}
+            {% if place_stats.total_visits > 1 %}
+            <span class="hero-badge"><i class="material-icons" style="font-size: 0.9rem;">repeat</i> Visit #{{ place_stats.total_visits }}</span>
+            {% endif %}
+            {% if visit.wines_tasted.count %}
+            <span class="hero-badge"><i class="material-icons" style="font-size: 0.9rem;">wine_bar</i> {{ visit.wines_tasted.count }} wine{{ visit.wines_tasted.count|pluralize }} tasted</span>
+            {% endif %}
+        </div>
+        {% if visit.rating_overall %}
+        <div class="hero-rating">
+            <div class="hero-rating-num">{{ visit.rating_overall }}</div>
+            <div class="hero-rating-stars">{% for i in "12345" %}{% if forloop.counter <= visit.rating_overall %}&#9733;{% else %}&#9734;{% endif %}{% endfor %}</div>
+            <div class="hero-rating-label">Overall</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Stat Pills -->
+    <div class="stat-pills">
+        <div class="stat-pill">
+            <div class="sp-icon" style="color: #7e57c2;"><i class="material-icons">repeat</i></div>
+            <div class="sp-num">{{ place_stats.total_visits }}</div>
+            <div class="sp-label">Total Visits</div>
+        </div>
+        <div class="stat-pill">
+            <div class="sp-icon" style="color: #ffb300;"><i class="material-icons">star</i></div>
+            <div class="sp-num">{% if place_stats.avg_overall %}{{ place_stats.avg_overall|floatformat:1 }}{% else %}&mdash;{% endif %}</div>
+            <div class="sp-label">Avg Rating</div>
+        </div>
+        <div class="stat-pill">
+            <div class="sp-icon" style="color: #e91e63;"><i class="material-icons">wine_bar</i></div>
+            <div class="sp-num">{{ wine_stats.total_tasted }}</div>
+            <div class="sp-label">Wines Tried</div>
+        </div>
+        <div class="stat-pill">
+            <div class="sp-icon" style="color: #43a047;"><i class="material-icons">shopping_bag</i></div>
+            <div class="sp-num">{{ wine_stats.purchased }}</div>
+            <div class="sp-label">Purchased</div>
+        </div>
+        <div class="stat-pill">
+            <div class="sp-icon" style="color: #ff5722;"><i class="material-icons">favorite</i></div>
+            <div class="sp-num">{{ wine_stats.favorites }}</div>
+            <div class="sp-label">Favorites</div>
+        </div>
+    </div>
+
     <div class="row">
+        <!-- Main Column -->
         <div class="col s12 m8">
-            <div class="card" style="border-radius: 8px;">
+            <!-- Notes -->
+            {% if visit.notes %}
+            <div class="card" style="border-radius: 10px;">
                 <div class="card-content">
-                    <div style="display: flex; align-items: flex-start; gap: 16px;">
-                        <div style="width: 56px; height: 56px; border-radius: 50%; background: #ede7f6; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                            <i class="material-icons deep-purple-text text-lighten-1" style="font-size: 1.6rem;">place</i>
-                        </div>
-                        <div>
-                            <h5 style="margin: 0 0 4px; font-weight: 700;">
-                                <a href="{% url 'place_detail' pk=visit.place.pk %}" style="color: #333;">{{ visit.place.name }}</a>
-                            </h5>
-                            <div style="font-size: 0.9rem; color: #9e9e9e;">
-                                <i class="material-icons tiny">event</i> {{ visit.visited_at|date:"l, F j, Y \a\t g:i A" }}
+                    <div class="section-head"><i class="material-icons">edit_note</i> Visit Notes</div>
+                    <div style="padding: 14px 16px; background: #fafafa; border-radius: 8px; border-left: 4px solid #7e57c2;">
+                        <p style="margin: 0; color: #616161; line-height: 1.7; font-size: 0.95rem;">{{ visit.notes|linebreaksbr }}</p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+        </div>
+    </div>
+
+    <!-- About + Ratings/Actions (equal-height row) -->
+    <div class="bottom-row">
+        <!-- About (left, stretches to match) -->
+        <div class="bottom-col-main">
+            <div class="card" style="border-radius: 10px;">
+                <div class="card-content">
+                    <div class="section-head"><i class="material-icons">storefront</i> About {{ visit.place.name }}</div>
+                    <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+                        {% if visit.place.image_url %}
+                        <img src="{{ visit.place.image_url }}" style="width: 180px; height: 130px; border-radius: 10px; object-fit: cover; flex-shrink: 0;">
+                        {% endif %}
+                        <div style="flex: 1; min-width: 200px;">
+                            {% if visit.place.description %}
+                            <p style="margin: 0 0 10px; font-size: 0.9rem; color: #616161; line-height: 1.6;">{{ visit.place.description }}</p>
+                            {% endif %}
+                            {% if visit.place.address %}
+                            <div style="font-size: 0.85rem; color: #757575; display: flex; align-items: center; gap: 4px; margin-bottom: 4px;">
+                                <i class="material-icons" style="font-size: 0.9rem;">place</i> {{ visit.place.address }}
                             </div>
-                            {% if visit.place.city %}
-                            <div style="font-size: 0.85rem; color: #9e9e9e; margin-top: 2px;">
-                                <i class="material-icons tiny">place</i> {{ visit.place.city }}{% if visit.place.state %}, {{ visit.place.state }}{% endif %}
+                            {% endif %}
+                            {% if visit.place.phone %}
+                            <div style="font-size: 0.85rem; color: #757575; display: flex; align-items: center; gap: 4px; margin-bottom: 4px;">
+                                <i class="material-icons" style="font-size: 0.9rem;">phone</i> {{ visit.place.phone }}
+                            </div>
+                            {% endif %}
+                            {% if visit.place.website %}
+                            <div style="font-size: 0.85rem; margin-top: 4px;">
+                                <a href="{{ visit.place.website }}" target="_blank" rel="noopener" style="color: #7e57c2; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; text-decoration: none;">
+                                    <i class="material-icons" style="font-size: 0.9rem;">language</i> Visit Website
+                                </a>
                             </div>
                             {% endif %}
                         </div>
                     </div>
-
-                    {% if visit.notes %}
-                    <div style="margin-top: 20px; padding: 16px; background: #fafafa; border-radius: 8px; border-left: 4px solid #7e57c2;">
-                        <div style="font-size: 0.8rem; color: #9e9e9e; margin-bottom: 6px; font-weight: 500;">NOTES</div>
-                        <p style="margin: 0; color: #616161; line-height: 1.6;">{{ visit.notes|linebreaksbr }}</p>
-                    </div>
+                    {% if visit.place.latitude and visit.place.longitude and google_maps_api_key %}
+                    <div id="visit-map" style="margin-top: 14px;"></div>
                     {% endif %}
 
-                    <!-- Wines Tasted -->
-                    {% if visit.wines_tasted.count %}
-                    <div style="margin-top: 20px;">
-                        <h6 style="font-weight: 600; color: #455a64;">
-                            <i class="material-icons tiny" style="vertical-align: middle;">wine_bar</i> Wines Tasted
-                        </h6>
-                        {% for vw in visit.wines_tasted.all %}
-                        <div style="padding: 10px 0; border-bottom: 1px solid #f5f5f5;">
-                            <div style="display: flex; justify-content: space-between;">
-                                <strong>{{ vw.wine.name }}</strong>
-                                {% if vw.rating %}<span class="star-display">{% for i in "12345" %}{% if forloop.counter <= vw.rating %}&#9733;{% else %}&#9734;{% endif %}{% endfor %}</span>{% endif %}
+                    {% if visit_history %}
+                    <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid #f0f0f0;">
+                        <div class="section-head"><i class="material-icons">history</i> Other Visits Here</div>
+                        {% for v in visit_history %}
+                        <a href="{% url 'visit_detail' pk=v.pk %}" style="text-decoration: none;">
+                            <div class="timeline-item">
+                                <div class="timeline-dot"></div>
+                                <div style="flex: 1;">
+                                    <div class="timeline-date">{{ v.visited_at|date:"M j, Y \a\t g:i A" }}</div>
+                                    {% if v.rating_overall %}
+                                    <div class="timeline-rating star-display">{% for i in "12345" %}{% if forloop.counter <= v.rating_overall %}&#9733;{% else %}&#9734;{% endif %}{% endfor %}</div>
+                                    {% endif %}
+                                </div>
                             </div>
-                            <div style="font-size: 0.82rem; color: #9e9e9e;">{{ vw.wine.varietal }}{% if vw.wine.vintage %} {{ vw.wine.vintage }}{% endif %}</div>
-                            {% if vw.tasting_notes %}<p style="font-size: 0.85rem; color: #757575; margin: 4px 0 0;">{{ vw.tasting_notes }}</p>{% endif %}
-                        </div>
+                        </a>
                         {% endfor %}
                     </div>
                     {% endif %}
@@ -75,39 +313,194 @@
             </div>
         </div>
 
-        <!-- Ratings Sidebar -->
-        <div class="col s12 m4">
-            <div class="card" style="border-radius: 8px;">
+        <!-- Ratings + Quick Actions (right, stacked) -->
+        <div class="bottom-col-side">
+            <div class="card" style="border-radius: 10px;">
                 <div class="card-content">
-                    <span class="card-title" style="font-size: 1.1rem; font-weight: 600; color: #455a64;">
-                        <i class="material-icons">star</i> Ratings
-                    </span>
+                    <div class="section-head"><i class="material-icons">insights</i> Ratings</div>
 
-                    {% if visit.rating_overall %}
-                    <div class="center-align" style="margin: 12px 0;">
-                        <div style="font-size: 2.5rem; font-weight: 700; color: #ffb300;">{{ visit.rating_overall }}</div>
-                        <div class="star-display" style="font-size: 1.2rem;">
-                            {% for i in "12345" %}{% if forloop.counter <= visit.rating_overall %}&#9733;{% else %}&#9734;{% endif %}{% endfor %}
-                        </div>
-                        <div class="grey-text" style="font-size: 0.8rem;">Overall</div>
+                    {% if rating_comparison %}
+                    <div class="center-align" style="margin-bottom: 14px;">
+                        <span class="comparison-chip" style="background: {{ rating_comparison.color }}18; color: {{ rating_comparison.color }};">
+                            <i class="material-icons" style="font-size: 1rem;">{{ rating_comparison.icon }}</i>
+                            {{ rating_comparison.label }}
+                        </span>
                     </div>
                     {% endif %}
 
-                    <div class="detail-rating">
-                        <span class="dr-label">Staff</span>
-                        <span class="dr-stars star-display">{% if visit.rating_staff %}{% for i in "12345" %}{% if forloop.counter <= visit.rating_staff %}&#9733;{% else %}&#9734;{% endif %}{% endfor %}{% else %}&mdash;{% endif %}</span>
+                    <div class="rating-bar-row">
+                        <span class="rb-label">Overall</span>
+                        <div class="rb-bar-track">
+                            <div class="rb-bar-fill" style="width: {% if visit.rating_overall %}{{ visit.rating_overall|floatformat:0 }}0%{% else %}0%{% endif %}; background: linear-gradient(90deg, #7e57c2, #ce93d8);"></div>
+                        </div>
+                        <span class="rb-value">{% if visit.rating_overall %}{{ visit.rating_overall }}{% else %}&mdash;{% endif %}</span>
                     </div>
-                    <div class="detail-rating">
-                        <span class="dr-label">Ambience</span>
-                        <span class="dr-stars star-display">{% if visit.rating_ambience %}{% for i in "12345" %}{% if forloop.counter <= visit.rating_ambience %}&#9733;{% else %}&#9734;{% endif %}{% endfor %}{% else %}&mdash;{% endif %}</span>
+                    <div class="rating-bar-row">
+                        <span class="rb-label">Staff</span>
+                        <div class="rb-bar-track">
+                            <div class="rb-bar-fill" style="width: {% if visit.rating_staff %}{{ visit.rating_staff|floatformat:0 }}0%{% else %}0%{% endif %}; background: linear-gradient(90deg, #42a5f5, #90caf9);"></div>
+                        </div>
+                        <span class="rb-value">{% if visit.rating_staff %}{{ visit.rating_staff }}{% else %}&mdash;{% endif %}</span>
                     </div>
-                    <div class="detail-rating">
-                        <span class="dr-label">Food</span>
-                        <span class="dr-stars star-display">{% if visit.rating_food %}{% for i in "12345" %}{% if forloop.counter <= visit.rating_food %}&#9733;{% else %}&#9734;{% endif %}{% endfor %}{% else %}&mdash;{% endif %}</span>
+                    <div class="rating-bar-row">
+                        <span class="rb-label">Ambience</span>
+                        <div class="rb-bar-track">
+                            <div class="rb-bar-fill" style="width: {% if visit.rating_ambience %}{{ visit.rating_ambience|floatformat:0 }}0%{% else %}0%{% endif %}; background: linear-gradient(90deg, #ff7043, #ffab91);"></div>
+                        </div>
+                        <span class="rb-value">{% if visit.rating_ambience %}{{ visit.rating_ambience }}{% else %}&mdash;{% endif %}</span>
+                    </div>
+                    <div class="rating-bar-row">
+                        <span class="rb-label">Food</span>
+                        <div class="rb-bar-track">
+                            <div class="rb-bar-fill" style="width: {% if visit.rating_food %}{{ visit.rating_food|floatformat:0 }}0%{% else %}0%{% endif %}; background: linear-gradient(90deg, #66bb6a, #a5d6a7);"></div>
+                        </div>
+                        <span class="rb-value">{% if visit.rating_food %}{{ visit.rating_food }}{% else %}&mdash;{% endif %}</span>
+                    </div>
+
+                    {% if place_stats.avg_overall %}
+                    <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid #f0f0f0;">
+                        <div style="font-size: 0.72rem; color: #9e9e9e; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 8px;">Your Averages Here</div>
+                        <div style="display: flex; justify-content: space-around; text-align: center; font-size: 0.82rem;">
+                            <div><div style="font-weight: 700; font-size: 1.1rem; color: #7e57c2;">{{ place_stats.avg_overall|floatformat:1 }}</div>Overall</div>
+                            {% if place_stats.avg_staff %}<div><div style="font-weight: 700; font-size: 1.1rem; color: #42a5f5;">{{ place_stats.avg_staff|floatformat:1 }}</div>Staff</div>{% endif %}
+                            {% if place_stats.avg_ambience %}<div><div style="font-weight: 700; font-size: 1.1rem; color: #ff7043;">{{ place_stats.avg_ambience|floatformat:1 }}</div>Vibe</div>{% endif %}
+                            {% if place_stats.avg_food %}<div><div style="font-weight: 700; font-size: 1.1rem; color: #66bb6a;">{{ place_stats.avg_food|floatformat:1 }}</div>Food</div>{% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card" style="border-radius: 10px;">
+                <div class="card-content">
+                    <div class="section-head"><i class="material-icons">bolt</i> Quick Actions</div>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <a href="{% url 'place_detail' pk=visit.place.pk %}" class="btn-flat waves-effect" style="text-align: left; display: flex; align-items: center; gap: 8px; color: #616161; border-radius: 8px;">
+                            <i class="material-icons" style="font-size: 1.1rem; color: #7e57c2;">storefront</i> View Place Details
+                        </a>
+                        <a href="{% url 'quick_checkin' %}?place={{ visit.place.pk }}" class="btn-flat waves-effect" style="text-align: left; display: flex; align-items: center; gap: 8px; color: #616161; border-radius: 8px;">
+                            <i class="material-icons" style="font-size: 1.1rem; color: #43a047;">add_location</i> Check In
+                        </a>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+
+    <!-- Drinks Grid (full width) -->
+    {% if all_wines_here %}
+    <div class="card" style="border-radius: 10px; margin-top: 20px;">
+        <div class="card-content">
+            <div class="section-head">
+                <i class="material-icons">local_bar</i> My Drinks at {{ visit.place.name }}
+                <span style="font-size: 0.78rem; font-weight: 400; color: #9e9e9e; margin-left: 8px;">{{ all_wines_here|length }} drink{{ all_wines_here|length|pluralize }}</span>
+            </div>
+            <div class="drinks-grid">
+                {% for vw in all_wines_here %}
+                <div class="drink-tile">
+                    {% if vw.photo %}
+                    <img src="{{ vw.photo }}" class="dt-img" alt="{{ vw.display_name }}">
+                    {% elif vw.menu_item and vw.menu_item.image_url %}
+                    <img src="{{ vw.menu_item.image_url }}" class="dt-img" alt="{{ vw.display_name }}">
+                    {% else %}
+                    <div class="dt-placeholder">
+                        <i class="material-icons">{% if vw.wine_type == 'Sparkling' or vw.wine_type == 'sparkling' %}bubble_chart{% else %}wine_bar{% endif %}</i>
+                    </div>
+                    {% endif %}
+                    <div class="dt-body">
+                        <div class="dt-name">{{ vw.display_name }}</div>
+                        <div class="dt-varietal">
+                            {% if vw.menu_item and vw.menu_item.varietal %}{{ vw.menu_item.varietal }}{% elif vw.wine_type %}{{ vw.wine_type }}{% endif %}
+                            {% if vw.menu_item and vw.menu_item.vintage %} · {{ vw.menu_item.vintage }}{% elif vw.wine_vintage %} · {{ vw.wine_vintage }}{% endif %}
+                        </div>
+                        {% if vw.rating %}
+                        <div class="dt-rating star-display">{% for i in "12345" %}{% if forloop.counter <= vw.rating %}&#9733;{% else %}&#9734;{% endif %}{% endfor %}</div>
+                        {% endif %}
+                        {% if vw.tasting_notes %}
+                        <div class="dt-notes">"{{ vw.tasting_notes }}"</div>
+                        {% endif %}
+                        <div class="dt-footer">
+                            <span class="dt-tag" style="background: #ede7f6; color: #4a148c;">{{ vw.get_serving_type_display }}</span>
+                            {% if vw.is_favorite %}
+                            <span class="dt-tag" style="background: #fce4ec; color: #c2185b;"><i class="material-icons" style="font-size: 0.7rem;">favorite</i> Fave</span>
+                            {% endif %}
+                            {% if vw.purchased %}
+                            <span class="dt-tag" style="background: #e8f5e9; color: #2e7d32;"><i class="material-icons" style="font-size: 0.7rem;">shopping_bag</i> Bought</span>
+                            {% endif %}
+                            {% if vw.menu_item and vw.menu_item.price %}
+                            <span class="dt-tag" style="background: #fff3e0; color: #e65100;">${{ vw.menu_item.price }}</span>
+                            {% endif %}
+                        </div>
+                        <div class="dt-date">{{ vw.visit.visited_at|date:"M j, Y" }}</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% elif menu_items %}
+    <div class="card" style="border-radius: 10px; margin-top: 20px;">
+        <div class="card-content">
+            <div class="section-head">
+                <i class="material-icons">menu_book</i> {{ visit.place.name }} Menu
+                <span style="font-size: 0.78rem; font-weight: 400; color: #9e9e9e; margin-left: 8px;">{{ menu_items|length }} item{{ menu_items|length|pluralize }}</span>
+            </div>
+            <div class="drinks-grid">
+                {% for mi in menu_items %}
+                <div class="drink-tile">
+                    {% if mi.image_url %}
+                    <img src="{{ mi.image_url }}" class="dt-img" alt="{{ mi.name }}">
+                    {% else %}
+                    <div class="dt-placeholder">
+                        <i class="material-icons">wine_bar</i>
+                    </div>
+                    {% endif %}
+                    <div class="dt-body">
+                        <div class="dt-name">{{ mi.name }}</div>
+                        <div class="dt-varietal">
+                            {% if mi.varietal %}{{ mi.varietal }}{% endif %}
+                            {% if mi.vintage %} · {{ mi.vintage }}{% endif %}
+                        </div>
+                        {% if mi.description %}
+                        <div class="dt-notes">{{ mi.description }}</div>
+                        {% endif %}
+                        <div class="dt-footer">
+                            {% if mi.price %}
+                            <span class="dt-tag" style="background: #fff3e0; color: #e65100;">${{ mi.price }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{% if visit.place.latitude and visit.place.longitude and google_maps_api_key %}
+<script>
+(g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]);for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.googleapis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?console.warn(p+" only loads once."):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({
+    key: "{{ google_maps_api_key }}",
+    v: "weekly",
+    loading: "async"
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    google.maps.importLibrary('maps').then(function() {
+        google.maps.importLibrary('marker').then(function(markerLib) {
+            var pos = { lat: {{ visit.place.latitude }}, lng: {{ visit.place.longitude }} };
+            var map = new google.maps.Map(document.getElementById('visit-map'), {
+                center: pos, zoom: 15, mapId: '374457006826d906d63af582',
+                mapTypeControl: false, streetViewControl: false, fullscreenControl: false,
+                zoomControl: false,
+            });
+            new markerLib.AdvancedMarkerElement({ map: map, position: pos, title: '{{ visit.place.name|escapejs }}' });
+        });
+    });
+});
+</script>
+{% endif %}
 {% endblock %}

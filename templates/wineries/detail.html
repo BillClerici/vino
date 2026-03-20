@@ -4,186 +4,374 @@
 
 {% block extra_css %}
 <style>
-    .rating-bar { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
-    .rating-bar .bar-label { min-width: 80px; font-size: 0.85rem; color: #757575; }
-    .rating-bar .bar-track { flex: 1; height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden; }
-    .rating-bar .bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease; }
-    .rating-bar .bar-value { min-width: 35px; text-align: right; font-weight: 600; font-size: 0.9rem; }
-    .wine-chip {
-        display: inline-flex; align-items: center; gap: 6px;
-        padding: 8px 16px; border-radius: 20px;
-        background: #f5f5f5; margin: 4px;
-        font-size: 0.85rem; transition: background 0.15s;
+    .star-display { color: #ffb300; letter-spacing: -1px; }
+
+    /* Hero */
+    .place-hero {
+        position: relative; border-radius: 12px; overflow: hidden;
+        background: linear-gradient(135deg, #1a237e 0%, #4a148c 40%, #7e57c2 100%);
+        color: #fff; padding: 32px 28px; margin-bottom: 20px;
     }
-    .wine-chip:hover { background: #ede7f6; }
-    .info-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; color: #616161; font-size: 0.9rem; }
-    .info-row i { color: #9e9e9e; font-size: 1.1rem; }
-    .star-display { color: #ffb300; }
+    .place-hero .hero-overlay {
+        position: absolute; inset: 0; opacity: 0.12;
+        background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><circle cx="40" cy="40" r="30" fill="none" stroke="white" stroke-width="0.5"/></svg>') repeat;
+        background-size: 80px;
+    }
+    .place-hero * { position: relative; }
+    .hero-name { font-size: 2rem; font-weight: 800; margin: 0 0 2px; line-height: 1.2; }
+    .hero-name a { color: #fff; text-decoration: none; }
+    .hero-meta { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; font-size: 0.88rem; opacity: 0.9; margin-top: 8px; }
+    .hero-meta span { display: inline-flex; align-items: center; gap: 4px; }
+    .hero-meta i { font-size: 1rem; }
+    .hero-badge {
+        display: inline-flex; align-items: center; gap: 5px;
+        padding: 5px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;
+        background: rgba(255,255,255,0.2); backdrop-filter: blur(4px);
+    }
+    .hero-rating { position: absolute; top: 28px; right: 28px; text-align: center; }
+    .hero-rating-num { font-size: 3rem; font-weight: 800; line-height: 1; }
+    .hero-rating-stars { font-size: 1.1rem; margin-top: 2px; letter-spacing: 1px; }
+    .hero-rating-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1px; opacity: 0.7; margin-top: 2px; }
+
+    /* Stat Pills */
+    .stat-pills { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+    .stat-pill {
+        flex: 1; min-width: 110px; padding: 16px; border-radius: 10px;
+        background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.06); text-align: center;
+    }
+    .stat-pill .sp-num { font-size: 1.6rem; font-weight: 800; color: #333; }
+    .stat-pill .sp-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; color: #9e9e9e; font-weight: 600; margin-top: 2px; }
+    .stat-pill .sp-icon { font-size: 1.3rem; margin-bottom: 4px; }
+
+    /* Section header */
+    .section-head {
+        font-size: 1rem; font-weight: 700; color: #455a64;
+        display: flex; align-items: center; gap: 6px; margin-bottom: 14px;
+    }
+    .section-head i { font-size: 1.2rem; color: #7e57c2; }
+
+    /* Equal-height row */
+    .info-row-flex { display: flex; gap: 20px; align-items: stretch; }
+    .info-col-main { flex: 2; min-width: 300px; display: flex; }
+    .info-col-side { flex: 1; min-width: 280px; display: flex; flex-direction: column; gap: 20px; }
+    .info-col-main > .card { flex: 1; margin: 0; }
+    .info-col-side > .card { margin: 0; }
+    @media only screen and (max-width: 600px) {
+        .info-row-flex { flex-direction: column; }
+    }
+
+    /* Timeline */
+    .timeline-item { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid #f5f5f5; }
+    .timeline-item:last-child { border-bottom: none; }
+    .timeline-dot { width: 10px; height: 10px; border-radius: 50%; background: #ce93d8; margin-top: 5px; flex-shrink: 0; }
+
+    /* Map */
+    #place-detail-map { width: 100%; height: 220px; border-radius: 10px; }
+
+    /* Drinks Grid */
+    .drinks-grid {
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px;
+    }
+    .drink-tile {
+        border-radius: 12px; overflow: hidden;
+        background: #fff; border: 1px solid #f0f0f0;
+        transition: box-shadow 0.2s, transform 0.15s;
+    }
+    .drink-tile:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.1); transform: translateY(-2px); }
+    .drink-tile .dt-img { width: 100%; height: 160px; object-fit: cover; }
+    .drink-tile .dt-placeholder {
+        width: 100%; height: 160px;
+        background: linear-gradient(135deg, #ede7f6, #f3e5f5);
+        display: flex; align-items: center; justify-content: center;
+    }
+    .drink-tile .dt-placeholder i { font-size: 3rem; color: #ce93d8; }
+    .drink-tile .dt-body { padding: 12px 14px; }
+    .drink-tile .dt-name { font-weight: 700; font-size: 0.95rem; color: #333; }
+    .drink-tile .dt-varietal { font-size: 0.78rem; color: #9e9e9e; margin-top: 2px; }
+    .drink-tile .dt-desc {
+        font-size: 0.8rem; color: #757575; margin-top: 6px; line-height: 1.5;
+        display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .drink-tile .dt-footer {
+        display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+        margin-top: 8px; padding-top: 8px; border-top: 1px solid #f5f5f5;
+    }
+    .drink-tile .dt-tag {
+        display: inline-flex; align-items: center; gap: 2px;
+        padding: 2px 8px; border-radius: 10px; font-size: 0.68rem; font-weight: 600;
+    }
+
+    /* Rating bars */
+    .rating-bar-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f5f5f5; }
+    .rating-bar-row:last-child { border-bottom: none; }
+    .rb-label { min-width: 80px; font-size: 0.85rem; font-weight: 500; color: #616161; }
+    .rb-bar-track { flex: 1; height: 8px; border-radius: 4px; background: #f0f0f0; overflow: hidden; }
+    .rb-bar-fill { height: 100%; border-radius: 4px; }
+    .rb-value { min-width: 28px; text-align: right; font-weight: 700; font-size: 0.9rem; color: #333; }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container" style="margin-top: 20px; padding-bottom: 30px;">
-    <!-- Breadcrumb -->
     <div style="margin-bottom: 16px;">
-        <a href="{% url 'place_list' %}" class="grey-text" style="font-size: 0.85rem;">
-            <i class="material-icons tiny">arrow_back</i> All Places
+        <a href="{% url 'place_list' %}" class="grey-text" style="font-size: 0.85rem; display: inline-flex; align-items: center; gap: 4px;">
+            <i class="material-icons" style="font-size: 1rem;">arrow_back</i> Explore
         </a>
     </div>
 
-    <div class="row">
-        <!-- Left: Main Info -->
-        <div class="col s12 m8">
-            <div class="card" style="border-radius: 8px;">
-                <div class="card-content">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                        <div>
-                            <h4 style="margin: 0 0 4px 0; font-weight: 700; color: #333;">{{ place.name }}</h4>
-                            {% if place.city %}
-                            <div style="font-size: 0.95rem; color: #9e9e9e; display: flex; align-items: center; gap: 4px;">
-                                <i class="material-icons tiny">place</i>
-                                {{ place.city }}{% if place.state %}, {{ place.state }}{% endif %}{% if place.country != "US" %}, {{ place.country }}{% endif %}
-                            </div>
-                            {% endif %}
-                        </div>
-                        <a href="{% url 'place_edit' pk=place.pk %}" class="btn-flat waves-effect">
-                            <i class="material-icons">edit</i>
-                        </a>
-                    </div>
-
-                    {% if place.description %}
-                    <p style="margin-top: 16px; color: #616161; line-height: 1.6;">{{ place.description }}</p>
+    <!-- Hero Banner -->
+    <div class="place-hero">
+        <div class="hero-overlay"></div>
+        {% if place.image_url %}
+        <div style="position: absolute; inset: 0; background: url('{{ place.image_url }}') center/cover; opacity: 0.25;"></div>
+        {% endif %}
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div>
+                <div class="hero-name">{{ place.name }}</div>
+                <div class="hero-meta">
+                    {% if place.city %}
+                    <span><i class="material-icons">place</i> {{ place.city }}{% if place.state %}, {{ place.state }}{% endif %}</span>
                     {% endif %}
-
-                    <div style="margin-top: 16px;">
-                        {% if place.address %}
-                        <div class="info-row"><i class="material-icons">location_on</i> {{ place.address }}</div>
-                        {% endif %}
-                        {% if place.website %}
-                        <div class="info-row"><i class="material-icons">language</i> <a href="{{ place.website }}" target="_blank">{{ place.website }}</a></div>
-                        {% endif %}
-                        {% if place.phone %}
-                        <div class="info-row"><i class="material-icons">phone</i> {{ place.phone }}</div>
-                        {% endif %}
-                    </div>
+                    {% if place.place_type %}
+                    <span><i class="material-icons">{% if place.place_type == 'brewery' %}sports_bar{% elif place.place_type == 'restaurant' %}restaurant{% else %}wine_bar{% endif %}</i> {{ place.get_place_type_display }}</span>
+                    {% endif %}
+                    {% if place.website %}
+                    <span><a href="{{ place.website }}" target="_blank" rel="noopener" style="color: #fff; opacity: 0.9; display: inline-flex; align-items: center; gap: 4px; text-decoration: none;" onclick="event.stopPropagation()"><i class="material-icons">language</i> Website</a></span>
+                    {% endif %}
                 </div>
-                <div class="card-action">
-                    <a href="{% url 'checkin' %}?place={{ place.pk }}" class="btn deep-purple lighten-1 waves-effect waves-light">
-                        <i class="material-icons left">add_location</i>Check In Here
-                    </a>
-                    <a href="{% url 'menuitem_create' place_pk=place.pk %}" class="btn-flat waves-effect">
-                        <i class="material-icons left">add</i>Add Wine
-                    </a>
-                </div>
-            </div>
-
-            <!-- Wines -->
-            <div class="card" style="border-radius: 8px;">
-                <div class="card-content">
-                    <span class="card-title" style="font-size: 1.1rem; font-weight: 600; color: #455a64;">
-                        <i class="material-icons">wine_bar</i> Wines ({{ wines|length }})
-                    </span>
-                    <div style="margin-top: 8px;">
-                        {% for wine in wines %}
-                        <div class="wine-chip">
-                            &#127863; <strong>{{ wine.name }}</strong>
-                            <span style="color: #9e9e9e;">&middot; {{ wine.varietal }}{% if wine.vintage %} {{ wine.vintage }}{% endif %}</span>
-                        </div>
-                        {% empty %}
-                        <p class="grey-text">No wines listed yet. <a href="{% url 'menuitem_create' place_pk=place.pk %}">Add one</a></p>
-                        {% endfor %}
-                    </div>
-                </div>
-            </div>
-
-            <!-- Recent Visits -->
-            <div class="card" style="border-radius: 8px;">
-                <div class="card-content">
-                    <span class="card-title" style="font-size: 1.1rem; font-weight: 600; color: #455a64;">
-                        <i class="material-icons">history</i> Recent Visits
-                    </span>
-                    {% for visit in visits %}
-                    <div style="padding: 10px 0; border-bottom: 1px solid #f5f5f5; display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <strong style="font-size: 0.9rem;">{{ visit.user.first_name|default:visit.user.email }}</strong>
-                            <span class="grey-text" style="font-size: 0.8rem;">&middot; {{ visit.visited_at|date:"M j, Y" }}</span>
-                        </div>
-                        {% if visit.rating_overall %}
-                        <div class="star-display">
-                            {% for i in "12345" %}{% if forloop.counter <= visit.rating_overall %}&#9733;{% else %}&#9734;{% endif %}{% endfor %}
-                        </div>
-                        {% endif %}
-                    </div>
-                    {% empty %}
-                    <p class="grey-text">No visits recorded yet. Be the first!</p>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
-
-        <!-- Right: Ratings Sidebar -->
-        <div class="col s12 m4">
-            <div class="card" style="border-radius: 8px;">
-                <div class="card-content">
-                    <span class="card-title" style="font-size: 1.1rem; font-weight: 600; color: #455a64;">
-                        <i class="material-icons">insights</i> Ratings
-                    </span>
-                    {% if avg_ratings.overall %}
-                    <div class="center-align" style="margin: 16px 0;">
-                        <div style="font-size: 3rem; font-weight: 700; color: #ffb300;">{{ avg_ratings.overall|floatformat:1 }}</div>
-                        <div class="star-display" style="font-size: 1.3rem;">
-                            {% for i in "12345" %}{% if forloop.counter <= avg_ratings.overall %}&#9733;{% else %}&#9734;{% endif %}{% endfor %}
-                        </div>
-                        <div class="grey-text" style="font-size: 0.8rem; margin-top: 4px;">Overall</div>
-                    </div>
-
-                    <div class="rating-bar">
-                        <span class="bar-label">Staff</span>
-                        <div class="bar-track"><div class="bar-fill teal lighten-1" style="width: {% if avg_ratings.staff %}{{ avg_ratings.staff|floatformat:0 }}0%{% else %}0%{% endif %}"></div></div>
-                        <span class="bar-value">{% if avg_ratings.staff %}{{ avg_ratings.staff|floatformat:1 }}{% else %}&mdash;{% endif %}</span>
-                    </div>
-                    <div class="rating-bar">
-                        <span class="bar-label">Ambience</span>
-                        <div class="bar-track"><div class="bar-fill deep-purple lighten-2" style="width: {% if avg_ratings.ambience %}{{ avg_ratings.ambience|floatformat:0 }}0%{% else %}0%{% endif %}"></div></div>
-                        <span class="bar-value">{% if avg_ratings.ambience %}{{ avg_ratings.ambience|floatformat:1 }}{% else %}&mdash;{% endif %}</span>
-                    </div>
-                    <div class="rating-bar">
-                        <span class="bar-label">Food</span>
-                        <div class="bar-track"><div class="bar-fill orange lighten-1" style="width: {% if avg_ratings.food %}{{ avg_ratings.food|floatformat:0 }}0%{% else %}0%{% endif %}"></div></div>
-                        <span class="bar-value">{% if avg_ratings.food %}{{ avg_ratings.food|floatformat:1 }}{% else %}&mdash;{% endif %}</span>
-                    </div>
-                    {% else %}
-                    <div class="center-align" style="padding: 20px 0;">
-                        <i class="material-icons medium grey-text text-lighten-1">star_border</i>
-                        <p class="grey-text">No ratings yet</p>
-                    </div>
+                <div style="display: flex; align-items: center; gap: 8px; margin-top: 12px;">
+                    {% if is_favorite %}
+                    <span class="hero-badge"><i class="material-icons" style="font-size: 0.9rem; color: #ff80ab;">favorite</i> Favorite</span>
+                    {% endif %}
+                    {% if my_visit_count %}
+                    <span class="hero-badge"><i class="material-icons" style="font-size: 0.9rem;">repeat</i> Visited {{ my_visit_count }} time{{ my_visit_count|pluralize }}</span>
+                    {% endif %}
+                    {% if wines %}
+                    <span class="hero-badge"><i class="material-icons" style="font-size: 0.9rem;">menu_book</i> {{ wines|length }} on menu</span>
                     {% endif %}
                 </div>
             </div>
-
-            <!-- My Visits -->
-            {% if my_visits %}
-            <div class="card" style="border-radius: 8px;">
-                <div class="card-content">
-                    <span class="card-title" style="font-size: 1.1rem; font-weight: 600; color: #455a64;">
-                        <i class="material-icons">person</i> My Visits ({{ my_visits|length }})
-                    </span>
-                    {% for visit in my_visits %}
-                    <a href="{% url 'visit_detail' pk=visit.pk %}" style="color: inherit;">
-                        <div style="padding: 8px 0; border-bottom: 1px solid #f5f5f5; display: flex; justify-content: space-between;">
-                            <span style="font-size: 0.85rem;">{{ visit.visited_at|date:"M j, Y" }}</span>
-                            {% if visit.rating_overall %}
-                            <span class="star-display" style="font-size: 0.85rem;">
-                                {% for i in "12345" %}{% if forloop.counter <= visit.rating_overall %}&#9733;{% else %}&#9734;{% endif %}{% endfor %}
-                            </span>
-                            {% endif %}
-                        </div>
-                    </a>
-                    {% endfor %}
-                </div>
+            {% if avg_ratings.overall %}
+            <div class="hero-rating">
+                <div class="hero-rating-num">{{ avg_ratings.overall|floatformat:1 }}</div>
+                <div class="hero-rating-stars">{% for i in "12345" %}{% if forloop.counter <= avg_ratings.overall %}&#9733;{% else %}&#9734;{% endif %}{% endfor %}</div>
+                <div class="hero-rating-label">Avg Rating</div>
             </div>
             {% endif %}
         </div>
     </div>
+
+    <!-- Stat Pills -->
+    <div class="stat-pills">
+        <div class="stat-pill">
+            <div class="sp-icon" style="color: #7e57c2;"><i class="material-icons">groups</i></div>
+            <div class="sp-num">{{ total_community_visits }}</div>
+            <div class="sp-label">Total Visits</div>
+        </div>
+        <div class="stat-pill">
+            <div class="sp-icon" style="color: #e91e63;"><i class="material-icons">person</i></div>
+            <div class="sp-num">{{ my_visit_count }}</div>
+            <div class="sp-label">My Visits</div>
+        </div>
+        <div class="stat-pill">
+            <div class="sp-icon" style="color: #ffb300;"><i class="material-icons">star</i></div>
+            <div class="sp-num">{% if avg_ratings.overall %}{{ avg_ratings.overall|floatformat:1 }}{% else %}&mdash;{% endif %}</div>
+            <div class="sp-label">Avg Rating</div>
+        </div>
+        <div class="stat-pill">
+            <div class="sp-icon" style="color: #43a047;"><i class="material-icons">menu_book</i></div>
+            <div class="sp-num">{{ wines|length }}</div>
+            <div class="sp-label">Menu Items</div>
+        </div>
+        <div class="stat-pill">
+            <div class="sp-icon" style="color: #ff5722;"><i class="material-icons">wine_bar</i></div>
+            <div class="sp-num">{{ my_wines_here|length }}</div>
+            <div class="sp-label">I've Tried</div>
+        </div>
+    </div>
+
+    <!-- About + Sidebar -->
+    <div class="info-row-flex">
+        <!-- About / Description / Map -->
+        <div class="info-col-main">
+            <div class="card" style="border-radius: 10px;">
+                <div class="card-content">
+                    <div class="section-head"><i class="material-icons">storefront</i> About</div>
+                    <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+                        {% if place.image_url %}
+                        <img src="{{ place.image_url }}" style="width: 180px; height: 130px; border-radius: 10px; object-fit: cover; flex-shrink: 0;">
+                        {% endif %}
+                        <div style="flex: 1; min-width: 200px;">
+                            {% if place.description %}
+                            <p style="margin: 0 0 10px; font-size: 0.9rem; color: #616161; line-height: 1.6;">{{ place.description }}</p>
+                            {% endif %}
+                            {% if place.address %}
+                            <div style="font-size: 0.85rem; color: #757575; display: flex; align-items: center; gap: 4px; margin-bottom: 4px;">
+                                <i class="material-icons" style="font-size: 0.9rem;">place</i> {{ place.address }}
+                            </div>
+                            {% endif %}
+                            {% if place.phone %}
+                            <div style="font-size: 0.85rem; color: #757575; display: flex; align-items: center; gap: 4px; margin-bottom: 4px;">
+                                <i class="material-icons" style="font-size: 0.9rem;">phone</i> {{ place.phone }}
+                            </div>
+                            {% endif %}
+                            {% if place.website %}
+                            <div style="font-size: 0.85rem; margin-top: 4px;">
+                                <a href="{{ place.website }}" target="_blank" rel="noopener" style="color: #7e57c2; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; text-decoration: none;">
+                                    <i class="material-icons" style="font-size: 0.9rem;">language</i> Visit Website
+                                </a>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    {% if place.latitude and place.longitude and google_maps_api_key %}
+                    <div id="place-detail-map" style="margin-top: 14px;"></div>
+                    {% endif %}
+
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar: Ratings + Quick Actions -->
+        <div class="info-col-side">
+            <!-- Community Ratings -->
+            <div class="card" style="border-radius: 10px;">
+                <div class="card-content">
+                    <div class="section-head"><i class="material-icons">insights</i> Community Ratings</div>
+                    {% if avg_ratings.overall or avg_ratings.staff or avg_ratings.ambience or avg_ratings.food %}
+                    <div class="rating-bar-row">
+                        <span class="rb-label">Overall</span>
+                        <div class="rb-bar-track">
+                            <div class="rb-bar-fill" style="width: {% if avg_ratings.overall %}{{ avg_ratings.overall|floatformat:0 }}0%{% else %}0%{% endif %}; background: linear-gradient(90deg, #7e57c2, #ce93d8);"></div>
+                        </div>
+                        <span class="rb-value">{% if avg_ratings.overall %}{{ avg_ratings.overall|floatformat:1 }}{% else %}&mdash;{% endif %}</span>
+                    </div>
+                    <div class="rating-bar-row">
+                        <span class="rb-label">Staff</span>
+                        <div class="rb-bar-track">
+                            <div class="rb-bar-fill" style="width: {% if avg_ratings.staff %}{{ avg_ratings.staff|floatformat:0 }}0%{% else %}0%{% endif %}; background: linear-gradient(90deg, #42a5f5, #90caf9);"></div>
+                        </div>
+                        <span class="rb-value">{% if avg_ratings.staff %}{{ avg_ratings.staff|floatformat:1 }}{% else %}&mdash;{% endif %}</span>
+                    </div>
+                    <div class="rating-bar-row">
+                        <span class="rb-label">Ambience</span>
+                        <div class="rb-bar-track">
+                            <div class="rb-bar-fill" style="width: {% if avg_ratings.ambience %}{{ avg_ratings.ambience|floatformat:0 }}0%{% else %}0%{% endif %}; background: linear-gradient(90deg, #ff7043, #ffab91);"></div>
+                        </div>
+                        <span class="rb-value">{% if avg_ratings.ambience %}{{ avg_ratings.ambience|floatformat:1 }}{% else %}&mdash;{% endif %}</span>
+                    </div>
+                    <div class="rating-bar-row">
+                        <span class="rb-label">Food</span>
+                        <div class="rb-bar-track">
+                            <div class="rb-bar-fill" style="width: {% if avg_ratings.food %}{{ avg_ratings.food|floatformat:0 }}0%{% else %}0%{% endif %}; background: linear-gradient(90deg, #66bb6a, #a5d6a7);"></div>
+                        </div>
+                        <span class="rb-value">{% if avg_ratings.food %}{{ avg_ratings.food|floatformat:1 }}{% else %}&mdash;{% endif %}</span>
+                    </div>
+                    <div style="margin-top: 10px; font-size: 0.75rem; color: #bdbdbd; text-align: center;">
+                        Based on {{ total_community_visits }} visit{{ total_community_visits|pluralize }}
+                    </div>
+                    {% else %}
+                    <div class="center-align" style="padding: 16px 0;">
+                        <i class="material-icons" style="font-size: 2.5rem; color: #e0e0e0;">star_border</i>
+                        <p class="grey-text" style="font-size: 0.85rem; margin: 8px 0 0;">No ratings yet. Be the first!</p>
+                        <a href="{% url 'quick_checkin' %}?place={{ place.pk }}" class="btn-small waves-effect waves-light" style="background: #7e57c2; margin-top: 10px;">
+                            <i class="material-icons left" style="margin-right: 4px;">add_location</i> Check In
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card" style="border-radius: 10px;">
+                <div class="card-content">
+                    <div class="section-head"><i class="material-icons">bolt</i> Quick Actions</div>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <a href="{% url 'quick_checkin' %}?place={{ place.pk }}" class="btn-flat waves-effect" style="text-align: left; display: flex; align-items: center; gap: 8px; color: #616161; border-radius: 8px;">
+                            <i class="material-icons" style="font-size: 1.1rem; color: #43a047;">add_location</i> Check In
+                        </a>
+                        <a href="{% url 'place_edit' pk=place.pk %}" class="btn-flat waves-effect" style="text-align: left; display: flex; align-items: center; gap: 8px; color: #616161; border-radius: 8px;">
+                            <i class="material-icons" style="font-size: 1.1rem; color: #7e57c2;">edit</i> Edit Place Info
+                        </a>
+                        {% if place.website %}
+                        <a href="{{ place.website }}" target="_blank" rel="noopener" class="btn-flat waves-effect" style="text-align: left; display: flex; align-items: center; gap: 8px; color: #616161; border-radius: 8px;">
+                            <i class="material-icons" style="font-size: 1.1rem; color: #1565c0;">language</i> Visit Website
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Drinks / Menu Grid (full width) -->
+    {% if wines %}
+    <div class="card" style="border-radius: 10px; margin-top: 20px;">
+        <div class="card-content">
+            <div class="section-head">
+                <i class="material-icons">menu_book</i> {% if place.place_type == 'brewery' %}Beer Menu{% elif place.place_type == 'restaurant' %}Drink Menu{% else %}Wine Menu{% endif %}
+                <span style="font-size: 0.78rem; font-weight: 400; color: #9e9e9e; margin-left: 8px;">{{ wines|length }} item{{ wines|length|pluralize }}</span>
+            </div>
+            <div class="drinks-grid">
+                {% for mi in wines %}
+                <div class="drink-tile">
+                    {% if mi.image_url %}
+                    <img src="{{ mi.image_url }}" class="dt-img" alt="{{ mi.name }}">
+                    {% else %}
+                    <div class="dt-placeholder">
+                        <i class="material-icons">{% if place.place_type == 'brewery' %}sports_bar{% else %}wine_bar{% endif %}</i>
+                    </div>
+                    {% endif %}
+                    <div class="dt-body">
+                        <div class="dt-name">{{ mi.name }}</div>
+                        <div class="dt-varietal">
+                            {% if mi.varietal %}{{ mi.varietal }}{% endif %}
+                            {% if mi.vintage %} · {{ mi.vintage }}{% endif %}
+                        </div>
+                        {% if mi.description %}
+                        <div class="dt-desc">{{ mi.description }}</div>
+                        {% endif %}
+                        <div class="dt-footer">
+                            {% if mi.price %}
+                            <span class="dt-tag" style="background: #fff3e0; color: #e65100;">${{ mi.price }}</span>
+                            {% endif %}
+                            {% if mi.varietal %}
+                            <span class="dt-tag" style="background: #ede7f6; color: #4a148c;">{{ mi.varietal }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{% if place.latitude and place.longitude and google_maps_api_key %}
+<script>
+(g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]);for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.googleapis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?console.warn(p+" only loads once."):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({
+    key: "{{ google_maps_api_key }}",
+    v: "weekly",
+    loading: "async"
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    google.maps.importLibrary('maps').then(function() {
+        google.maps.importLibrary('marker').then(function(markerLib) {
+            var pos = { lat: {{ place.latitude }}, lng: {{ place.longitude }} };
+            var map = new google.maps.Map(document.getElementById('place-detail-map'), {
+                center: pos, zoom: 15, mapId: '374457006826d906d63af582',
+                mapTypeControl: false, streetViewControl: false, fullscreenControl: false,
+                zoomControl: false,
+            });
+            new markerLib.AdvancedMarkerElement({ map: map, position: pos, title: '{{ place.name|escapejs }}' });
+        });
+    });
+});
+</script>
+{% endif %}
 {% endblock %}

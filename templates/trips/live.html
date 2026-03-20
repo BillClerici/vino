@@ -182,9 +182,15 @@
 {% block content %}
 <div class="container" style="margin-top: 12px; padding-bottom: 30px; max-width: 95%;">
 
-    <div style="margin-bottom: 8px;">
-        <a href="{% url 'trip_detail' pk=trip.pk %}" style="display: inline-flex; align-items: center; gap: 5px; background: #546e7a; border-radius: 18px; padding: 6px 16px; text-decoration: none; font-size: 0.82rem; font-weight: 600; color: #fff; line-height: 1.4;">
-            <i class="material-icons" style="font-size: 1rem;">arrow_back</i> Trip Details
+    <div style="margin-bottom: 8px; display: flex; gap: 8px;">
+        <a href="javascript:history.back()" style="display: inline-flex; align-items: center; gap: 5px; background: #37474f; border-radius: 18px; padding: 6px 16px; text-decoration: none; font-size: 0.82rem; font-weight: 600; color: #fff; line-height: 1.4; transition: background 0.15s;" onmouseover="this.style.background='#263238'" onmouseout="this.style.background='#37474f'">
+            <i class="material-icons" style="font-size: 1rem;">arrow_back</i> Back
+        </a>
+        <a href="{% url 'trip_list' %}" style="display: inline-flex; align-items: center; gap: 5px; background: #455a64; border-radius: 18px; padding: 6px 16px; text-decoration: none; font-size: 0.82rem; font-weight: 600; color: #fff; line-height: 1.4; transition: background 0.15s;" onmouseover="this.style.background='#37474f'" onmouseout="this.style.background='#455a64'">
+            <i class="material-icons" style="font-size: 1rem;">map</i> My Trips
+        </a>
+        <a href="{% url 'trip_detail' pk=trip.pk %}" style="display: inline-flex; align-items: center; gap: 5px; background: #546e7a; border-radius: 18px; padding: 6px 16px; text-decoration: none; font-size: 0.82rem; font-weight: 600; color: #fff; line-height: 1.4; transition: background 0.15s;" onmouseover="this.style.background='#455a64'" onmouseout="this.style.background='#546e7a'">
+            <i class="material-icons" style="font-size: 1rem;">info</i> Trip Details
         </a>
     </div>
 
@@ -395,6 +401,20 @@
                         <div style="margin-bottom: 10px;">
                             <label>Tasting Notes</label>
                             <textarea id="wf-notes-{{ forloop.counter0 }}" placeholder="{% if stop.place.place_type == 'brewery' %}Hoppy, malty, citrus, smooth... what did you think?{% else %}Fruity, oaky, dry, sweet... what did you think?{% endif %}"></textarea>
+                        </div>
+                        <div style="margin-bottom: 10px;">
+                            <label>Photo</label>
+                            <div style="display:flex;align-items:center;gap:10px;margin-top:4px;">
+                                <button type="button" onclick="capturePhoto({{ forloop.counter0 }})" style="display:inline-flex;align-items:center;gap:5px;padding:8px 16px;border-radius:16px;border:1.5px solid #e0e0e0;background:#fff;color:#616161;font-size:0.82rem;font-weight:600;cursor:pointer;transition:all 0.15s;">
+                                    <i class="material-icons" style="font-size:1rem;">photo_camera</i> Take Photo
+                                </button>
+                                <input type="file" id="wf-photo-input-{{ forloop.counter0 }}" accept="image/*" capture="environment" style="display:none;" onchange="handlePhotoSelect({{ forloop.counter0 }}, this)">
+                                <img id="wf-photo-preview-{{ forloop.counter0 }}" style="display:none;width:60px;height:60px;border-radius:8px;object-fit:cover;border:2px solid #ede7f6;">
+                                <button type="button" id="wf-photo-clear-{{ forloop.counter0 }}" onclick="clearPhoto({{ forloop.counter0 }})" style="display:none;border:none;background:none;cursor:pointer;color:#c62828;padding:2px;" title="Remove photo">
+                                    <i class="material-icons" style="font-size:1.1rem;">close</i>
+                                </button>
+                            </div>
+                            <input type="hidden" id="wf-photo-{{ forloop.counter0 }}" value="">
                         </div>
                         <div style="margin-bottom: 12px;">
                             <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
@@ -654,6 +674,17 @@ function prefillFromMenu(stopIndex, menuIndex) {
         });
         state.type = wineType;
     }
+
+    // Pre-populate photo from menu item image
+    if (wine.image_url) {
+        document.getElementById('wf-photo-' + stopIndex).value = wine.image_url;
+        var preview = document.getElementById('wf-photo-preview-' + stopIndex);
+        preview.src = wine.image_url;
+        preview.style.display = 'block';
+        document.getElementById('wf-photo-clear-' + stopIndex).style.display = 'block';
+    } else {
+        clearPhoto(stopIndex);
+    }
 }
 
 // ── Ratings ──
@@ -750,6 +781,45 @@ function togglePurchase(stopIndex) {
     }
 }
 
+function capturePhoto(stopIndex) {
+    document.getElementById('wf-photo-input-' + stopIndex).click();
+}
+
+function handlePhotoSelect(stopIndex, input) {
+    if (!input.files || !input.files[0]) return;
+    var file = input.files[0];
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        // Resize to max 800px to keep data URL manageable
+        var img = new Image();
+        img.onload = function() {
+            var canvas = document.createElement('canvas');
+            var maxSize = 800;
+            var w = img.width, h = img.height;
+            if (w > maxSize || h > maxSize) {
+                if (w > h) { h = Math.round(h * maxSize / w); w = maxSize; }
+                else { w = Math.round(w * maxSize / h); h = maxSize; }
+            }
+            canvas.width = w; canvas.height = h;
+            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+            var dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+            document.getElementById('wf-photo-' + stopIndex).value = dataUrl;
+            var preview = document.getElementById('wf-photo-preview-' + stopIndex);
+            preview.src = dataUrl; preview.style.display = 'block';
+            document.getElementById('wf-photo-clear-' + stopIndex).style.display = 'block';
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+function clearPhoto(stopIndex) {
+    document.getElementById('wf-photo-' + stopIndex).value = '';
+    document.getElementById('wf-photo-preview-' + stopIndex).style.display = 'none';
+    document.getElementById('wf-photo-clear-' + stopIndex).style.display = 'none';
+    document.getElementById('wf-photo-input-' + stopIndex).value = '';
+}
+
 function selectType(stopIndex, el) {
     el.closest('.type-options').querySelectorAll('.type-opt').forEach(function(o) { o.classList.remove('selected'); });
     el.classList.add('selected');
@@ -793,7 +863,8 @@ function saveWine(stopIndex) {
         rating: state.rating || null,
         tasting_notes: document.getElementById('wf-notes-' + stopIndex).value,
         is_favorite: state.fav || false,
-        purchased: state.purchased || false
+        purchased: state.purchased || false,
+        photo: document.getElementById('wf-photo-' + stopIndex).value || ''
     };
     if (state.purchased) {
         payload.purchased_quantity = document.getElementById('wf-pqty-' + stopIndex).value || 1;
@@ -841,6 +912,7 @@ function addWineCard(stopIndex, data) {
     card.dataset.purchasedQuantity = data.purchased_quantity || '';
     card.dataset.purchasedPrice = data.purchased_price || '';
     card.dataset.purchasedNotes = data.purchased_notes || '';
+    card.dataset.photo = data.photo || '';
 
     var displayName = data.wine_name;
     var vintageStr = '';
@@ -868,9 +940,13 @@ function addWineCard(stopIndex, data) {
         starsDisplayHtml += '<i class="material-icons ' + (i <= (data.rating || 0) ? 'filled' : 'empty') + '" style="font-size:1rem;">star</i>';
     }
 
+    var photoThumb = data.photo
+        ? '<img src="' + data.photo + '" style="width:80px;height:80px;border-radius:8px;object-fit:cover;flex-shrink:0;">'
+        : '<div class="wine-color-dot ' + getTypeClass(data.wine_type) + '"></div>';
+
     card.innerHTML =
         '<div class="wine-log-header" onclick="toggleWineEdit(\'' + data.visit_wine_id + '\')">' +
-        '<div class="wine-color-dot ' + getTypeClass(data.wine_type) + '"></div>' +
+        photoThumb +
         '<div style="flex:1;min-width:0;">' +
         '<div style="display:flex;align-items:center;gap:6px;">' +
         '<span class="vw-display-name" style="font-weight:600;font-size:0.9rem;">' + displayName + vintageStr + '</span>' +
@@ -1013,6 +1089,7 @@ function saveWineEdit(vwId) {
         rating: rating || null,
         tasting_notes: panel.querySelector('.ve-notes').value,
         purchased: panel.querySelector('.ve-purchased-btn').dataset.active === '1',
+        photo: card.dataset.photo || '',
     };
     if (payload.purchased) {
         payload.purchased_quantity = panel.querySelector('.ve-pqty').value || 1;
@@ -1164,7 +1241,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     is_favorite: w.is_favorite,
                     purchased: w.purchased,
                     purchased_quantity: w.purchased_quantity,
-                    purchased_price: w.purchased_price
+                    purchased_price: w.purchased_price,
+                    photo: w.photo || ''
                 });
             });
         }

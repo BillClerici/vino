@@ -330,13 +330,14 @@ class FindOrCreatePlaceView(LoginRequiredMixin, View):
 class PlaceDetailView(LoginRequiredMixin, View):
     def get(self, request, pk):
         place = get_object_or_404(Place, pk=pk)
+        user = request.user
         menu_items = place.menu_items.filter(is_active=True).order_by("name")
         visits = (
             VisitLog.objects.filter(place=place, is_active=True)
             .select_related("user")
             .order_by("-visited_at")[:10]
         )
-        my_visits = VisitLog.objects.filter(place=place, user=request.user, is_active=True).order_by("-visited_at")
+        my_visits = VisitLog.objects.filter(place=place, user=user, is_active=True).order_by("-visited_at")
         avg_ratings = VisitLog.objects.filter(place=place, is_active=True).aggregate(
             staff=Avg("rating_staff"),
             ambience=Avg("rating_ambience"),
@@ -344,15 +345,33 @@ class PlaceDetailView(LoginRequiredMixin, View):
             overall=Avg("rating_overall"),
         )
         is_favorite = FavoritePlace.objects.filter(
-            user=request.user, place=place, is_active=True
+            user=user, place=place, is_active=True
         ).exists()
+
+        # Stats
+        from apps.visits.models import VisitWine
+        total_community_visits = VisitLog.objects.filter(place=place, is_active=True).count()
+        my_visit_count = my_visits.count()
+        my_wines_here = (
+            VisitWine.objects.filter(
+                visit__user=user, visit__place=place, is_active=True,
+            )
+            .select_related("menu_item")
+            .order_by("-rating", "wine_name")
+        )
+
         return render(request, "wineries/detail.html", {
+            "place": place,
             "winery": place,
             "wines": menu_items,
             "visits": visits,
             "my_visits": my_visits,
             "avg_ratings": avg_ratings,
             "is_favorite": is_favorite,
+            "total_community_visits": total_community_visits,
+            "my_visit_count": my_visit_count,
+            "my_wines_here": my_wines_here,
+            "google_maps_api_key": settings.GOOGLE_MAPS_API_KEY,
         })
 
 

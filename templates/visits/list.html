@@ -4,99 +4,222 @@
 
 {% block extra_css %}
 <style>
+    .visits-wrap { max-width: 960px; margin: 0 auto; padding: 20px 16px 30px; width: 100%; box-sizing: border-box; }
+
+    /* Toolbar */
+    .visit-toolbar { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 12px; }
+    .visit-toolbar .tf-group { display: flex; flex-direction: column; }
+    .visit-toolbar label { font-size: 0.7rem; color: #9e9e9e; text-transform: uppercase; letter-spacing: 0.3px; font-weight: 600; margin-bottom: 3px; line-height: 1; display: block; }
+    .visit-toolbar input, .visit-toolbar select {
+        height: 36px !important; border: 1px solid #e0e0e0 !important;
+        border-radius: 4px !important; padding: 0 10px !important;
+        font-size: 0.85rem !important; box-sizing: border-box !important;
+        background: #fff !important; width: 100% !important;
+        margin: 0 !important; line-height: 36px !important;
+    }
+    .visit-toolbar select { appearance: auto !important; cursor: pointer; }
+    .visit-toolbar input:focus, .visit-toolbar select:focus { border-color: #7e57c2 !important; outline: none; }
+    .visit-toolbar .tf-btns { display: flex; gap: 6px; align-items: center; }
+    .visit-toolbar .tf-btns .btn-small { height: 36px; line-height: 36px; padding: 0 14px; }
+
+    /* Sort */
+    .sort-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+    .sort-bar .sort-label { font-size: 0.78rem; color: #9e9e9e; }
+    .sort-btn {
+        display: inline-flex; align-items: center; gap: 3px;
+        padding: 4px 10px; border-radius: 12px; border: 1px solid #e0e0e0;
+        background: #fff; font-size: 0.75rem; color: #616161;
+        cursor: pointer; text-decoration: none; transition: all 0.15s;
+    }
+    .sort-btn:hover { border-color: #7e57c2; color: #7e57c2; }
+    .sort-btn.active { border-color: #7e57c2; background: #ede7f6; color: #4a148c; font-weight: 600; }
+    .sort-btn i { font-size: 0.85rem; }
+
+    /* Cards */
     .visit-card {
-        border-radius: 8px;
-        margin-bottom: 12px;
-        transition: transform 0.15s;
+        border-radius: 8px; margin-bottom: 10px; transition: transform 0.15s;
     }
     .visit-card:hover { transform: translateY(-2px); }
-    .visit-card .card-content { padding: 18px; }
+    .visit-card > .card-content { padding: 14px 18px; }
     .star-display { color: #ffb300; letter-spacing: -1px; }
-    .rating-pills { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    .rating-pills { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
     .rating-pill {
-        display: inline-flex; align-items: center; gap: 4px;
-        padding: 3px 10px; border-radius: 12px;
-        background: #f5f5f5; font-size: 0.78rem; color: #757575;
+        display: inline-flex; align-items: center; gap: 3px;
+        padding: 2px 8px; border-radius: 10px;
+        background: #f5f5f5; font-size: 0.72rem; color: #757575; font-weight: 600;
     }
+    .visit-action-btn {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 5px 12px; border-radius: 14px; border: 1.5px solid #e0e0e0;
+        background: #fff; color: #616161; font-size: 0.78rem; font-weight: 600;
+        text-decoration: none; transition: all 0.15s;
+    }
+    .visit-action-btn:hover { border-color: #7e57c2; color: #7e57c2; }
+    .visit-action-btn i { font-size: 0.9rem; }
+
+    .results-count { font-size: 0.82rem; color: #9e9e9e; margin-bottom: 12px; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container" style="margin-top: 20px; padding-bottom: 30px;">
-    <div class="row" style="margin-bottom: 16px;">
-        <div class="col s8">
-            <h5 style="font-weight: 600; color: #455a64; margin-top: 0;">
-                <i class="material-icons" style="vertical-align: middle;">history</i> My Visits
-            </h5>
-        </div>
-        <div class="col s4 right-align">
-            <a href="{% url 'checkin' %}" class="btn deep-purple lighten-1 waves-effect waves-light">
-                <i class="material-icons left">add_location</i>Check In
-            </a>
-        </div>
+<div class="visits-wrap">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h5 style="font-weight: 600; color: #455a64; margin: 0; display: inline-flex; align-items: center; gap: 6px;">
+            <i class="material-icons">add_location</i> My Visits
+        </h5>
+        <a href="{% url 'checkin' %}" class="btn deep-purple lighten-1 waves-effect waves-light">
+            <i class="material-icons left">add_location</i>Check In
+        </a>
     </div>
 
-    {% for visit in visits %}
-    <a href="{% url 'visit_detail' pk=visit.pk %}" style="color: inherit;">
-        <div class="card visit-card hoverable">
-            <div class="card-content">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                    <div>
-                        <div style="font-weight: 700; font-size: 1.05rem;">{{ visit.place.name }}</div>
-                        <div style="font-size: 0.82rem; color: #9e9e9e; display: flex; align-items: center; gap: 4px;">
-                            <i class="material-icons tiny">event</i> {{ visit.visited_at|date:"M j, Y \a\t g:i A" }}
-                            {% if visit.place.city %}
-                            &middot; <i class="material-icons tiny">place</i> {{ visit.place.city }}{% if visit.place.state %}, {{ visit.place.state }}{% endif %}
-                            {% endif %}
-                        </div>
-                    </div>
-                    {% if visit.rating_overall %}
-                    <div class="star-display" style="font-size: 1.1rem;">
-                        {% for i in "12345" %}{% if forloop.counter <= visit.rating_overall %}&#9733;{% else %}&#9734;{% endif %}{% endfor %}
-                    </div>
+    <!-- Search & Filters -->
+    <form method="get" id="filter-form">
+        <div class="visit-toolbar">
+            <div class="tf-group" style="flex: 2; min-width: 200px;">
+                <label>Search</label>
+                <input type="text" name="q" value="{{ search_query }}" placeholder="Place name, city, notes...">
+            </div>
+            <div class="tf-group" style="min-width: 120px;">
+                <label>Rating</label>
+                <select name="rating" class="browser-default" onchange="this.form.submit()">
+                    <option value="">All Ratings</option>
+                    <option value="5" {% if filter_rating == "5" %}selected{% endif %}>5 Stars</option>
+                    <option value="4" {% if filter_rating == "4" %}selected{% endif %}>4 Stars</option>
+                    <option value="3" {% if filter_rating == "3" %}selected{% endif %}>3 Stars</option>
+                    <option value="2" {% if filter_rating == "2" %}selected{% endif %}>2 Stars</option>
+                    <option value="1" {% if filter_rating == "1" %}selected{% endif %}>1 Star</option>
+                </select>
+            </div>
+            <div class="tf-group" style="min-width: 120px;">
+                <label>Type</label>
+                <select name="type" class="browser-default" onchange="this.form.submit()">
+                    <option value="">All Types</option>
+                    {% for value, label in place_type_choices %}
+                    <option value="{{ value }}" {% if filter_type == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="tf-group" style="min-width: 140px;">
+                <label>From Date</label>
+                <input type="date" name="from" value="{{ filter_from }}">
+            </div>
+            <div class="tf-group" style="min-width: 140px;">
+                <label>To Date</label>
+                <input type="date" name="to" value="{{ filter_to }}">
+            </div>
+            <input type="hidden" name="sort" value="{{ current_sort }}" id="sort-input">
+            <div class="tf-group">
+                <label>&nbsp;</label>
+                <div class="tf-btns">
+                    <button type="submit" class="btn-small waves-effect waves-light" style="background: #7e57c2;">
+                        <i class="material-icons">search</i>
+                    </button>
+                    {% if search_query or filter_rating or filter_type or filter_from or filter_to %}
+                    <a href="{% url 'visit_list' %}" class="btn-small btn-flat waves-effect" style="height: 36px; line-height: 36px;">Clear</a>
                     {% endif %}
-                </div>
-                {% if visit.notes %}
-                <p style="margin: 10px 0 0; font-size: 0.88rem; color: #757575; line-height: 1.5;">
-                    {{ visit.notes|truncatewords:40 }}
-                </p>
-                {% endif %}
-                <div class="rating-pills">
-                    {% if visit.rating_staff %}<span class="rating-pill"><i class="material-icons tiny">people</i> Staff {{ visit.rating_staff }}/5</span>{% endif %}
-                    {% if visit.rating_ambience %}<span class="rating-pill"><i class="material-icons tiny">nightlife</i> Ambience {{ visit.rating_ambience }}/5</span>{% endif %}
-                    {% if visit.rating_food %}<span class="rating-pill"><i class="material-icons tiny">restaurant</i> Food {{ visit.rating_food }}/5</span>{% endif %}
-                    {% if visit.wines_tasted.count %}<span class="rating-pill"><i class="material-icons tiny">wine_bar</i> {{ visit.wines_tasted.count }} wine{{ visit.wines_tasted.count|pluralize }}</span>{% endif %}
                 </div>
             </div>
         </div>
-    </a>
+    </form>
+
+    <!-- Sort Bar -->
+    <div class="sort-bar">
+        <span class="sort-label">Sort by:</span>
+        {% with cs=current_sort %}
+        <a href="?q={{ search_query }}&rating={{ filter_rating }}&type={{ filter_type }}&from={{ filter_from }}&to={{ filter_to }}&sort={% if cs == '-visited_at' %}visited_at{% else %}-visited_at{% endif %}" class="sort-btn {% if cs == '-visited_at' or cs == 'visited_at' %}active{% endif %}">
+            <i class="material-icons">event</i> Date
+            {% if cs == '-visited_at' %}<i class="material-icons">arrow_downward</i>{% elif cs == 'visited_at' %}<i class="material-icons">arrow_upward</i>{% endif %}
+        </a>
+        <a href="?q={{ search_query }}&rating={{ filter_rating }}&type={{ filter_type }}&from={{ filter_from }}&to={{ filter_to }}&sort={% if cs == 'place__name' %}-place__name{% else %}place__name{% endif %}" class="sort-btn {% if cs == 'place__name' or cs == '-place__name' %}active{% endif %}">
+            <i class="material-icons">sort_by_alpha</i> Place
+            {% if cs == 'place__name' %}<i class="material-icons">arrow_upward</i>{% elif cs == '-place__name' %}<i class="material-icons">arrow_downward</i>{% endif %}
+        </a>
+        <a href="?q={{ search_query }}&rating={{ filter_rating }}&type={{ filter_type }}&from={{ filter_from }}&to={{ filter_to }}&sort={% if cs == '-rating_overall' %}rating_overall{% else %}-rating_overall{% endif %}" class="sort-btn {% if cs == '-rating_overall' or cs == 'rating_overall' %}active{% endif %}">
+            <i class="material-icons">star</i> Rating
+            {% if cs == '-rating_overall' %}<i class="material-icons">arrow_downward</i>{% elif cs == 'rating_overall' %}<i class="material-icons">arrow_upward</i>{% endif %}
+        </a>
+        {% endwith %}
+    </div>
+
+    {% if search_query or filter_rating or filter_type or filter_from or filter_to %}
+    <div class="results-count">{{ page_obj.paginator.count }} visit{{ page_obj.paginator.count|pluralize }} found</div>
+    {% endif %}
+
+    {% for visit in visits %}
+    <div class="card visit-card hoverable">
+        <div class="card-content">
+            <div style="display: flex; align-items: center; gap: 14px;">
+                {% if visit.place.image_url %}
+                <img src="{{ visit.place.image_url }}" alt="" style="width: 80px; height: 80px; border-radius: 8px; object-fit: cover; flex-shrink: 0; box-shadow: 0 2px 6px rgba(0,0,0,0.1);">
+                {% else %}
+                <div style="width: 80px; height: 80px; border-radius: 8px; background: #ede7f6; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <i class="material-icons" style="color: #7e57c2; font-size: 1.8rem;">{% if visit.place.place_type == 'brewery' %}sports_bar{% elif visit.place.place_type == 'restaurant' %}restaurant{% else %}wine_bar{% endif %}</i>
+                </div>
+                {% endif %}
+                <div style="flex: 1; min-width: 0;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-weight: 700; font-size: 1.1rem;">{{ visit.place.name }}</span>
+                        {% if visit.rating_overall %}
+                        <span class="star-display" style="font-size: 1rem;">{% for i in "12345" %}{% if forloop.counter <= visit.rating_overall %}&#9733;{% else %}&#9734;{% endif %}{% endfor %}</span>
+                        {% endif %}
+                    </div>
+                    <div style="font-size: 0.82rem; color: #9e9e9e; margin-top: 3px; display: flex; align-items: center; gap: 4px;">
+                        <i class="material-icons" style="font-size: 0.9rem;">event</i> {{ visit.visited_at|date:"M j, Y \a\t g:i A" }}
+                        {% if visit.place.city %}
+                        &middot; <i class="material-icons" style="font-size: 0.9rem;">place</i> {{ visit.place.city }}{% if visit.place.state %}, {{ visit.place.state }}{% endif %}
+                        {% endif %}
+                    </div>
+                    {% if visit.notes %}
+                    <div style="font-size: 0.82rem; color: #757575; margin-top: 3px; line-height: 1.4;">
+                        {{ visit.notes|truncatewords:30 }}
+                    </div>
+                    {% endif %}
+                    <div class="rating-pills">
+                        {% if visit.rating_staff %}<span class="rating-pill"><i class="material-icons" style="font-size: 0.75rem;">people</i> Staff {{ visit.rating_staff }}/5</span>{% endif %}
+                        {% if visit.rating_ambience %}<span class="rating-pill"><i class="material-icons" style="font-size: 0.75rem;">nightlife</i> Ambience {{ visit.rating_ambience }}/5</span>{% endif %}
+                        {% if visit.rating_food %}<span class="rating-pill"><i class="material-icons" style="font-size: 0.75rem;">restaurant</i> Food {{ visit.rating_food }}/5</span>{% endif %}
+                        {% if visit.wines_tasted.count %}<span class="rating-pill"><i class="material-icons" style="font-size: 0.75rem;">wine_bar</i> {{ visit.wines_tasted.count }} wine{{ visit.wines_tasted.count|pluralize }}</span>{% endif %}
+                    </div>
+                </div>
+                <div style="display: flex; gap: 8px; flex-shrink: 0; align-items: center;">
+                    <a href="{% url 'visit_detail' pk=visit.pk %}" class="visit-action-btn">
+                        <i class="material-icons">visibility</i> Details
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
     {% empty %}
     <div class="center-align" style="padding: 60px 0;">
         <i class="material-icons large grey-text text-lighten-1">wine_bar</i>
+        {% if search_query or filter_rating or filter_type or filter_from or filter_to %}
+        <p class="grey-text flow-text">No visits match your filters</p>
+        <a href="{% url 'visit_list' %}" class="btn-flat waves-effect" style="margin-top: 8px;">Clear Filters</a>
+        {% else %}
         <p class="grey-text flow-text">No visits yet</p>
         <p class="grey-text">Check in at a place to start building your trip journal.</p>
         <a href="{% url 'checkin' %}" class="btn-large deep-purple lighten-1 waves-effect waves-light" style="margin-top: 12px;">
             <i class="material-icons left">add_location</i>First Check-in
         </a>
+        {% endif %}
     </div>
     {% endfor %}
 
-    <!-- Pagination -->
     {% if page_obj.has_other_pages %}
     <div class="center-align" style="margin-top: 20px;">
         <ul class="pagination">
             {% if page_obj.has_previous %}
-            <li class="waves-effect"><a href="?page={{ page_obj.previous_page_number }}"><i class="material-icons">chevron_left</i></a></li>
+            <li class="waves-effect"><a href="?q={{ search_query }}&rating={{ filter_rating }}&type={{ filter_type }}&from={{ filter_from }}&to={{ filter_to }}&sort={{ current_sort }}&page={{ page_obj.previous_page_number }}"><i class="material-icons">chevron_left</i></a></li>
             {% endif %}
             {% for num in page_obj.paginator.page_range %}
                 {% if page_obj.number == num %}
                 <li class="active blue-grey darken-1"><a>{{ num }}</a></li>
                 {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
-                <li class="waves-effect"><a href="?page={{ num }}">{{ num }}</a></li>
+                <li class="waves-effect"><a href="?q={{ search_query }}&rating={{ filter_rating }}&type={{ filter_type }}&from={{ filter_from }}&to={{ filter_to }}&sort={{ current_sort }}&page={{ num }}">{{ num }}</a></li>
                 {% endif %}
             {% endfor %}
             {% if page_obj.has_next %}
-            <li class="waves-effect"><a href="?page={{ page_obj.next_page_number }}"><i class="material-icons">chevron_right</i></a></li>
+            <li class="waves-effect"><a href="?q={{ search_query }}&rating={{ filter_rating }}&type={{ filter_type }}&from={{ filter_from }}&to={{ filter_to }}&sort={{ current_sort }}&page={{ page_obj.next_page_number }}"><i class="material-icons">chevron_right</i></a></li>
             {% endif %}
         </ul>
     </div>

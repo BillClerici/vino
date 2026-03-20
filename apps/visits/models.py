@@ -75,6 +75,9 @@ class VisitWine(BaseModel):
         null=True, blank=True,
     )
 
+    # Photo
+    photo = models.TextField(blank=True, help_text="Photo URL or base64 data URI")
+
     # Purchase tracking
     purchased = models.BooleanField(default=False)
     purchased_quantity = models.PositiveSmallIntegerField(null=True, blank=True)
