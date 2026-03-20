@@ -1,0 +1,240 @@
+{% extends "base.html" %}
+
+{% block title %}My Profile — Vino Trip{% endblock %}
+
+{% block extra_css %}
+<style>
+    .profile-stat {
+        text-align: center; padding: 14px 10px; border-radius: 8px;
+        background: #fff; border: 1px solid #f0f0f0;
+    }
+    .profile-stat .stat-val { font-size: 1.5rem; font-weight: 700; line-height: 1.1; }
+    .profile-stat .stat-lbl { font-size: 0.72rem; color: #9e9e9e; text-transform: uppercase; letter-spacing: 0.3px; margin-top: 4px; }
+    .social-badge {
+        display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px;
+        border-radius: 8px; font-size: 0.85rem; font-weight: 600;
+    }
+    .social-badge.google { background: #fce8e6; color: #c5221f; }
+    .social-badge.microsoft { background: #e8f0fe; color: #1a73e8; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container" style="margin-top: 20px; padding-bottom: 40px; max-width: 95%;">
+
+    <!-- Profile Header -->
+    <div class="card" style="border-radius: 8px;">
+        <div class="card-content">
+            <div style="display: flex; align-items: center; gap: 20px;">
+                {% if profile_user.avatar_url %}
+                <img src="{{ profile_user.avatar_url }}" alt="" style="width: 72px; height: 72px; border-radius: 50%; object-fit: cover; border: 3px solid #ede7f6;">
+                {% else %}
+                <div style="width: 72px; height: 72px; border-radius: 50%; background: linear-gradient(135deg, #7e57c2, #ab47bc); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <span style="font-size: 1.8rem; font-weight: 700; color: #fff;">{{ profile_user.first_name|default:profile_user.email|make_list|first|upper }}</span>
+                </div>
+                {% endif %}
+                <div style="flex: 1;">
+                    <h5 style="margin: 0; font-weight: 700; color: #333;">{{ profile_user.full_name }}</h5>
+                    <div style="font-size: 0.88rem; color: #9e9e9e; margin-top: 2px;">{{ profile_user.email }}</div>
+                    <div style="margin-top: 6px; display: flex; gap: 6px; align-items: center;">
+                        {% if profile_user.subscription_status == 'trialing' %}
+                        <span style="background:#fff3e0;color:#e65100;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:600;">Trial — {{ profile_user.trial_days_remaining }} day{{ profile_user.trial_days_remaining|pluralize }} left</span>
+                        {% elif profile_user.subscription_status == 'active' %}
+                        <span style="background:#e8f5e9;color:#2e7d32;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:600;">{{ profile_user.subscription_plan|title }} Plan</span>
+                        {% elif profile_user.subscription_status == 'past_due' %}
+                        <span style="background:#fce4ec;color:#c62828;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:600;">Payment Past Due</span>
+                        {% elif profile_user.subscription_status == 'canceled' %}
+                        <span style="background:#e0e0e0;color:#616161;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:600;">Canceled</span>
+                        {% endif %}
+                        <span style="font-size: 0.75rem; color: #bdbdbd;">Joined {{ profile_user.created_at|date:"M Y" }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats -->
+            <div class="row" style="margin-top: 20px; margin-bottom: 0;">
+                <div class="col s4 m2">
+                    <div class="profile-stat">
+                        <div class="stat-val deep-purple-text">{{ visit_count }}</div>
+                        <div class="stat-lbl">Check-ins</div>
+                    </div>
+                </div>
+                <div class="col s4 m2">
+                    <div class="profile-stat">
+                        <div class="stat-val teal-text">{{ places_visited }}</div>
+                        <div class="stat-lbl">Places</div>
+                    </div>
+                </div>
+                <div class="col s4 m2">
+                    <div class="profile-stat">
+                        <div class="stat-val amber-text text-darken-2">{% if avg_rating %}{{ avg_rating }}{% else %}&mdash;{% endif %}</div>
+                        <div class="stat-lbl">Avg Rating</div>
+                    </div>
+                </div>
+                <div class="col s4 m2">
+                    <div class="profile-stat">
+                        <div class="stat-val blue-grey-text">{{ trips_total }}</div>
+                        <div class="stat-lbl">Trips</div>
+                    </div>
+                </div>
+                <div class="col s4 m2">
+                    <div class="profile-stat">
+                        <div class="stat-val" style="color: #7e57c2;">{{ wines_logged }}</div>
+                        <div class="stat-lbl">Drinks Logged</div>
+                    </div>
+                </div>
+                <div class="col s4 m2">
+                    <div class="profile-stat">
+                        <div class="stat-val red-text text-lighten-1">{{ favorites }}</div>
+                        <div class="stat-lbl">Favorites</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Left: Edit Profile -->
+        <div class="col s12 m6">
+            <div class="card" style="border-radius: 8px;">
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="card-content">
+                        <span class="card-title" style="font-size: 1.1rem; font-weight: 600; color: #455a64; display: inline-flex; align-items: center; gap: 6px;">
+                            <i class="material-icons">person</i> Edit Profile
+                        </span>
+
+                        {% if messages %}
+                        {% for message in messages %}
+                        <div class="card-panel green lighten-4" style="padding: 10px;">{{ message }}</div>
+                        {% endfor %}
+                        {% endif %}
+
+                        <div class="row" style="margin-bottom: 0;">
+                            <div class="input-field col s6">
+                                {{ form.first_name }}
+                                <label for="{{ form.first_name.id_for_label }}" class="{% if form.first_name.value %}active{% endif %}">First Name</label>
+                            </div>
+                            <div class="input-field col s6">
+                                {{ form.last_name }}
+                                <label for="{{ form.last_name.id_for_label }}" class="{% if form.last_name.value %}active{% endif %}">Last Name</label>
+                            </div>
+                        </div>
+                        <div class="row" style="margin-bottom: 0;">
+                            <div class="input-field col s12">
+                                <input type="email" value="{{ profile_user.email }}" disabled>
+                                <label class="active">Email (from sign-in provider)</label>
+                            </div>
+                        </div>
+                        <div class="row" style="margin-bottom: 0;">
+                            <div class="input-field col s12">
+                                {{ form.avatar_url }}
+                                <label for="{{ form.avatar_url.id_for_label }}" class="{% if form.avatar_url.value %}active{% endif %}">Avatar URL</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-action right-align">
+                        <button type="submit" class="btn waves-effect waves-light" style="background: #7e57c2; border-radius: 8px;">
+                            <i class="material-icons left">save</i> Save Profile
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Right: Subscription & Connected Accounts -->
+        <div class="col s12 m6">
+            <!-- Subscription -->
+            <div class="card" style="border-radius: 8px;">
+                <div class="card-content">
+                    <span class="card-title" style="font-size: 1.1rem; font-weight: 600; color: #455a64; display: inline-flex; align-items: center; gap: 6px;">
+                        <i class="material-icons">card_membership</i> Subscription
+                    </span>
+                    <div style="margin-top: 12px;">
+                        {% if profile_user.subscription_status == 'trialing' %}
+                        <p style="font-size: 0.9rem; color: #616161;">You're on a <strong>free trial</strong> with {{ profile_user.trial_days_remaining }} day{{ profile_user.trial_days_remaining|pluralize }} remaining.</p>
+                        <p style="font-size: 0.82rem; color: #9e9e9e;">Subscribe to keep access after your trial ends.</p>
+                        <a href="{% url 'pricing' %}" class="btn waves-effect waves-light" style="background: #7e57c2; border-radius: 8px; margin-top: 8px;">
+                            <i class="material-icons left">star</i> View Plans
+                        </a>
+                        {% elif profile_user.subscription_status == 'active' %}
+                        <p style="font-size: 0.9rem; color: #616161;"><strong>{{ profile_user.subscription_plan|title }}</strong> plan — active</p>
+                        <form method="post" action="{% url 'customer_portal' %}" style="margin-top: 8px;">
+                            {% csrf_token %}
+                            <button type="submit" class="btn-flat waves-effect" style="border: 1.5px solid #7e57c2; color: #7e57c2; border-radius: 8px;">
+                                <i class="material-icons left">settings</i> Manage Subscription
+                            </button>
+                        </form>
+                        {% elif profile_user.subscription_status == 'past_due' %}
+                        <p style="font-size: 0.9rem; color: #c62828;">Your payment is past due. Please update your payment method.</p>
+                        <form method="post" action="{% url 'customer_portal' %}" style="margin-top: 8px;">
+                            {% csrf_token %}
+                            <button type="submit" class="btn waves-effect waves-light" style="background: #c62828; border-radius: 8px;">Update Payment</button>
+                        </form>
+                        {% else %}
+                        <p style="font-size: 0.9rem; color: #616161;">No active subscription.</p>
+                        <a href="{% url 'pricing' %}" class="btn waves-effect waves-light" style="background: #7e57c2; border-radius: 8px; margin-top: 8px;">
+                            <i class="material-icons left">star</i> Subscribe
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Connected Accounts -->
+            <div class="card" style="border-radius: 8px;">
+                <div class="card-content">
+                    <span class="card-title" style="font-size: 1.1rem; font-weight: 600; color: #455a64; display: inline-flex; align-items: center; gap: 6px;">
+                        <i class="material-icons">link</i> Connected Accounts
+                    </span>
+                    <div style="margin-top: 12px; display: flex; flex-wrap: wrap; gap: 8px;">
+                        {% for sa in social_accounts %}
+                        <div class="social-badge {% if 'google' in sa.provider %}google{% elif 'microsoft' in sa.provider %}microsoft{% endif %}">
+                            {% if 'google' in sa.provider %}
+                            <i class="material-icons" style="font-size: 1rem;">g_mobiledata</i> Google
+                            {% elif 'microsoft' in sa.provider %}
+                            <i class="material-icons" style="font-size: 1rem;">window</i> Microsoft
+                            {% else %}
+                            <i class="material-icons" style="font-size: 1rem;">account_circle</i> {{ sa.provider|title }}
+                            {% endif %}
+                        </div>
+                        {% empty %}
+                        <p class="grey-text" style="font-size: 0.85rem;">No accounts linked yet.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Activity -->
+            {% if recent_visits %}
+            <div class="card" style="border-radius: 8px;">
+                <div class="card-content">
+                    <span class="card-title" style="font-size: 1.1rem; font-weight: 600; color: #455a64; display: inline-flex; align-items: center; gap: 6px;">
+                        <i class="material-icons">history</i> Recent Activity
+                    </span>
+                    {% for visit in recent_visits %}
+                    <div style="padding: 8px 0; border-bottom: 1px solid #f5f5f5; display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div style="font-weight: 600; font-size: 0.88rem;">{{ visit.place.name }}</div>
+                            <div style="font-size: 0.75rem; color: #9e9e9e;">{{ visit.visited_at|date:"M j, Y" }}</div>
+                        </div>
+                        {% if visit.rating_overall %}
+                        <span style="color: #ffb300; font-size: 0.85rem;">{{ visit.rating_overall }} &#9733;</span>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        M.updateTextFields();
+    });
+</script>
+{% endblock %}

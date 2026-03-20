@@ -24,12 +24,18 @@ SEED_DATA = {
         "prefix": "LOOKUP",
         "control_points": ["ADD", "UPDATE", "DELETE", "VIEW"],
     },
+    "Subscriber": {
+        "prefix": "SUB",
+        "control_points": ["DASHBOARD", "PLACES", "MY_VISITS", "TRIPS", "MY_PALATE", "MY_PROFILE", "MY_SUBSCRIPTION"],
+        "sort_order": 10,
+    },
 }
 
 # Roles and which control points they get (by code prefix pattern)
 ROLES = {
     "Admin": "*",           # All control points
-    "Power User": None,     # No default CPs — assign manually
+    "Subscriber": "SUB_*",  # All subscriber control points
+    "Power User": "SUB_*",  # All subscriber control points
     "Guest": None,          # No default CPs — assign manually
 }
 
@@ -44,7 +50,10 @@ class Command(BaseCommand):
         for group_name, config in SEED_DATA.items():
             group, created = ControlPointGroup.all_objects.get_or_create(
                 name=group_name,
-                defaults={"description": f"Manage {group_name.lower()}"},
+                defaults={
+                    "description": f"Manage {group_name.lower()}",
+                    "sort_order": config.get("sort_order", 0),
+                },
             )
             status = "created" if created else "exists"
             self.stdout.write(f"  [{status}] Group: {group_name}")
@@ -75,19 +84,25 @@ class Command(BaseCommand):
             self.stdout.write(f"  [{status}] Role: {role_name}")
 
             # Assign control points
-            if cp_assignment == "*" and created:
-                role.control_points.set(all_cps)
-                self.stdout.write(self.style.SUCCESS(
-                    f"    [+] Assigned all {len(all_cps)} control points to {role_name}"
-                ))
-            elif cp_assignment == "*" and not created:
-                # Ensure Admin always has all CPs even on re-run
+            if cp_assignment == "*":
+                # All control points
                 existing = set(role.control_points.values_list("pk", flat=True))
                 new_cps = [cp for cp in all_cps if cp.pk not in existing]
                 if new_cps:
                     role.control_points.add(*new_cps)
                     self.stdout.write(self.style.SUCCESS(
-                        f"    [+] Added {len(new_cps)} new control points to {role_name}"
+                        f"    [+] Assigned {len(new_cps)} control points to {role_name}"
+                    ))
+            elif cp_assignment and cp_assignment.endswith("*"):
+                # Pattern match (e.g., "SUB_*")
+                prefix = cp_assignment.replace("*", "")
+                matching = [cp for cp in all_cps if cp.code.startswith(prefix)]
+                existing = set(role.control_points.values_list("pk", flat=True))
+                new_cps = [cp for cp in matching if cp.pk not in existing]
+                if new_cps:
+                    role.control_points.add(*new_cps)
+                    self.stdout.write(self.style.SUCCESS(
+                        f"    [+] Assigned {len(new_cps)} control points to {role_name}"
                     ))
 
         # Assign Admin role to all superusers

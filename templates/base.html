@@ -176,7 +176,7 @@
                 <a href="{% url 'landing' %}" class="brand-logo center">&#127863; Vino Trip</a>
                 <ul class="right">
                     {% if user.is_authenticated %}
-                    <li><a class="grey-text text-lighten-2">{% firstof user.first_name user.email %}</a></li>
+                    <li><a href="{% url 'profile' %}" class="grey-text text-lighten-2" title="My Profile"><i class="material-icons left" style="margin-right:4px;">account_circle</i>{% firstof user.first_name user.email %}</a></li>
                     <li><a href="{% url 'logout' %}" title="Log Out"><i class="material-icons">logout</i></a></li>
                     {% else %}
                     <li><a href="{% url 'login' %}">Sign In</a></li>
@@ -275,13 +275,20 @@
         </li>
         {% endif %}
 
-        <!-- Bottom — user info + logout -->
+        <!-- Profile & Subscription -->
+        <li><div class="divider"></div></li>
+        <li class="{% if request.resolver_match.url_name == 'profile' %}active{% endif %}">
+            <a href="{% url 'profile' %}"><i class="material-icons">account_circle</i>My Profile</a>
+        </li>
+        <li class="{% if 'pricing' in request.resolver_match.url_name %}active{% endif %}">
+            <a href="{% url 'pricing' %}">
+                <i class="material-icons">card_membership</i>My Subscription
+            </a>
+        </li>
+
+        <!-- Bottom — logout -->
         <li>
             <div class="nav-bottom">
-                <div class="user-info">
-                    <i class="material-icons tiny">account_circle</i>
-                    {% firstof user.full_name user.email %}
-                </div>
                 <a href="{% url 'logout' %}"><i class="material-icons">logout</i>Log Out</a>
             </div>
         </li>

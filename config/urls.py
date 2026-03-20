@@ -26,7 +26,14 @@ from apps.rbac.views import (
     UserEditView,
     UserListView,
 )
-from apps.users.views import LoginView, LogoutView, RegisterView
+from apps.users.views import LoginView, LogoutView, ProfileView, RegisterView
+from apps.users.subscription_views import (
+    CheckoutSuccessView,
+    CreateCheckoutSessionView,
+    CustomerPortalView,
+    PricingView,
+    StripeWebhookView,
+)
 from apps.wineries.views import (
     PlaceAdminCreateView,
     PlaceAdminDeleteView,
@@ -44,6 +51,13 @@ urlpatterns = [
     path('login/', LoginView.as_view(), name='login'),
     path('register/', RegisterView.as_view(), name='register'),
     path('logout/', LogoutView.as_view(), name='logout'),
+    path('profile/', ProfileView.as_view(), name='profile'),
+    # Subscription
+    path('subscription/pricing/', PricingView.as_view(), name='pricing'),
+    path('subscription/create-checkout/', CreateCheckoutSessionView.as_view(), name='create_checkout'),
+    path('subscription/success/', CheckoutSuccessView.as_view(), name='checkout_success'),
+    path('subscription/portal/', CustomerPortalView.as_view(), name='customer_portal'),
+    path('subscription/webhook/', StripeWebhookView.as_view(), name='stripe_webhook'),
     # User-facing features
     path('places/', include('apps.wineries.urls')),
     path('visits/', include('apps.visits.urls')),

@@ -198,6 +198,14 @@ EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
 EMAIL_USE_TLS = env.bool('EMAIL_USE_TLS', default=True)
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='Vino Trip <noreply@vinovoyage.com>')
 
+# Stripe
+STRIPE_PUBLISHABLE_KEY = env('STRIPE_PUBLISHABLE_KEY', default='')
+STRIPE_SECRET_KEY = env('STRIPE_SECRET_KEY', default='')
+STRIPE_WEBHOOK_SECRET = env('STRIPE_WEBHOOK_SECRET', default='')
+STRIPE_MONTHLY_PRICE_ID = env('STRIPE_MONTHLY_PRICE_ID', default='')
+STRIPE_YEARLY_PRICE_ID = env('STRIPE_YEARLY_PRICE_ID', default='')
+STRIPE_TRIAL_DAYS = 14
+
 # Google Maps
 GOOGLE_MAPS_API_KEY = env('GOOGLE_MAPS_API_KEY', default='')
 
