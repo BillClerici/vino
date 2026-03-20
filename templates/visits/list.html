@@ -23,7 +23,7 @@
     .visit-toolbar .tf-btns .btn-small { height: 36px; line-height: 36px; padding: 0 14px; }
 
     /* Sort */
-    .sort-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+    .sort-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
     .sort-bar .sort-label { font-size: 0.78rem; color: #9e9e9e; }
     .sort-btn {
         display: inline-flex; align-items: center; gap: 3px;
@@ -63,13 +63,10 @@
 
 {% block content %}
 <div class="visits-wrap">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+    <div style="margin-bottom: 16px;">
         <h5 style="font-weight: 600; color: #455a64; margin: 0; display: inline-flex; align-items: center; gap: 6px;">
             <i class="material-icons">add_location</i> My Visits
         </h5>
-        <a href="{% url 'checkin' %}" class="btn deep-purple lighten-1 waves-effect waves-light">
-            <i class="material-icons left">add_location</i>Check In
-        </a>
     </div>
 
     <!-- Search & Filters -->
