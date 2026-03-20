@@ -176,6 +176,15 @@
                 <a href="{% url 'landing' %}" class="brand-logo center">&#127863; Vino Trip</a>
                 <ul class="right">
                     {% if user.is_authenticated %}
+                    {% if user.is_in_trial and user.subscription_status != 'active' and not user.is_superuser %}
+                    <li><a href="{% url 'pricing' %}" title="Free Trial" style="padding:0 10px;">
+                        <span style="background:#fff3e0;color:#e65100;padding:2px 8px;border-radius:10px;font-size:0.7rem;font-weight:700;white-space:nowrap;">Trial: {{ user.trial_days_remaining }}d</span>
+                    </a></li>
+                    {% elif not user.has_active_subscription and not user.is_superuser %}
+                    <li><a href="{% url 'pricing' %}" title="Subscribe" style="padding:0 10px;">
+                        <span style="background:#fce4ec;color:#c62828;padding:2px 8px;border-radius:10px;font-size:0.7rem;font-weight:700;white-space:nowrap;">Subscribe</span>
+                    </a></li>
+                    {% endif %}
                     <li><a href="{% url 'profile' %}" class="grey-text text-lighten-2" title="My Profile"><i class="material-icons left" style="margin-right:4px;">account_circle</i>{% firstof user.first_name user.email %}</a></li>
                     <li><a href="{% url 'logout' %}" title="Log Out"><i class="material-icons">logout</i></a></li>
                     {% else %}
@@ -203,6 +212,7 @@
         <li><div class="divider"></div></li>
 
         <!-- Main Navigation -->
+        {% if user.has_active_subscription %}
         <li class="{% if request.resolver_match.url_name == 'landing' %}active{% endif %}">
             <a href="{% url 'landing' %}"><i class="material-icons">dashboard</i>Dashboard</a>
         </li>
@@ -218,6 +228,18 @@
         <li class="{% if 'palate' in request.resolver_match.url_name %}active{% endif %}">
             <a href="{% url 'palate_profile' %}"><i class="material-icons">wine_bar</i>My Palate</a>
         </li>
+        {% else %}
+        <!-- No active subscription — show subscribe prompt -->
+        <li style="padding: 16px 20px;">
+            <div style="background:#fce4ec;border-radius:8px;padding:12px;text-align:center;">
+                <i class="material-icons" style="color:#c62828;font-size:1.5rem;">lock</i>
+                <p style="font-size:0.82rem;color:#c62828;font-weight:600;margin:6px 0;">{% if user.is_in_trial %}Your trial has expired{% else %}No active subscription{% endif %}</p>
+                <a href="{% url 'pricing' %}" style="display:inline-flex;align-items:center;gap:4px;background:#7e57c2;color:#fff;padding:6px 16px;border-radius:14px;font-size:0.8rem;font-weight:600;text-decoration:none;">
+                    <i class="material-icons" style="font-size:0.9rem;">star</i> Subscribe Now
+                </a>
+            </div>
+        </li>
+        {% endif %}
 
         {% if user.is_superuser %}
         <!-- App Admin section -->

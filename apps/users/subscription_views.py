@@ -24,12 +24,53 @@ def _get_stripe():
 
 
 class PricingView(LoginRequiredMixin, View):
-    """Display pricing page with plan options."""
+    """Display pricing page with plan options. Syncs from Stripe on each load."""
 
     def get(self, request):
+        user = request.user
+
+        # Sync subscription state from Stripe if user has a customer ID
+        if user.stripe_customer_id:
+            try:
+                s = _get_stripe()
+                subs = stripe.Subscription.list(
+                    customer=user.stripe_customer_id, status="active", limit=5
+                )
+                if subs.data:
+                    latest = sorted(subs.data, key=lambda s: s.created, reverse=True)[0]
+                    price_id = latest["items"]["data"][0]["price"]["id"]
+                    plan = ""
+                    if price_id == settings.STRIPE_MONTHLY_PRICE_ID:
+                        plan = "monthly"
+                    elif price_id == settings.STRIPE_YEARLY_PRICE_ID:
+                        plan = "yearly"
+
+                    changed = False
+                    if user.stripe_subscription_id != latest.id:
+                        user.stripe_subscription_id = latest.id
+                        changed = True
+                    if user.subscription_status != latest.status:
+                        user.subscription_status = latest.status
+                        changed = True
+                    if user.subscription_plan != plan:
+                        user.subscription_plan = plan
+                        changed = True
+                    if changed:
+                        user.save(update_fields=[
+                            "stripe_subscription_id", "subscription_status",
+                            "subscription_plan", "updated_at",
+                        ])
+                elif user.subscription_status == "active":
+                    # No active subs in Stripe but DB says active — mark as canceled
+                    user.subscription_status = "canceled"
+                    user.subscription_plan = ""
+                    user.save(update_fields=["subscription_status", "subscription_plan", "updated_at"])
+            except Exception as e:
+                logger.warning("Failed to sync subscription from Stripe: %s", e)
+
         return render(request, "subscription/pricing.html", {
             "stripe_publishable_key": settings.STRIPE_PUBLISHABLE_KEY,
-            "user": request.user,
+            "user": user,
         })
 
 
@@ -97,20 +138,32 @@ class CheckoutSuccessView(LoginRequiredMixin, View):
         session_id = request.GET.get("session_id")
         if session_id:
             try:
-                session = stripe.checkout.Session.retrieve(session_id)
-                subscription = stripe.Subscription.retrieve(session.subscription)
+                session = stripe.checkout.Session.retrieve(session_id, expand=["subscription"])
+                subscription = session.subscription
 
                 user = request.user
                 user.stripe_subscription_id = subscription.id
                 user.subscription_status = subscription.status
-                user.subscription_plan = session.metadata.get("plan", "")
-                if subscription.trial_end:
-                    from datetime import datetime, timezone
-                    user.trial_end = datetime.fromtimestamp(subscription.trial_end, tz=timezone.utc)
+
+                # Get plan from metadata or detect from price
+                plan = session.metadata.get("plan", "")
+                if not plan and subscription.get("items"):
+                    price_id = subscription["items"]["data"][0]["price"]["id"]
+                    if price_id == settings.STRIPE_MONTHLY_PRICE_ID:
+                        plan = "monthly"
+                    elif price_id == settings.STRIPE_YEARLY_PRICE_ID:
+                        plan = "yearly"
+                user.subscription_plan = plan
+
+                if subscription.get("trial_end"):
+                    from datetime import datetime, timezone as tz
+                    user.trial_end = datetime.fromtimestamp(subscription["trial_end"], tz=tz.utc)
+
                 user.save(update_fields=[
                     "stripe_subscription_id", "subscription_status",
                     "subscription_plan", "trial_end", "updated_at",
                 ])
+                logger.info("Checkout success for %s: plan=%s status=%s", user.email, plan, subscription.status)
             except Exception as e:
                 logger.error("Error retrieving checkout session: %s", e)
 

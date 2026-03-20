@@ -70,8 +70,9 @@
 
     <!-- Current Status -->
     <div class="current-plan">
-        {% if user.subscription_status == 'trialing' %}
+        {% if user.is_in_trial and user.subscription_status != 'active' %}
         <span class="status-badge trialing"><i class="material-icons" style="font-size:0.9rem;">hourglass_top</i> Free Trial — {{ user.trial_days_remaining }} day{{ user.trial_days_remaining|pluralize }} remaining</span>
+        <p style="font-size:0.85rem;color:#9e9e9e;margin-top:6px;">Subscribe now to keep access when your trial ends.</p>
         {% elif user.subscription_status == 'active' %}
         <span class="status-badge active"><i class="material-icons" style="font-size:0.9rem;">check_circle</i> {{ user.subscription_plan|title }} Plan — Active</span>
         <form method="post" action="{% url 'customer_portal' %}" style="margin-top: 10px;">
@@ -89,19 +90,23 @@
         </form>
         {% elif user.subscription_status == 'canceled' %}
         <span class="status-badge canceled"><i class="material-icons" style="font-size:0.9rem;">cancel</i> Subscription Canceled</span>
-        <p style="font-size:0.85rem;color:#9e9e9e;margin-top:6px;">Subscribe again to regain access.</p>
+        <p style="font-size:0.85rem;color:#c62828;margin-top:6px;font-weight:600;">Your subscription has been canceled. Subscribe to a plan to regain access.</p>
         {% else %}
-        <span class="status-badge none">No Active Subscription</span>
+        <span class="status-badge none"><i class="material-icons" style="font-size:0.9rem;">block</i> No Active Subscription</span>
+        <p style="font-size:0.85rem;color:#c62828;margin-top:6px;font-weight:600;">You need a subscription to use Vino Trip. Choose a plan below to get started.</p>
         {% endif %}
     </div>
 
     <!-- Pricing Cards -->
     <div class="pricing-cards">
         <!-- Monthly -->
-        <div class="pricing-card">
-            <div class="card-header">
+        <div class="pricing-card {% if user.subscription_plan == 'monthly' and user.subscription_status == 'active' %}featured{% endif %}">
+            <div class="card-header" {% if user.subscription_plan == 'monthly' and user.subscription_status == 'active' %}style="background: linear-gradient(135deg, #ede7f6, #f3e5f5);"{% endif %}>
                 <div class="plan-name">Monthly</div>
                 <div class="plan-price">$4.99 <span>/ month</span></div>
+                {% if user.subscription_plan == 'monthly' and user.subscription_status == 'active' %}
+                <div style="margin-top: 6px;"><span style="background:#e8f5e9;color:#2e7d32;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:600;">Your Current Plan</span></div>
+                {% endif %}
             </div>
             <div class="card-body">
                 <ul>
@@ -112,18 +117,31 @@
                     <li><i class="material-icons">check</i> Route maps & distances</li>
                     <li><i class="material-icons">check</i> Invite unlimited members</li>
                 </ul>
+                {% if user.subscription_plan == 'monthly' and user.subscription_status == 'active' %}
+                <form method="post" action="{% url 'customer_portal' %}">
+                    {% csrf_token %}
+                    <button type="submit" class="subscribe-btn btn-outline">
+                        <i class="material-icons">settings</i> Manage Plan
+                    </button>
+                </form>
+                {% else %}
                 <button class="subscribe-btn btn-outline" onclick="subscribe('monthly')">
                     <i class="material-icons">credit_card</i> Subscribe Monthly
                 </button>
+                {% endif %}
             </div>
         </div>
 
         <!-- Yearly -->
-        <div class="pricing-card featured">
+        <div class="pricing-card {% if user.subscription_plan == 'yearly' and user.subscription_status == 'active' %}featured{% elif user.subscription_plan != 'monthly' or user.subscription_status != 'active' %}featured{% endif %}">
             <div class="card-header" style="background: linear-gradient(135deg, #ede7f6, #f3e5f5);">
                 <div class="plan-name">Yearly</div>
                 <div class="plan-price">$49.00 <span>/ year</span></div>
+                {% if user.subscription_plan == 'yearly' and user.subscription_status == 'active' %}
+                <div style="margin-top: 6px;"><span style="background:#e8f5e9;color:#2e7d32;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:600;">Your Current Plan</span></div>
+                {% else %}
                 <div class="plan-savings">Save $10.88 vs monthly</div>
+                {% endif %}
             </div>
             <div class="card-body">
                 <ul>
@@ -134,9 +152,18 @@
                     <li><i class="material-icons">check</i> AI-powered recommendations</li>
                     <li><i class="material-icons">check</i> Best value</li>
                 </ul>
+                {% if user.subscription_plan == 'yearly' and user.subscription_status == 'active' %}
+                <form method="post" action="{% url 'customer_portal' %}">
+                    {% csrf_token %}
+                    <button type="submit" class="subscribe-btn btn-primary">
+                        <i class="material-icons">settings</i> Manage Plan
+                    </button>
+                </form>
+                {% else %}
                 <button class="subscribe-btn btn-primary" onclick="subscribe('yearly')">
                     <i class="material-icons">star</i> Subscribe Yearly
                 </button>
+                {% endif %}
             </div>
         </div>
     </div>

@@ -72,21 +72,30 @@ class User(AbstractBaseUser, PermissionsMixin, BaseModel):
 
     @property
     def has_active_subscription(self):
-        """User has access if trialing, active, or is superuser."""
+        """User has access if in trial period, active subscription, or is superuser."""
         if self.is_superuser:
             return True
-        if self.subscription_status in (self.SubscriptionStatus.TRIALING, self.SubscriptionStatus.ACTIVE):
-            # Check if trial has expired
-            if self.subscription_status == self.SubscriptionStatus.TRIALING and self.trial_end:
-                from django.utils import timezone
-                if timezone.now() > self.trial_end:
-                    return False
+        # Active Stripe subscription always grants access
+        if self.subscription_status == self.SubscriptionStatus.ACTIVE:
             return True
+        # Trial period grants access regardless of subscription status
+        if self.trial_end:
+            from django.utils import timezone
+            if timezone.now() < self.trial_end:
+                return True
         return False
 
     @property
+    def is_in_trial(self):
+        """User is still within the trial window (regardless of subscription status)."""
+        if not self.trial_end:
+            return False
+        from django.utils import timezone
+        return timezone.now() < self.trial_end
+
+    @property
     def trial_days_remaining(self):
-        if self.subscription_status != self.SubscriptionStatus.TRIALING or not self.trial_end:
+        if not self.trial_end:
             return 0
         from django.utils import timezone
         delta = self.trial_end - timezone.now()
