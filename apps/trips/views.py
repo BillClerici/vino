@@ -577,6 +577,24 @@ class QuickTripView(LoginRequiredMixin, View):
 
 # ── Live Trip ──────────────────────────────────────────────
 
+def _find_trip_visit(trip, place, user):
+    """Find a user's visit at a place during the trip's date range."""
+    from datetime import timedelta
+    from django.utils import timezone
+
+    qs = VisitLog.objects.filter(user=user, place=place)
+    if trip.scheduled_date:
+        end = trip.end_date or trip.scheduled_date
+        qs = qs.filter(
+            visited_at__date__gte=trip.scheduled_date,
+            visited_at__date__lte=end + timedelta(days=1),
+        )
+    else:
+        # No trip dates — find any visit in the last 30 days
+        qs = qs.filter(visited_at__date__gte=timezone.now().date() - timedelta(days=30))
+    return qs.order_by("-visited_at").first()
+
+
 class LiveTripView(LoginRequiredMixin, View):
     """Full-page live trip wizard."""
 
@@ -611,15 +629,27 @@ class LiveTripView(LoginRequiredMixin, View):
         if current_index >= len(stops):
             current_index = len(stops) - 1
 
-        # Find existing visits for this user at each stop's place (today)
+        # Find existing visits for this user at each stop's place during the trip
         from apps.visits.models import VisitWine
-        today = timezone.now().date()
         user = request.user
-        stop_visits_json = {}  # index -> {visit_id, place_name, ...}
+
+        # Determine the trip date range
+        trip_start = trip.scheduled_date
+        trip_end = trip.end_date or trip.scheduled_date
+        if trip_start:
+            from datetime import timedelta
+            # Include visits from trip start through end (+ 1 day buffer for timezone)
+            visit_filter = {"user": user, "visited_at__date__gte": trip_start, "visited_at__date__lte": (trip_end or trip_start) + timedelta(days=1)}
+        else:
+            # No dates set — fall back to any recent visit (last 7 days)
+            from datetime import timedelta
+            visit_filter = {"user": user, "visited_at__date__gte": timezone.now().date() - timedelta(days=7)}
+
+        stop_visits_json = {}
         for idx, stop in enumerate(stops):
             visit = VisitLog.objects.filter(
-                user=user, place=stop.place, visited_at__date=today
-            ).first()
+                place=stop.place, **visit_filter
+            ).order_by("-visited_at").first()
             if visit:
                 wines_logged = list(
                     VisitWine.objects.filter(visit=visit)
@@ -657,9 +687,11 @@ class LiveTripView(LoginRequiredMixin, View):
         for stop in stops:
             place_id = stop.place_id
             if place_id not in place_stats:
-                past_visits = VisitLog.objects.filter(
-                    user=user, place_id=place_id
-                ).exclude(visited_at__date=today).count()
+                # Count visits before this trip started
+                past_qs = VisitLog.objects.filter(user=user, place_id=place_id)
+                if trip.scheduled_date:
+                    past_qs = past_qs.filter(visited_at__date__lt=trip.scheduled_date)
+                past_visits = past_qs.count()
                 fav_wines = VisitWine.objects.filter(
                     visit__user=user, visit__place_id=place_id
                 ).filter(Q(is_favorite=True) | Q(rating__gte=4)).count()
@@ -685,16 +717,14 @@ class LiveTripCheckinView(LoginRequiredMixin, View):
 
     def post(self, request, pk, stop_pk):
         from django.utils import timezone
+        from datetime import timedelta
 
         trip = get_object_or_404(Trip, pk=pk)
         stop = get_object_or_404(TripStop, pk=stop_pk, trip=trip)
         user = request.user
-        today = timezone.now().date()
 
-        # Idempotent: don't create duplicate
-        visit = VisitLog.objects.filter(
-            user=user, place=stop.place, visited_at__date=today
-        ).first()
+        # Find existing visit during trip date range
+        visit = _find_trip_visit(trip, stop.place, user)
 
         if not visit:
             visit = VisitLog.objects.create(
@@ -721,11 +751,8 @@ class LiveTripUndoCheckinView(LoginRequiredMixin, View):
         trip = get_object_or_404(Trip, pk=pk)
         stop = get_object_or_404(TripStop, pk=stop_pk, trip=trip)
         user = request.user
-        today = timezone.now().date()
 
-        visit = VisitLog.objects.filter(
-            user=user, place=stop.place, visited_at__date=today
-        ).first()
+        visit = _find_trip_visit(trip, stop.place, user)
 
         if visit:
             # Soft-delete wines logged on this visit
