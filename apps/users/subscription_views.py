@@ -229,6 +229,14 @@ class StripeWebhookView(View):
         from apps.users.models import User
 
         customer_id = subscription.get("customer")
+
+        # Check if this is a partner subscription
+        from apps.partners.models import Partner
+        if Partner.objects.filter(stripe_customer_id=customer_id).exists():
+            from apps.partners.subscription_views import handle_partner_subscription_webhook
+            handle_partner_subscription_webhook("customer.subscription.updated", subscription)
+            return
+
         try:
             user = User.objects.get(stripe_customer_id=customer_id)
         except User.DoesNotExist:
@@ -262,6 +270,14 @@ class StripeWebhookView(View):
         from apps.users.models import User
 
         customer_id = subscription.get("customer")
+
+        # Check if this is a partner subscription
+        from apps.partners.models import Partner
+        if Partner.objects.filter(stripe_customer_id=customer_id).exists():
+            from apps.partners.subscription_views import handle_partner_subscription_webhook
+            handle_partner_subscription_webhook("customer.subscription.deleted", subscription)
+            return
+
         try:
             user = User.objects.get(stripe_customer_id=customer_id)
             user.subscription_status = "canceled"

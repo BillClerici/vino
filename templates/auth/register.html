@@ -1,40 +1,101 @@
 {% extends "base.html" %}
 
-{% block title %}Vino - Register{% endblock %}
+{% block title %}Trip Me - Register{% endblock %}
+
+{% block extra_css %}
+<style>
+    .reg-container { max-width: 800px; margin: 0 auto; padding: 20px 16px 40px; }
+    .reg-cards { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; margin-top: 24px; }
+    .reg-card {
+        flex: 1; min-width: 300px; max-width: 380px;
+        border-radius: 12px; border: 2px solid #e0e0e0;
+        background: #fff; overflow: hidden; transition: all 0.2s;
+    }
+    .reg-card:hover { border-color: #7e57c2; box-shadow: 0 4px 16px rgba(126,87,194,0.12); }
+    .reg-card-header {
+        padding: 28px 24px 20px; text-align: center;
+    }
+    .reg-card-header i { font-size: 2.5rem; margin-bottom: 8px; }
+    .reg-card-header .reg-type { font-size: 1.2rem; font-weight: 800; color: #333; }
+    .reg-card-header .reg-desc { font-size: 0.88rem; color: #9e9e9e; margin-top: 6px; line-height: 1.5; }
+    .reg-card-body { padding: 0 24px 24px; }
+    .reg-card-body .reg-features { list-style: none; padding: 0; margin: 0 0 20px; }
+    .reg-card-body .reg-features li {
+        padding: 5px 0; font-size: 0.85rem; color: #616161;
+        display: flex; align-items: center; gap: 6px;
+    }
+    .reg-card-body .reg-features li i { font-size: 0.95rem; color: #43a047; }
+    .reg-btn {
+        display: block; width: 100%; padding: 12px; border-radius: 8px; border: none;
+        font-size: 0.9rem; font-weight: 600; cursor: pointer; text-align: center;
+        text-decoration: none; margin-bottom: 8px; transition: all 0.15s;
+    }
+    .reg-btn.google { background: #db4437; color: #fff; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .reg-btn.google:hover { background: #c23321; }
+    .reg-btn.microsoft { background: #2f2f2f; color: #fff; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .reg-btn.microsoft:hover { background: #1a1a1a; }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="section">
-    <div class="container">
-        <div class="row">
-            <div class="col s12 m6 offset-m3">
-                <div class="card">
-                    <div class="card-content">
-                        <span class="card-title center-align">Create Account</span>
-                        <p class="center-align grey-text" style="margin-bottom: 2rem;">
-                            Create your account by signing in with Google or Microsoft.
-                            Your account is created automatically on first sign-in.
-                        </p>
-                        <div class="center-align">
-                            <a href="{% url 'social:begin' 'google-oauth2' %}"
-                               class="btn-large waves-effect waves-light red darken-1"
-                               style="width: 100%; margin-bottom: 1rem;">
-                                <i class="material-icons left">mail</i>
-                                Sign up with Google
-                            </a>
-                            <a href="{% url 'social:begin' 'microsoft-graph' %}"
-                               class="btn-large waves-effect waves-light blue darken-3"
-                               style="width: 100%;">
-                                <i class="material-icons left">business</i>
-                                Sign up with Microsoft
-                            </a>
-                        </div>
-                    </div>
-                    <div class="card-action center-align">
-                        <p>Already have an account? <a href="{% url 'login' %}">Sign in here</a></p>
-                    </div>
-                </div>
+<div class="reg-container">
+    <div style="text-align: center;">
+        <h5 style="font-weight: 700; color: #455a64; margin: 0 0 4px;">Create Your Account</h5>
+        <p class="grey-text">Choose how you want to use Trip Me</p>
+    </div>
+
+    <div class="reg-cards">
+        <!-- Planner Registration -->
+        <div class="reg-card">
+            <div class="reg-card-header">
+                <i class="material-icons" style="color: #7e57c2;">map</i>
+                <div class="reg-type">Planner</div>
+                <div class="reg-desc">Discover places, plan trips, log visits, and track your favorite drinks.</div>
+            </div>
+            <div class="reg-card-body">
+                <ul class="reg-features">
+                    <li><i class="material-icons">check</i> Explore wineries, breweries & restaurants</li>
+                    <li><i class="material-icons">check</i> Plan trips with friends</li>
+                    <li><i class="material-icons">check</i> Live trip tracking & check-ins</li>
+                    <li><i class="material-icons">check</i> Log drinks with photos & ratings</li>
+                    <li><i class="material-icons">check</i> 14-day free trial</li>
+                </ul>
+                <a href="{% url 'social:begin' 'google-oauth2' %}?next=/" class="reg-btn google">
+                    <i class="material-icons" style="font-size: 1.1rem;">mail</i> Sign up with Google
+                </a>
+                <a href="{% url 'social:begin' 'microsoft-graph' %}?next=/" class="reg-btn microsoft">
+                    <i class="material-icons" style="font-size: 1.1rem;">business</i> Sign up with Microsoft
+                </a>
             </div>
         </div>
+
+        <!-- Partner Registration -->
+        <div class="reg-card">
+            <div class="reg-card-header" style="background: linear-gradient(135deg, #faf5ff, #f3e5f5);">
+                <i class="material-icons" style="color: #ff9800;">handshake</i>
+                <div class="reg-type">Partner</div>
+                <div class="reg-desc">Claim your business, reach new customers, and promote your venue.</div>
+            </div>
+            <div class="reg-card-body">
+                <ul class="reg-features">
+                    <li><i class="material-icons">check</i> Claim & manage your place profile</li>
+                    <li><i class="material-icons">check</i> Create promotions & special offers</li>
+                    <li><i class="material-icons">check</i> Analytics on visits & engagement</li>
+                    <li><i class="material-icons">check</i> Featured placement on the map</li>
+                    <li><i class="material-icons">check</i> Free tier available</li>
+                </ul>
+                <a href="{% url 'social:begin' 'google-oauth2' %}?next=/partners/apply/" class="reg-btn google">
+                    <i class="material-icons" style="font-size: 1.1rem;">mail</i> Sign up with Google
+                </a>
+                <a href="{% url 'social:begin' 'microsoft-graph' %}?next=/partners/apply/" class="reg-btn microsoft">
+                    <i class="material-icons" style="font-size: 1.1rem;">business</i> Sign up with Microsoft
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div style="text-align: center; margin-top: 24px;">
+        <p class="grey-text" style="font-size: 0.9rem;">Already have an account? <a href="{% url 'login' %}" style="color: #7e57c2; font-weight: 600;">Sign in here</a></p>
     </div>
 </div>
 {% endblock %}

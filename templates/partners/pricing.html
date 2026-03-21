@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+
+{% block title %}Partner Subscription — Trip Me{% endblock %}
+
+{% block extra_css %}
+<style>
+    .pricing-grid { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; margin-top: 20px; }
+    .pricing-card {
+        flex: 1; min-width: 240px; max-width: 300px;
+        border-radius: 12px; border: 2px solid #e0e0e0;
+        background: #fff; padding: 28px 24px; text-align: center;
+        transition: all 0.2s; position: relative;
+    }
+    .pricing-card:hover { border-color: #7e57c2; box-shadow: 0 4px 16px rgba(126,87,194,0.15); }
+    .pricing-card.current { border-color: #7e57c2; background: #faf5ff; }
+    .pricing-card.popular { border-color: #ff9800; }
+    .pricing-card .popular-badge {
+        position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+        background: #ff9800; color: #fff; padding: 3px 14px; border-radius: 10px;
+        font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    }
+    .pricing-tier { font-size: 1.4rem; font-weight: 800; color: #333; margin-bottom: 4px; }
+    .pricing-price { font-size: 2rem; font-weight: 800; color: #7e57c2; }
+    .pricing-price span { font-size: 0.9rem; font-weight: 400; color: #9e9e9e; }
+    .pricing-features { list-style: none; padding: 0; margin: 16px 0; text-align: left; }
+    .pricing-features li {
+        padding: 6px 0; font-size: 0.88rem; color: #616161;
+        display: flex; align-items: center; gap: 8px;
+    }
+    .pricing-features li i { font-size: 1rem; color: #43a047; }
+    .pricing-features li.disabled { color: #bdbdbd; }
+    .pricing-features li.disabled i { color: #e0e0e0; }
+    .pricing-btn {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 10px 24px; border-radius: 8px; border: none;
+        font-size: 0.9rem; font-weight: 700; cursor: pointer;
+        transition: all 0.15s; width: 100%; justify-content: center;
+    }
+    .pricing-btn.primary { background: #7e57c2; color: #fff; }
+    .pricing-btn.primary:hover { background: #6a3fb5; }
+    .pricing-btn.outline { background: #fff; color: #7e57c2; border: 2px solid #7e57c2; }
+    .pricing-btn.outline:hover { background: #ede7f6; }
+    .pricing-btn.disabled { background: #e0e0e0; color: #9e9e9e; cursor: default; }
+    .billing-toggle { display: flex; justify-content: center; gap: 12px; align-items: center; margin-bottom: 8px; }
+    .billing-opt {
+        padding: 6px 16px; border-radius: 16px; font-size: 0.85rem; font-weight: 600;
+        cursor: pointer; transition: all 0.15s; border: 1.5px solid #e0e0e0; color: #616161;
+    }
+    .billing-opt.active { background: #7e57c2; color: #fff; border-color: #7e57c2; }
+    .current-badge {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 4px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;
+        background: #e8f5e9; color: #2e7d32; margin-bottom: 12px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container" style="margin-top: 20px; padding-bottom: 30px; max-width: 960px;">
+    <div style="text-align: center; margin-bottom: 24px;">
+        <h5 style="font-weight: 700; color: #455a64; margin: 0 0 4px; display: inline-flex; align-items: center; gap: 8px;">
+            <i class="material-icons">card_membership</i> Partner Subscription
+        </h5>
+        <p class="grey-text">Choose the right plan for {{ partner.business_name }}</p>
+
+        {% if partner.has_active_subscription %}
+        <div class="current-badge" style="margin-top: 8px;">
+            <i class="material-icons" style="font-size: 0.9rem;">check_circle</i>
+            Current: {{ partner.get_tier_display }} ({{ partner.subscription_plan|default:"active" }})
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="billing-toggle">
+        <span class="billing-opt active" onclick="setBilling('monthly')">Monthly</span>
+        <span class="billing-opt" onclick="setBilling('yearly')">Yearly <span style="font-size: 0.72rem; color: #43a047;">(Save 20%)</span></span>
+    </div>
+
+    <div class="pricing-grid">
+        <!-- Free -->
+        <div class="pricing-card {% if partner.tier == 'free' %}current{% endif %}">
+            <div class="pricing-tier">Free</div>
+            <div class="pricing-price">$0 <span>/mo</span></div>
+            <ul class="pricing-features">
+                <li><i class="material-icons">check</i> Claim 1 place</li>
+                <li><i class="material-icons">check</i> Basic profile</li>
+                <li class="disabled"><i class="material-icons">close</i> Promotions</li>
+                <li class="disabled"><i class="material-icons">close</i> Analytics</li>
+                <li class="disabled"><i class="material-icons">close</i> Featured badge</li>
+            </ul>
+            {% if partner.tier == 'free' %}
+            <button class="pricing-btn disabled">Current Plan</button>
+            {% else %}
+            <button class="pricing-btn outline" disabled>Included</button>
+            {% endif %}
+        </div>
+
+        <!-- Silver -->
+        <div class="pricing-card {% if partner.tier == 'silver' %}current{% endif %}">
+            <div class="pricing-tier">Silver</div>
+            <div class="pricing-price" data-monthly="$49" data-yearly="$39">$49 <span>/mo</span></div>
+            <ul class="pricing-features">
+                <li><i class="material-icons">check</i> Claim 1 place</li>
+                <li><i class="material-icons">check</i> Enhanced profile</li>
+                <li><i class="material-icons">check</i> 2 promotions/month</li>
+                <li><i class="material-icons">check</i> Views + clicks analytics</li>
+                <li class="disabled"><i class="material-icons">close</i> Featured badge</li>
+            </ul>
+            {% if partner.tier == 'silver' %}
+            <button class="pricing-btn disabled">Current Plan</button>
+            {% else %}
+            <button class="pricing-btn outline" onclick="subscribe('silver')">Choose Silver</button>
+            {% endif %}
+        </div>
+
+        <!-- Gold -->
+        <div class="pricing-card popular {% if partner.tier == 'gold' %}current{% endif %}">
+            <div class="popular-badge">Most Popular</div>
+            <div class="pricing-tier">Gold</div>
+            <div class="pricing-price" data-monthly="$99" data-yearly="$79">$99 <span>/mo</span></div>
+            <ul class="pricing-features">
+                <li><i class="material-icons">check</i> Claim 3 places</li>
+                <li><i class="material-icons">check</i> Enhanced profile</li>
+                <li><i class="material-icons">check</i> 10 promotions/month</li>
+                <li><i class="material-icons">check</i> Full funnel analytics</li>
+                <li><i class="material-icons">check</i> Featured badge on map</li>
+            </ul>
+            {% if partner.tier == 'gold' %}
+            <button class="pricing-btn disabled">Current Plan</button>
+            {% else %}
+            <button class="pricing-btn primary" onclick="subscribe('gold')">Choose Gold</button>
+            {% endif %}
+        </div>
+
+        <!-- Platinum -->
+        <div class="pricing-card {% if partner.tier == 'platinum' %}current{% endif %}">
+            <div class="pricing-tier">Platinum</div>
+            <div class="pricing-price" data-monthly="$199" data-yearly="$159">$199 <span>/mo</span></div>
+            <ul class="pricing-features">
+                <li><i class="material-icons">check</i> Unlimited places</li>
+                <li><i class="material-icons">check</i> Enhanced profile</li>
+                <li><i class="material-icons">check</i> Unlimited promotions</li>
+                <li><i class="material-icons">check</i> Full analytics + export</li>
+                <li><i class="material-icons">check</i> Trip recommendations</li>
+            </ul>
+            {% if partner.tier == 'platinum' %}
+            <button class="pricing-btn disabled">Current Plan</button>
+            {% else %}
+            <button class="pricing-btn outline" onclick="subscribe('platinum')">Choose Platinum</button>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if partner.has_active_subscription %}
+    <div style="text-align: center; margin-top: 24px;">
+        <form method="post" action="{% url 'partner_portal' %}">
+            {% csrf_token %}
+            <button type="submit" class="btn-flat waves-effect" style="color: #7e57c2; font-weight: 600;">
+                <i class="material-icons left">settings</i> Manage Subscription
+            </button>
+        </form>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+var csrfToken = '{{ csrf_token }}';
+var billingPeriod = 'monthly';
+
+function setBilling(period) {
+    billingPeriod = period;
+    document.querySelectorAll('.billing-opt').forEach(function(el) {
+        el.classList.toggle('active', el.textContent.toLowerCase().indexOf(period) >= 0);
+    });
+    document.querySelectorAll('.pricing-price[data-monthly]').forEach(function(el) {
+        var price = period === 'yearly' ? el.dataset.yearly : el.dataset.monthly;
+        el.innerHTML = price + ' <span>/' + (period === 'yearly' ? 'mo (billed yearly)' : 'mo') + '</span>';
+    });
+}
+
+function subscribe(tier) {
+    var plan = tier + '_' + billingPeriod;
+    fetch('{% url "partner_checkout" %}', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: plan })
+    }).then(function(r) { return r.json(); }).then(function(data) {
+        if (data.url) window.location.href = data.url;
+        else if (data.error) M.toast({ html: data.error });
+    });
+}
+</script>
+{% endblock %}

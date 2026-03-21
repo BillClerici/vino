@@ -11,10 +11,10 @@ class Partner(BaseModel):
         SUSPENDED = "suspended", "Suspended"
         REJECTED = "rejected", "Rejected"
 
-    user = models.OneToOneField(
+    owners = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="partner_profile",
+        through="PartnerOwner",
+        related_name="partner_memberships",
     )
     business_name = models.CharField(max_length=255)
     business_email = models.EmailField(blank=True)
@@ -22,14 +22,26 @@ class Partner(BaseModel):
     website = models.URLField(blank=True)
     logo_url = models.URLField(max_length=1000, blank=True)
     description = models.TextField(blank=True)
-    tier = models.ForeignKey(
-        "lookup.LookupValue",
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        related_name="partners_by_tier",
-        help_text="Partner tier from Lookup: PARTNER_TIER",
+
+    class Tier(models.TextChoices):
+        FREE = "free", "Free"
+        SILVER = "silver", "Silver"
+        GOLD = "gold", "Gold"
+        PLATINUM = "platinum", "Platinum"
+
+    class SubscriptionStatus(models.TextChoices):
+        NONE = "none", "None"
+        TRIALING = "trialing", "Trialing"
+        ACTIVE = "active", "Active"
+        PAST_DUE = "past_due", "Past Due"
+        CANCELED = "canceled", "Canceled"
+
+    tier = models.CharField(max_length=20, choices=Tier.choices, default=Tier.FREE)
+    subscription_status = models.CharField(
+        max_length=20, choices=SubscriptionStatus.choices, default=SubscriptionStatus.NONE,
     )
+    subscription_plan = models.CharField(max_length=30, blank=True, help_text="e.g. silver_monthly, gold_yearly")
+
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     approved_at = models.DateTimeField(null=True, blank=True)
     approved_by = models.ForeignKey(
@@ -39,9 +51,25 @@ class Partner(BaseModel):
         on_delete=models.SET_NULL,
         related_name="approved_partners",
     )
+    rejected_at = models.DateTimeField(null=True, blank=True)
+    rejected_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="rejected_partners",
+    )
+    decision_email_sent_at = models.DateTimeField(null=True, blank=True)
     stripe_customer_id = models.CharField(max_length=255, blank=True)
     stripe_subscription_id = models.CharField(max_length=255, blank=True)
     metadata = models.JSONField(default=dict, blank=True)
+
+    @property
+    def has_active_subscription(self):
+        return self.subscription_status in (
+            self.SubscriptionStatus.ACTIVE,
+            self.SubscriptionStatus.TRIALING,
+        )
 
     class Meta:
         db_table = "partners_partner"
@@ -49,6 +77,52 @@ class Partner(BaseModel):
 
     def __str__(self):
         return self.business_name
+
+    @property
+    def primary_owner(self):
+        """Return the primary owner's PartnerOwner record, or the first owner."""
+        return (
+            self.partner_owners.filter(role=PartnerOwner.Role.PRIMARY, is_active=True).first()
+            or self.partner_owners.filter(is_active=True).first()
+        )
+
+
+class PartnerOwner(BaseModel):
+    """Through model linking users to partners with role and contact info."""
+
+    class Role(models.TextChoices):
+        PRIMARY = "primary", "Primary Owner"
+        OWNER = "owner", "Owner"
+        MANAGER = "manager", "Manager"
+
+    partner = models.ForeignKey(Partner, on_delete=models.CASCADE, related_name="partner_owners")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="partner_roles",
+    )
+    role = models.CharField(max_length=20, choices=Role.choices, default=Role.OWNER)
+    title = models.CharField(max_length=100, blank=True, help_text="e.g. CEO, Head Winemaker")
+    contact_email = models.EmailField(blank=True)
+    contact_phone = models.CharField(max_length=30, blank=True)
+    mobile_phone = models.CharField(max_length=30, blank=True)
+    address = models.CharField(max_length=500, blank=True)
+    city = models.CharField(max_length=100, blank=True)
+    state = models.CharField(max_length=100, blank=True)
+    zip_code = models.CharField(max_length=20, blank=True)
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        db_table = "partners_partnerowner"
+        unique_together = [("partner", "user")]
+        ordering = ["role", "user__first_name"]
+
+    def __str__(self):
+        return f"{self.user.full_name} — {self.get_role_display()} @ {self.partner.business_name}"
+
+    @property
+    def display_name(self):
+        return self.user.full_name or self.user.email
 
 
 class PlaceClaim(BaseModel):

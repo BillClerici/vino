@@ -69,6 +69,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'apps.core.context_processors.partner_context',
             ],
         },
     },
@@ -199,7 +200,7 @@ EMAIL_PORT = env.int('EMAIL_PORT', default=587)
 EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
 EMAIL_USE_TLS = env.bool('EMAIL_USE_TLS', default=True)
-DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='Vino Trip <noreply@vinovoyage.com>')
+DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='Trip Me <noreply@tripme.app>')
 
 # Stripe
 STRIPE_PUBLISHABLE_KEY = env('STRIPE_PUBLISHABLE_KEY', default='')
@@ -208,6 +209,14 @@ STRIPE_WEBHOOK_SECRET = env('STRIPE_WEBHOOK_SECRET', default='')
 STRIPE_MONTHLY_PRICE_ID = env('STRIPE_MONTHLY_PRICE_ID', default='')
 STRIPE_YEARLY_PRICE_ID = env('STRIPE_YEARLY_PRICE_ID', default='')
 STRIPE_TRIAL_DAYS = 14
+
+# Partner subscription price IDs (create these as separate Products in Stripe Dashboard)
+STRIPE_PARTNER_SILVER_MONTHLY_PRICE_ID = env('STRIPE_PARTNER_SILVER_MONTHLY_PRICE_ID', default='')
+STRIPE_PARTNER_SILVER_YEARLY_PRICE_ID = env('STRIPE_PARTNER_SILVER_YEARLY_PRICE_ID', default='')
+STRIPE_PARTNER_GOLD_MONTHLY_PRICE_ID = env('STRIPE_PARTNER_GOLD_MONTHLY_PRICE_ID', default='')
+STRIPE_PARTNER_GOLD_YEARLY_PRICE_ID = env('STRIPE_PARTNER_GOLD_YEARLY_PRICE_ID', default='')
+STRIPE_PARTNER_PLATINUM_MONTHLY_PRICE_ID = env('STRIPE_PARTNER_PLATINUM_MONTHLY_PRICE_ID', default='')
+STRIPE_PARTNER_PLATINUM_YEARLY_PRICE_ID = env('STRIPE_PARTNER_PLATINUM_YEARLY_PRICE_ID', default='')
 
 # Google Maps
 GOOGLE_MAPS_API_KEY = env('GOOGLE_MAPS_API_KEY', default='')

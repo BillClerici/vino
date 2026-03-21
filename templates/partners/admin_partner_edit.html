@@ -1,0 +1,835 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }} — Admin{% endblock %}
+
+{% block extra_css %}
+<style>
+    .owner-card {
+        border: 1px solid #e0e0e0; border-radius: 8px;
+        margin-bottom: 10px; background: #fff; transition: box-shadow 0.15s;
+    }
+    .owner-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    .owner-header {
+        display: flex; align-items: center; gap: 12px;
+        padding: 14px 16px; cursor: pointer;
+    }
+    .owner-avatar {
+        width: 44px; height: 44px; border-radius: 50%;
+        background: #ede7f6; color: #7e57c2;
+        display: flex; align-items: center; justify-content: center;
+        font-weight: 700; font-size: 1rem; flex-shrink: 0;
+    }
+    .owner-name { font-weight: 600; font-size: 0.95rem; color: #333; }
+    .owner-subtitle { font-size: 0.78rem; color: #9e9e9e; margin-top: 1px; }
+    .owner-role-badge {
+        display: inline-flex; padding: 3px 10px; border-radius: 10px;
+        font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
+    }
+    .owner-role-badge.primary { background: #fff3e0; color: #e65100; }
+    .owner-role-badge.owner { background: #ede7f6; color: #4a148c; }
+    .owner-role-badge.manager { background: #e3f2fd; color: #1565c0; }
+    .owner-details {
+        display: none; padding: 0 16px 16px;
+        border-top: 1px solid #f0f0f0; margin-top: -4px;
+    }
+    .owner-details.open { display: block; }
+    .od-field { margin-bottom: 10px; }
+    .od-field label {
+        font-size: 0.72rem; color: #9e9e9e; text-transform: uppercase;
+        letter-spacing: 0.3px; font-weight: 600; display: block; margin-bottom: 3px;
+    }
+    .od-field input, .od-field select, .od-field textarea {
+        width: 100%; border: 1px solid #e0e0e0; border-radius: 4px;
+        padding: 7px 10px; font-size: 0.88rem; box-sizing: border-box;
+        font-family: inherit;
+    }
+    .od-field textarea { resize: vertical; min-height: 50px; }
+    .od-field input:focus, .od-field select:focus, .od-field textarea:focus { border-color: #7e57c2; outline: none; }
+    .od-row { display: flex; gap: 10px; }
+    .od-row > div { flex: 1; }
+
+    /* User Search */
+    .user-search-wrap { position: relative; }
+    .user-search-results {
+        position: absolute; top: 100%; left: 0; right: 0; z-index: 20;
+        background: #fff; border: 1px solid #e0e0e0; border-top: none;
+        border-radius: 0 0 8px 8px; max-height: 260px; overflow-y: auto;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.12); display: none;
+    }
+    .usr-item {
+        display: flex; align-items: center; gap: 10px;
+        padding: 10px 14px; cursor: pointer; transition: background 0.1s;
+        border-bottom: 1px solid #f8f8f8;
+    }
+    .usr-item:last-child { border-bottom: none; }
+    .usr-item:hover { background: #f5f5f5; }
+    .usr-item .usr-avatar {
+        width: 32px; height: 32px; border-radius: 50%;
+        background: #e3f2fd; color: #1565c0;
+        display: flex; align-items: center; justify-content: center;
+        font-weight: 700; font-size: 0.75rem; flex-shrink: 0;
+    }
+    .usr-item .usr-name { font-weight: 600; font-size: 0.88rem; }
+    .usr-item .usr-email { font-size: 0.78rem; color: #9e9e9e; }
+
+    .selected-user-chip {
+        display: flex; align-items: center; gap: 8px;
+        padding: 8px 14px; background: #e8f5e9; border-radius: 8px;
+        border: 1px solid #c8e6c9; margin-bottom: 12px;
+    }
+    .selected-user-chip .suc-name { font-weight: 600; font-size: 0.9rem; color: #2e7d32; }
+    .selected-user-chip .suc-email { font-size: 0.78rem; color: #66bb6a; }
+
+    .add-owner-panel {
+        border: 2px dashed #e0e0e0; border-radius: 8px;
+        padding: 20px; margin-top: 16px; background: #fafafa;
+    }
+    .add-owner-panel.has-user { border-color: #7e57c2; border-style: solid; background: #fff; }
+
+    /* Status & Decision */
+    .status-badge-lg {
+        display: inline-flex; align-items: center; gap: 5px;
+        padding: 6px 16px; border-radius: 14px; font-size: 0.85rem; font-weight: 700;
+        text-transform: uppercase;
+    }
+    .status-badge-lg.pending { background: #fff3e0; color: #e65100; }
+    .status-badge-lg.approved { background: #e8f5e9; color: #2e7d32; }
+    .status-badge-lg.rejected { background: #fce4ec; color: #c62828; }
+    .decision-btn {
+        display: inline-flex; align-items: center; gap: 5px;
+        padding: 8px 20px; border-radius: 6px; border: none;
+        font-size: 0.88rem; font-weight: 700; cursor: pointer; transition: all 0.15s;
+    }
+    .decision-btn.accept { background: #43a047; color: #fff; }
+    .decision-btn.accept:hover { background: #388e3c; }
+    .decision-btn.reject { background: #c62828; color: #fff; }
+    .decision-btn.reject:hover { background: #b71c1c; }
+    .decision-timestamp { font-size: 0.78rem; color: #9e9e9e; margin-top: 6px; }
+    .decision-timestamp i { font-size: 0.85rem; vertical-align: middle; }
+
+    /* Email Modal */
+    .email-overlay {
+        display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+        z-index: 1000; align-items: center; justify-content: center;
+    }
+    .email-overlay.open { display: flex; }
+    .email-modal {
+        background: #fff; border-radius: 12px; width: 90%; max-width: 640px;
+        max-height: 90vh; overflow-y: auto; box-shadow: 0 8px 40px rgba(0,0,0,0.2);
+    }
+    .email-modal-header {
+        padding: 20px 24px 16px; border-bottom: 1px solid #f0f0f0;
+        display: flex; align-items: center; justify-content: space-between;
+    }
+    .email-modal-body { padding: 20px 24px; }
+    .email-modal-footer {
+        padding: 16px 24px; border-top: 1px solid #f0f0f0;
+        display: flex; justify-content: flex-end; gap: 8px;
+    }
+    .em-field { margin-bottom: 14px; }
+    .em-field label {
+        font-size: 0.72rem; color: #9e9e9e; text-transform: uppercase;
+        font-weight: 600; display: block; margin-bottom: 3px;
+    }
+    .em-field input, .em-field textarea {
+        width: 100%; border: 1px solid #e0e0e0; border-radius: 4px;
+        padding: 8px 10px; font-size: 0.88rem; box-sizing: border-box;
+        font-family: inherit;
+    }
+    .em-field textarea { resize: vertical; min-height: 180px; }
+    .em-field input:focus, .em-field textarea:focus { border-color: #7e57c2; outline: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container" style="margin-top: 20px; padding-bottom: 30px;">
+    <div class="row">
+        <div class="col s12 m10 offset-m1">
+            <!-- Status & Decision -->
+            <div class="card" style="border-radius: 8px;">
+                <div class="card-content">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span class="card-title" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: #455a64; margin: 0;">
+                            <i class="material-icons">verified</i> Application Status
+                        </span>
+                        <span class="status-badge-lg {{ object.status }}" id="status-badge">
+                            <i class="material-icons" style="font-size: 1rem;">{% if object.status == 'approved' %}check_circle{% elif object.status == 'rejected' %}cancel{% else %}hourglass_top{% endif %}</i>
+                            {{ object.get_status_display }}
+                        </span>
+                    </div>
+
+                    {% if object.status == 'pending' %}
+                    <div style="margin-top: 16px; padding: 16px; background: #fff8e1; border-radius: 8px; border: 1px solid #ffe082;">
+                        <div style="font-size: 0.88rem; color: #f57f17; font-weight: 600; margin-bottom: 12px;">
+                            <i class="material-icons" style="font-size: 1rem; vertical-align: middle;">pending_actions</i>
+                            This partner application is awaiting your review.
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <button class="decision-btn accept" onclick="openDecisionModal('accept')">
+                                <i class="material-icons" style="font-size: 1rem;">check</i> Accept
+                            </button>
+                            <button class="decision-btn reject" onclick="openDecisionModal('reject')">
+                                <i class="material-icons" style="font-size: 1rem;">close</i> Reject
+                            </button>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div style="margin-top: 16px; display: flex; gap: 10px;">
+                        {% if object.status == 'rejected' %}
+                        <button class="decision-btn accept" onclick="openDecisionModal('accept')">
+                            <i class="material-icons" style="font-size: 1rem;">check</i> Accept
+                        </button>
+                        {% endif %}
+                        <button onclick="resetStatus()" style="display: inline-flex; align-items: center; gap: 5px; padding: 8px 20px; border-radius: 6px; border: 1.5px solid #e0e0e0; background: #fff; color: #616161; font-size: 0.88rem; font-weight: 600; cursor: pointer; transition: all 0.15s;" onmouseover="this.style.borderColor='#ff9800';this.style.color='#ff9800'" onmouseout="this.style.borderColor='#e0e0e0';this.style.color='#616161'">
+                            <i class="material-icons" style="font-size: 1rem;">restart_alt</i> Reset to Pending
+                        </button>
+                    </div>
+                    {% endif %}
+
+                    <div style="margin-top: 12px;">
+                        {% if object.approved_at %}
+                        <div class="decision-timestamp">
+                            <i class="material-icons">check_circle</i> Approved on {{ object.approved_at|date:"M j, Y \a\t g:i A" }}{% if object.approved_by %} by {{ object.approved_by.full_name|default:object.approved_by.email }}{% endif %}
+                        </div>
+                        {% endif %}
+                        {% if object.rejected_at %}
+                        <div class="decision-timestamp">
+                            <i class="material-icons">cancel</i> Rejected on {{ object.rejected_at|date:"M j, Y \a\t g:i A" }}{% if object.rejected_by %} by {{ object.rejected_by.full_name|default:object.rejected_by.email }}{% endif %}
+                        </div>
+                        {% endif %}
+                        {% if object.decision_email_sent_at %}
+                        <div class="decision-timestamp">
+                            <i class="material-icons">email</i> Notification sent on {{ object.decision_email_sent_at|date:"M j, Y \a\t g:i A" }}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Email Decision Modal -->
+            <div class="email-overlay" id="email-modal">
+                <div class="email-modal">
+                    <div class="email-modal-header">
+                        <span style="font-weight: 700; font-size: 1.1rem; display: inline-flex; align-items: center; gap: 6px;" id="modal-title">
+                            <i class="material-icons" id="modal-icon">email</i> <span id="modal-title-text">Send Notification</span>
+                        </span>
+                        <button onclick="closeDecisionModal()" style="border: none; background: none; cursor: pointer; color: #9e9e9e; padding: 4px;">
+                            <i class="material-icons">close</i>
+                        </button>
+                    </div>
+                    <div class="email-modal-body">
+                        <div class="em-field">
+                            <label>To</label>
+                            <input type="text" id="em-to" readonly style="background: #fafafa;">
+                        </div>
+                        <div class="em-field">
+                            <label>Subject</label>
+                            <input type="text" id="em-subject">
+                        </div>
+                        <div class="em-field">
+                            <label>Message</label>
+                            <textarea id="em-body"></textarea>
+                        </div>
+                    </div>
+                    <div class="email-modal-footer">
+                        <button onclick="closeDecisionModal()" class="btn-flat waves-effect">Cancel</button>
+                        <button onclick="sendDecision()" class="btn waves-effect waves-light" style="background: #7e57c2;" id="em-send-btn">
+                            <i class="material-icons left" style="margin-right: 4px;">send</i> Send & <span id="em-action-label">Accept</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Partner Form -->
+            <div class="card" style="border-radius: 8px;">
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="card-content">
+                        <span class="card-title" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: #455a64;">
+                            <i class="material-icons">{{ icon }}</i> {{ page_title }}
+                        </span>
+
+                        {% if form.errors %}
+                        <div class="card-panel red lighten-4" style="padding: 10px;">
+                            <ul class="browser-default">
+                                {% for field, errors in form.errors.items %}
+                                {% for error in errors %}
+                                <li><strong>{{ field }}:</strong> {{ error }}</li>
+                                {% endfor %}
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %}
+
+                        {% for field in form %}
+                        <div class="row" style="margin-bottom: 0;">
+                            <div class="input-field col s12">
+                                {{ field }}
+                                <label for="{{ field.id_for_label }}" class="{% if field.value %}active{% endif %}">{{ field.label }}</label>
+                                {% if field.help_text %}<span class="helper-text">{{ field.help_text }}</span>{% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="card-action right-align">
+                        <a href="{{ cancel_url }}" class="btn-flat waves-effect">Cancel</a>
+                        <button type="submit" class="btn blue-grey darken-1 waves-effect waves-light">
+                            <i class="material-icons left">save</i>Save Partner
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Owners Section -->
+            <div class="card" style="border-radius: 8px;">
+                <div class="card-content">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <span class="card-title" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: #455a64; margin: 0;">
+                            <i class="material-icons">people</i> Owners <span style="font-weight: 400; font-size: 0.85rem; color: #9e9e9e;" id="owner-count">({{ owners|length }})</span>
+                        </span>
+                    </div>
+
+                    <!-- Owner Cards -->
+                    <div id="owners-list">
+                        {% for po in owners %}
+                        <div class="owner-card" id="owner-{{ po.pk }}" data-owner-id="{{ po.pk }}">
+                            <div class="owner-header" onclick="toggleOwnerDetails('{{ po.pk }}')">
+                                <div class="owner-avatar">{{ po.user.first_name|first|default:po.user.email|first|upper }}</div>
+                                <div style="flex: 1;">
+                                    <div class="owner-name">{{ po.user.full_name|default:po.user.email }}</div>
+                                    <div class="owner-subtitle">
+                                        {{ po.user.email }}
+                                        {% if po.title %} &middot; {{ po.title }}{% endif %}
+                                    </div>
+                                </div>
+                                <span class="owner-role-badge {{ po.role }}">{{ po.get_role_display }}</span>
+                                <i class="material-icons" style="color: #bdbdbd; font-size: 1.2rem;">expand_more</i>
+                            </div>
+                            <div class="owner-details" id="details-{{ po.pk }}">
+                                <div class="od-row" style="margin-top: 12px;">
+                                    <div class="od-field">
+                                        <label>Role</label>
+                                        <select class="browser-default" data-field="role" onchange="saveOwnerField('{{ po.pk }}')">
+                                            <option value="primary" {% if po.role == 'primary' %}selected{% endif %}>Primary Owner</option>
+                                            <option value="owner" {% if po.role == 'owner' %}selected{% endif %}>Owner</option>
+                                            <option value="manager" {% if po.role == 'manager' %}selected{% endif %}>Manager</option>
+                                        </select>
+                                    </div>
+                                    <div class="od-field">
+                                        <label>Title</label>
+                                        <input type="text" value="{{ po.title }}" data-field="title" onblur="saveOwnerField('{{ po.pk }}')">
+                                    </div>
+                                </div>
+                                <div class="od-row">
+                                    <div class="od-field">
+                                        <label>Contact Email</label>
+                                        <input type="email" value="{{ po.contact_email }}" data-field="contact_email" onblur="saveOwnerField('{{ po.pk }}')">
+                                    </div>
+                                    <div class="od-field">
+                                        <label>Phone</label>
+                                        <input type="tel" value="{{ po.contact_phone }}" data-field="contact_phone" onblur="saveOwnerField('{{ po.pk }}')">
+                                    </div>
+                                    <div class="od-field">
+                                        <label>Mobile</label>
+                                        <input type="tel" value="{{ po.mobile_phone }}" data-field="mobile_phone" onblur="saveOwnerField('{{ po.pk }}')">
+                                    </div>
+                                </div>
+                                <div class="od-field">
+                                    <label>Street Address</label>
+                                    <input type="text" value="{{ po.address }}" data-field="address" onblur="saveOwnerField('{{ po.pk }}')">
+                                </div>
+                                <div class="od-row">
+                                    <div class="od-field" style="flex: 2;">
+                                        <label>City</label>
+                                        <input type="text" value="{{ po.city }}" data-field="city" onblur="saveOwnerField('{{ po.pk }}')">
+                                    </div>
+                                    <div class="od-field">
+                                        <label>State</label>
+                                        <input type="text" value="{{ po.state }}" data-field="state" onblur="saveOwnerField('{{ po.pk }}')">
+                                    </div>
+                                    <div class="od-field">
+                                        <label>ZIP</label>
+                                        <input type="text" value="{{ po.zip_code }}" data-field="zip_code" onblur="saveOwnerField('{{ po.pk }}')">
+                                    </div>
+                                </div>
+                                <div class="od-field">
+                                    <label>Notes</label>
+                                    <textarea data-field="notes" onblur="saveOwnerField('{{ po.pk }}')">{{ po.notes }}</textarea>
+                                </div>
+                                <div style="display: flex; justify-content: flex-end; padding-top: 8px; border-top: 1px solid #f0f0f0;">
+                                    <button onclick="removeOwner('{{ po.pk }}')" style="display: inline-flex; align-items: center; gap: 4px; padding: 6px 14px; border-radius: 4px; border: 1px solid #e0e0e0; background: #fff; color: #c62828; font-size: 0.82rem; cursor: pointer;" onmouseover="this.style.background='#fce4ec';this.style.borderColor='#c62828'" onmouseout="this.style.background='#fff';this.style.borderColor='#e0e0e0'">
+                                        <i class="material-icons" style="font-size: 0.95rem;">delete</i> Remove Owner
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div id="no-owners-msg" style="text-align: center; padding: 24px 0; color: #bdbdbd;">
+                            <i class="material-icons" style="font-size: 2.5rem;">person_add</i>
+                            <p style="margin: 6px 0 0; font-size: 0.88rem;">No owners assigned yet. Add one below.</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- Add Owner Panel -->
+                    <div class="add-owner-panel" id="add-owner-panel">
+                        <div style="font-size: 0.9rem; font-weight: 600; color: #455a64; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+                            <i class="material-icons" style="font-size: 1.1rem; color: #7e57c2;">person_add</i> Add New Owner
+                        </div>
+
+                        <!-- Step 1: Search for User -->
+                        <div class="user-search-wrap">
+                            <label style="font-size: 0.72rem; color: #9e9e9e; text-transform: uppercase; font-weight: 600;">Search Users</label>
+                            <input type="text" id="user-search" placeholder="Type a name or email to search..." style="border: 1px solid #e0e0e0; border-radius: 6px; padding: 10px 14px; width: 100%; box-sizing: border-box; font-size: 0.9rem; margin-top: 4px;" autocomplete="off">
+                            <div class="user-search-results" id="search-results"></div>
+                        </div>
+
+                        <!-- Selected User -->
+                        <div id="selected-user" style="display: none;">
+                            <div class="selected-user-chip">
+                                <div class="owner-avatar" style="width: 36px; height: 36px; font-size: 0.85rem; background: #c8e6c9; color: #2e7d32;" id="selected-avatar"></div>
+                                <div style="flex: 1;">
+                                    <div class="suc-name" id="selected-name"></div>
+                                    <div class="suc-email" id="selected-email"></div>
+                                </div>
+                                <button onclick="clearSelectedUser()" style="border: none; background: none; cursor: pointer; color: #66bb6a; padding: 4px;">
+                                    <i class="material-icons" style="font-size: 1.1rem;">close</i>
+                                </button>
+                            </div>
+
+                            <!-- Owner Details Form -->
+                            <div class="od-row">
+                                <div class="od-field">
+                                    <label>Role</label>
+                                    <select id="new-role" class="browser-default">
+                                        <option value="primary">Primary Owner</option>
+                                        <option value="owner" selected>Owner</option>
+                                        <option value="manager">Manager</option>
+                                    </select>
+                                </div>
+                                <div class="od-field">
+                                    <label>Title</label>
+                                    <input type="text" id="new-title" placeholder="e.g. Head Winemaker, CEO">
+                                </div>
+                            </div>
+                            <div class="od-row">
+                                <div class="od-field">
+                                    <label>Contact Email</label>
+                                    <input type="email" id="new-contact-email">
+                                </div>
+                                <div class="od-field">
+                                    <label>Phone</label>
+                                    <input type="tel" id="new-contact-phone" placeholder="(555) 123-4567">
+                                </div>
+                                <div class="od-field">
+                                    <label>Mobile</label>
+                                    <input type="tel" id="new-mobile-phone" placeholder="(555) 987-6543">
+                                </div>
+                            </div>
+                            <div class="od-field">
+                                <label>Street Address</label>
+                                <input type="text" id="new-address" placeholder="123 Main St">
+                            </div>
+                            <div class="od-row">
+                                <div class="od-field" style="flex: 2;">
+                                    <label>City</label>
+                                    <input type="text" id="new-city">
+                                </div>
+                                <div class="od-field">
+                                    <label>State</label>
+                                    <input type="text" id="new-state" placeholder="NC">
+                                </div>
+                                <div class="od-field">
+                                    <label>ZIP</label>
+                                    <input type="text" id="new-zip" placeholder="27101">
+                                </div>
+                            </div>
+                            <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px;">
+                                <button onclick="clearSelectedUser()" class="btn-flat waves-effect" style="font-size: 0.85rem;">Cancel</button>
+                                <button onclick="addOwner()" class="btn waves-effect waves-light" style="background: #7e57c2;">
+                                    <i class="material-icons left" style="margin-right: 4px;">person_add</i> Add Owner
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Manage Subscription -->
+            <div class="card" style="border-radius: 8px;">
+                <div class="card-content">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span class="card-title" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: #455a64; margin: 0;">
+                            <i class="material-icons">card_membership</i> Subscription
+                        </span>
+                        <div style="display: flex; gap: 8px;">
+                            <a href="{% url 'admin_partner_subscription' pk=object.pk %}" style="display: inline-flex; align-items: center; gap: 5px; padding: 8px 16px; border-radius: 6px; border: none; background: #7e57c2; color: #fff; font-size: 0.82rem; font-weight: 600; text-decoration: none; transition: background 0.15s;" onmouseover="this.style.background='#6a3fb5'" onmouseout="this.style.background='#7e57c2'">
+                                <i class="material-icons" style="font-size: 1rem;">settings</i> Manage Subscription
+                            </a>
+                            {% if object.stripe_customer_id %}
+                            <a href="https://dashboard.stripe.com/customers/{{ object.stripe_customer_id }}" target="_blank" rel="noopener" style="display: inline-flex; align-items: center; gap: 5px; padding: 8px 16px; border-radius: 6px; border: 1.5px solid #635bff; background: #fff; color: #635bff; font-size: 0.82rem; font-weight: 600; text-decoration: none; transition: all 0.15s;" onmouseover="this.style.background='#f0efff'" onmouseout="this.style.background='#fff'">
+                                <i class="material-icons" style="font-size: 1rem;">open_in_new</i> Stripe
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 16px; padding: 16px; background: #fafafa; border-radius: 8px; margin-top: 16px;">
+                        <div style="width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; {% if object.tier == 'platinum' %}background: #e8eaf6; color: #283593;{% elif object.tier == 'gold' %}background: #fff8e1; color: #f57f17;{% elif object.tier == 'silver' %}background: #eceff1; color: #546e7a;{% else %}background: #f5f5f5; color: #bdbdbd;{% endif %}">
+                            <i class="material-icons" style="font-size: 1.6rem;">{% if object.tier == 'free' %}card_membership{% else %}workspace_premium{% endif %}</i>
+                        </div>
+                        <div style="flex: 1;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="font-size: 1.2rem; font-weight: 800; color: #333;">{{ object.get_tier_display }}</span>
+                                {% if object.has_active_subscription %}
+                                <span style="display: inline-flex; align-items: center; gap: 3px; padding: 3px 10px; border-radius: 10px; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; background: #e8f5e9; color: #2e7d32;">
+                                    <i class="material-icons" style="font-size: 0.8rem;">check_circle</i> {{ object.get_subscription_status_display }}
+                                </span>
+                                {% elif object.subscription_status == 'past_due' %}
+                                <span style="display: inline-flex; align-items: center; gap: 3px; padding: 3px 10px; border-radius: 10px; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; background: #fff3e0; color: #e65100;">
+                                    <i class="material-icons" style="font-size: 0.8rem;">warning</i> Past Due
+                                </span>
+                                {% elif object.subscription_status == 'canceled' %}
+                                <span style="display: inline-flex; align-items: center; gap: 3px; padding: 3px 10px; border-radius: 10px; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; background: #fce4ec; color: #c62828;">
+                                    Canceled
+                                </span>
+                                {% else %}
+                                <span style="display: inline-flex; align-items: center; gap: 3px; padding: 3px 10px; border-radius: 10px; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; background: #e0e0e0; color: #616161;">
+                                    No Subscription
+                                </span>
+                                {% endif %}
+                            </div>
+                            {% if object.subscription_plan %}
+                            <div style="font-size: 0.82rem; color: #9e9e9e; margin-top: 4px;">{{ object.subscription_plan }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+var partnerId = '{{ object.pk }}';
+var csrfToken = '{{ csrf_token }}';
+var selectedUserId = null;
+var searchTimer = null;
+var saveTimers = {};
+var currentDecisionAction = null;
+
+var ownerEmails = [{% for po in owners %}'{{ po.contact_email|default:po.user.email|escapejs }}'{% if not forloop.last %}, {% endif %}{% endfor %}];
+var businessName = '{{ object.business_name|escapejs }}';
+
+function openDecisionModal(action) {
+    currentDecisionAction = action;
+    var modal = document.getElementById('email-modal');
+    var toField = document.getElementById('em-to');
+    var subjectField = document.getElementById('em-subject');
+    var bodyField = document.getElementById('em-body');
+    var titleText = document.getElementById('modal-title-text');
+    var modalIcon = document.getElementById('modal-icon');
+    var actionLabel = document.getElementById('em-action-label');
+    var sendBtn = document.getElementById('em-send-btn');
+
+    toField.value = ownerEmails.join(', ');
+
+    if (action === 'accept') {
+        titleText.textContent = 'Accept Partner — Send Notification';
+        modalIcon.textContent = 'check_circle';
+        modalIcon.style.color = '#43a047';
+        actionLabel.textContent = 'Accept';
+        sendBtn.style.background = '#43a047';
+        subjectField.value = 'Your Trip Me Partner Application Has Been Approved!';
+        bodyField.value = 'Dear ' + businessName + ' Team,\n\n' +
+            'Great news! Your partner application with Trip Me has been approved.\n\n' +
+            'What happens next:\n' +
+            '1. Sign in to your Trip Me account\n' +
+            '2. Access your Partner Dashboard from the left menu\n' +
+            '3. Claim your business location(s)\n' +
+            '4. Set up your profile and start creating promotions\n' +
+            '5. Choose a subscription plan that fits your needs\n\n' +
+            'Welcome aboard!\n\n' +
+            'The Trip Me Team';
+    } else {
+        titleText.textContent = 'Reject Partner — Send Notification';
+        modalIcon.textContent = 'cancel';
+        modalIcon.style.color = '#c62828';
+        actionLabel.textContent = 'Reject';
+        sendBtn.style.background = '#c62828';
+        subjectField.value = 'Update on Your Trip Me Partner Application';
+        bodyField.value = 'Dear ' + businessName + ' Team,\n\n' +
+            'Thank you for your interest in partnering with Trip Me.\n\n' +
+            'After reviewing your application, we are unable to approve your partner account at this time.\n\n' +
+            'Reason:\n' +
+            '[Please provide the reason for rejection here]\n\n' +
+            'If you believe this was in error or would like to discuss further, please reply to this email.\n\n' +
+            'Best regards,\n' +
+            'The Trip Me Team';
+    }
+
+    modal.classList.add('open');
+}
+
+function closeDecisionModal() {
+    document.getElementById('email-modal').classList.remove('open');
+    currentDecisionAction = null;
+}
+
+function sendDecision() {
+    if (!currentDecisionAction) return;
+    var toStr = document.getElementById('em-to').value.trim();
+    var toList = toStr.split(',').map(function(e) { return e.trim(); }).filter(function(e) { return e; });
+    var subject = document.getElementById('em-subject').value.trim();
+    var body = document.getElementById('em-body').value.trim();
+
+    if (!subject || !body) { M.toast({ html: 'Subject and message are required' }); return; }
+
+    var sendBtn = document.getElementById('em-send-btn');
+    sendBtn.disabled = true;
+    sendBtn.innerHTML = '<i class="material-icons left" style="margin-right:4px;">hourglass_empty</i> Sending...';
+
+    api('/manage/partners/' + partnerId + '/decision/', {
+        action: currentDecisionAction,
+        to: toList,
+        subject: subject,
+        body: body,
+    }).then(function(data) {
+        if (data.ok) {
+            closeDecisionModal();
+            // Update the status badge
+            var badge = document.getElementById('status-badge');
+            if (currentDecisionAction === 'accept') {
+                badge.className = 'status-badge-lg approved';
+                badge.innerHTML = '<i class="material-icons" style="font-size:1rem;">check_circle</i> Approved';
+                M.toast({ html: 'Partner approved and notification sent!' });
+            } else {
+                badge.className = 'status-badge-lg rejected';
+                badge.innerHTML = '<i class="material-icons" style="font-size:1rem;">cancel</i> Rejected';
+                M.toast({ html: 'Partner rejected and notification sent.' });
+            }
+            // Reload to show updated timestamps
+            setTimeout(function() { location.reload(); }, 1500);
+        }
+        if (data.email_error) {
+            M.toast({ html: 'Decision saved but email failed: ' + data.email_error });
+            setTimeout(function() { location.reload(); }, 2000);
+        }
+    }).catch(function(e) {
+        console.error(e);
+        sendBtn.disabled = false;
+        sendBtn.innerHTML = '<i class="material-icons left" style="margin-right:4px;">send</i> Send & ' + (currentDecisionAction === 'accept' ? 'Accept' : 'Reject');
+    });
+}
+
+function resetStatus() {
+    if (!confirm('Reset this partner back to Pending status? This will require a new review.')) return;
+    api('/manage/partners/' + partnerId + '/decision/', {
+        action: 'reset',
+    }).then(function(data) {
+        if (data.ok) {
+            M.toast({ html: 'Status reset to Pending' });
+            setTimeout(function() { location.reload(); }, 1000);
+        }
+    });
+}
+
+// Close modal on overlay click
+document.getElementById('email-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeDecisionModal();
+});
+
+function api(url, body) {
+    return fetch(url, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body || {})
+    }).then(function(r) { return r.json(); });
+}
+
+// ── Toggle Owner Details ──
+function toggleOwnerDetails(ownerId) {
+    var details = document.getElementById('details-' + ownerId);
+    details.classList.toggle('open');
+    var header = details.previousElementSibling;
+    var arrow = header.querySelector('.material-icons:last-child');
+    arrow.textContent = details.classList.contains('open') ? 'expand_less' : 'expand_more';
+}
+
+// ── Save Owner Field (debounced) ──
+function saveOwnerField(ownerId) {
+    clearTimeout(saveTimers[ownerId]);
+    saveTimers[ownerId] = setTimeout(function() {
+        var card = document.getElementById('owner-' + ownerId);
+        var body = {};
+        card.querySelectorAll('[data-field]').forEach(function(el) {
+            body[el.dataset.field] = el.value;
+        });
+        api('/manage/partners/' + partnerId + '/owners/' + ownerId + '/update/', body)
+            .then(function(data) {
+                if (data.ok) {
+                    // Update the header display
+                    var header = card.querySelector('.owner-header');
+                    var nameEl = header.querySelector('.owner-name');
+                    var subtitleEl = header.querySelector('.owner-subtitle');
+                    var badge = header.querySelector('.owner-role-badge');
+                    nameEl.textContent = data.name;
+                    subtitleEl.textContent = data.email + (data.title ? ' · ' + data.title : '');
+                    badge.textContent = data.role_display;
+                    badge.className = 'owner-role-badge ' + data.role;
+                }
+            });
+    }, 500);
+}
+
+// ── Remove Owner ──
+function removeOwner(ownerId) {
+    if (!confirm('Remove this owner from the partner?')) return;
+    fetch('/manage/partners/' + partnerId + '/owners/' + ownerId + '/remove/', {
+        method: 'POST', headers: { 'X-CSRFToken': csrfToken }
+    }).then(function(r) { return r.json(); }).then(function(data) {
+        if (data.ok) {
+            document.getElementById('owner-' + ownerId).remove();
+            updateOwnerCount();
+            M.toast({ html: 'Owner removed' });
+        }
+    });
+}
+
+// ── User Search ──
+document.getElementById('user-search').addEventListener('input', function() {
+    var q = this.value.trim();
+    clearTimeout(searchTimer);
+    if (q.length < 2) {
+        document.getElementById('search-results').style.display = 'none';
+        return;
+    }
+    searchTimer = setTimeout(function() {
+        fetch('/manage/users/search/?q=' + encodeURIComponent(q), {
+            headers: { 'X-CSRFToken': csrfToken }
+        }).then(function(r) { return r.json(); }).then(function(data) {
+            var container = document.getElementById('search-results');
+            if (!data.results || data.results.length === 0) {
+                container.innerHTML = '<div style="padding:14px;color:#9e9e9e;font-size:0.85rem;text-align:center;">No users found for "' + q + '"</div>';
+                container.style.display = 'block';
+                return;
+            }
+            container.innerHTML = data.results.map(function(u) {
+                var initial = (u.name || u.email).charAt(0).toUpperCase();
+                return '<div class="usr-item" onclick="selectUser(\'' + u.id + '\', \'' + u.name.replace(/'/g, "\\'") + '\', \'' + u.email.replace(/'/g, "\\'") + '\')">' +
+                    '<div class="usr-avatar">' + initial + '</div>' +
+                    '<div><div class="usr-name">' + u.name + '</div><div class="usr-email">' + u.email + '</div></div></div>';
+            }).join('');
+            container.style.display = 'block';
+        });
+    }, 300);
+});
+
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.user-search-wrap')) {
+        document.getElementById('search-results').style.display = 'none';
+    }
+});
+
+function selectUser(id, name, email) {
+    selectedUserId = id;
+    document.getElementById('selected-avatar').textContent = (name || email).charAt(0).toUpperCase();
+    document.getElementById('selected-name').textContent = name;
+    document.getElementById('selected-email').textContent = email;
+    document.getElementById('new-contact-email').value = email;
+    document.getElementById('selected-user').style.display = 'block';
+    document.getElementById('user-search').value = '';
+    document.getElementById('search-results').style.display = 'none';
+    document.getElementById('add-owner-panel').classList.add('has-user');
+}
+
+function clearSelectedUser() {
+    selectedUserId = null;
+    document.getElementById('selected-user').style.display = 'none';
+    document.getElementById('add-owner-panel').classList.remove('has-user');
+    // Reset form fields
+    ['new-role', 'new-title', 'new-contact-email', 'new-contact-phone',
+     'new-mobile-phone', 'new-address', 'new-city', 'new-state', 'new-zip'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el.tagName === 'SELECT') el.selectedIndex = 1;
+        else el.value = '';
+    });
+}
+
+// ── Add Owner ──
+function addOwner() {
+    if (!selectedUserId) { M.toast({ html: 'Search and select a user first' }); return; }
+    api('/manage/partners/' + partnerId + '/owners/add/', {
+        user_id: selectedUserId,
+        role: document.getElementById('new-role').value,
+        title: document.getElementById('new-title').value.trim(),
+        contact_email: document.getElementById('new-contact-email').value.trim(),
+        contact_phone: document.getElementById('new-contact-phone').value.trim(),
+        mobile_phone: document.getElementById('new-mobile-phone').value.trim(),
+        address: document.getElementById('new-address').value.trim(),
+        city: document.getElementById('new-city').value.trim(),
+        state: document.getElementById('new-state').value.trim(),
+        zip_code: document.getElementById('new-zip').value.trim(),
+    }).then(function(data) {
+        if (data.error) { M.toast({ html: data.error }); return; }
+        // Remove empty state
+        var noMsg = document.getElementById('no-owners-msg');
+        if (noMsg) noMsg.remove();
+        // Build and insert owner card
+        var list = document.getElementById('owners-list');
+        var initial = (data.name || data.email).charAt(0).toUpperCase();
+        var subtitle = data.email + (data.title ? ' · ' + data.title : '');
+        var card = document.createElement('div');
+        card.className = 'owner-card';
+        card.id = 'owner-' + data.owner_id;
+        card.dataset.ownerId = data.owner_id;
+        card.innerHTML =
+            '<div class="owner-header" onclick="toggleOwnerDetails(\'' + data.owner_id + '\')">' +
+                '<div class="owner-avatar">' + initial + '</div>' +
+                '<div style="flex:1;"><div class="owner-name">' + data.name + '</div><div class="owner-subtitle">' + subtitle + '</div></div>' +
+                '<span class="owner-role-badge ' + data.role + '">' + data.role_display + '</span>' +
+                '<i class="material-icons" style="color:#bdbdbd;font-size:1.2rem;">expand_more</i>' +
+            '</div>' +
+            '<div class="owner-details" id="details-' + data.owner_id + '">' +
+                buildOwnerDetailsHtml(data) +
+            '</div>';
+        list.appendChild(card);
+        clearSelectedUser();
+        updateOwnerCount();
+        M.toast({ html: data.name + ' added as owner' });
+    });
+}
+
+function buildOwnerDetailsHtml(d) {
+    var oid = d.owner_id;
+    return '<div class="od-row" style="margin-top:12px;">' +
+        '<div class="od-field"><label>Role</label><select class="browser-default" data-field="role" onchange="saveOwnerField(\'' + oid + '\')">' +
+            '<option value="primary"' + (d.role === 'primary' ? ' selected' : '') + '>Primary Owner</option>' +
+            '<option value="owner"' + (d.role === 'owner' ? ' selected' : '') + '>Owner</option>' +
+            '<option value="manager"' + (d.role === 'manager' ? ' selected' : '') + '>Manager</option></select></div>' +
+        '<div class="od-field"><label>Title</label><input type="text" value="' + (d.title || '') + '" data-field="title" onblur="saveOwnerField(\'' + oid + '\')"></div></div>' +
+        '<div class="od-row">' +
+            '<div class="od-field"><label>Contact Email</label><input type="email" value="' + (d.contact_email || '') + '" data-field="contact_email" onblur="saveOwnerField(\'' + oid + '\')"></div>' +
+            '<div class="od-field"><label>Phone</label><input type="tel" value="' + (d.contact_phone || '') + '" data-field="contact_phone" onblur="saveOwnerField(\'' + oid + '\')"></div>' +
+            '<div class="od-field"><label>Mobile</label><input type="tel" value="' + (d.mobile_phone || '') + '" data-field="mobile_phone" onblur="saveOwnerField(\'' + oid + '\')"></div></div>' +
+        '<div class="od-field"><label>Street Address</label><input type="text" value="' + (d.address || '') + '" data-field="address" onblur="saveOwnerField(\'' + oid + '\')"></div>' +
+        '<div class="od-row">' +
+            '<div class="od-field" style="flex:2;"><label>City</label><input type="text" value="' + (d.city || '') + '" data-field="city" onblur="saveOwnerField(\'' + oid + '\')"></div>' +
+            '<div class="od-field"><label>State</label><input type="text" value="' + (d.state || '') + '" data-field="state" onblur="saveOwnerField(\'' + oid + '\')"></div>' +
+            '<div class="od-field"><label>ZIP</label><input type="text" value="' + (d.zip_code || '') + '" data-field="zip_code" onblur="saveOwnerField(\'' + oid + '\')"></div></div>' +
+        '<div class="od-field"><label>Notes</label><textarea data-field="notes" onblur="saveOwnerField(\'' + oid + '\')">' + (d.notes || '') + '</textarea></div>' +
+        '<div style="display:flex;justify-content:flex-end;padding-top:8px;border-top:1px solid #f0f0f0;">' +
+            '<button onclick="removeOwner(\'' + oid + '\')" style="display:inline-flex;align-items:center;gap:4px;padding:6px 14px;border-radius:4px;border:1px solid #e0e0e0;background:#fff;color:#c62828;font-size:0.82rem;cursor:pointer;" onmouseover="this.style.background=\'#fce4ec\';this.style.borderColor=\'#c62828\'" onmouseout="this.style.background=\'#fff\';this.style.borderColor=\'#e0e0e0\'">' +
+                '<i class="material-icons" style="font-size:0.95rem;">delete</i> Remove Owner</button></div>';
+}
+
+function updateOwnerCount() {
+    var count = document.querySelectorAll('.owner-card').length;
+    document.getElementById('owner-count').textContent = '(' + count + ')';
+}
+
+document.addEventListener('DOMContentLoaded', function() { M.updateTextFields(); });
+</script>
+{% endblock %}

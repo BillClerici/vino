@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Partner Profile — Vino{% endblock %}
+{% block title %}Partner Profile — Trip Me{% endblock %}
 
 {% block content %}
 <div class="container" style="margin-top: 20px;">
@@ -14,7 +14,7 @@
                             <i class="material-icons">business</i> Business Profile
                         </span>
                         <p class="grey-text" style="margin-bottom: 16px;">
-                            Tier: <strong>{{ partner.tier.label|default:"—" }}</strong> |
+                            Tier: <strong>{{ partner.get_tier_display }}</strong> |
                             Status: <strong>{{ partner.get_status_display }}</strong>
                         </p>
 

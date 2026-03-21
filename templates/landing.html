@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Vino Trip{% endblock %}
+{% block title %}Trip Me{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -121,7 +121,6 @@
     <div class="hero-section" style="padding: 28px 0 24px;">
         <div class="container">
             <div style="display: flex; align-items: center; justify-content: center; gap: 12px;">
-                <span style="font-size: 2.2rem;">&#127863;</span>
                 <h4 style="margin: 0; font-weight: 300;">Welcome back, {% firstof user.first_name user.email %}</h4>
             </div>
             <p style="font-size: 0.95rem; margin-top: 6px;">Here's what's happening in your wine world.</p>
@@ -320,7 +319,7 @@
                     <a href="{% url 'place_detail' pk=w.pk %}" style="color: inherit;">
                         <div class="card discover-card hoverable">
                             <div class="card-content">
-                                <div style="font-size: 2rem; margin-bottom: 8px;">&#127863;</div>
+                                <div style="font-size: 2rem; margin-bottom: 8px;"><i class="material-icons" style="color: #7e57c2;">explore</i></div>
                                 <div style="font-weight: 600;">{{ w.name }}</div>
                                 <div style="font-size: 0.8rem; color: #9e9e9e;">
                                     {% if w.city %}{{ w.city }}{% if w.state %}, {{ w.state }}{% endif %}{% else %}Location TBD{% endif %}
@@ -350,12 +349,11 @@
     <!-- Hero -->
     <div class="hero-section">
         <div class="container">
-            <div style="font-size: 3.5rem; margin-bottom: 8px;">&#127863;</div>
-            <h2>Vino Trip</h2>
-            <p>Your personal trip companion. Discover places, log tastings, and plan unforgettable trips with friends.</p>
+            <h3 style="font-weight: 700; margin: 0 0 8px; text-align: center;">Plan. Explore. Experience.</h3>
+            <p>Discover places, plan trips with friends, and log every tasting along the way.</p>
             <div style="margin-top: 28px;">
                 <a href="{% url 'register' %}" class="btn-large white purple-text text-darken-3 waves-effect" style="margin-right: 8px;">
-                    <i class="material-icons left">person_add</i>Get Started
+                    <i class="material-icons left">person_add</i>Create Account
                 </a>
                 <a href="{% url 'login' %}" class="btn-large white-text waves-effect" style="border: 1px solid rgba(255,255,255,0.5); background: transparent;">
                     <i class="material-icons left">login</i>Sign In

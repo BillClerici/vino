@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Subscription — {{ partner.business_name }} — Admin{% endblock %}
+
+{% block extra_css %}
+<style>
+    .sub-wrap { max-width: 960px; margin: 0 auto; padding: 20px 16px 30px; }
+    .plan-grid { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; margin-top: 20px; }
+    .plan-card {
+        flex: 1; min-width: 200px; max-width: 260px;
+        border-radius: 12px; border: 2px solid #e0e0e0;
+        background: #fff; padding: 24px 20px; text-align: center;
+        transition: all 0.2s; position: relative;
+    }
+    .plan-card:hover { border-color: #7e57c2; box-shadow: 0 4px 16px rgba(126,87,194,0.12); }
+    .plan-card.current { border-color: #7e57c2; background: #faf5ff; }
+    .plan-card.popular { border-color: #ff9800; }
+    .plan-card .popular-tag {
+        position: absolute; top: -11px; left: 50%; transform: translateX(-50%);
+        background: #ff9800; color: #fff; padding: 2px 12px; border-radius: 8px;
+        font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    }
+    .plan-tier { font-size: 1.2rem; font-weight: 800; color: #333; margin-bottom: 4px; }
+    .plan-price { font-size: 1.8rem; font-weight: 800; color: #7e57c2; }
+    .plan-price span { font-size: 0.85rem; font-weight: 400; color: #9e9e9e; }
+    .plan-features { list-style: none; padding: 0; margin: 14px 0; text-align: left; }
+    .plan-features li {
+        padding: 5px 0; font-size: 0.82rem; color: #616161;
+        display: flex; align-items: center; gap: 6px;
+    }
+    .plan-features li i { font-size: 0.95rem; color: #43a047; }
+    .plan-features li.off { color: #ccc; }
+    .plan-features li.off i { color: #e0e0e0; }
+    .plan-btn {
+        display: block; width: 100%; padding: 10px; border-radius: 8px; border: none;
+        font-size: 0.88rem; font-weight: 700; cursor: pointer; transition: all 0.15s;
+        text-align: center;
+    }
+    .plan-btn.primary { background: #7e57c2; color: #fff; }
+    .plan-btn.primary:hover { background: #6a3fb5; }
+    .plan-btn.outline { background: #fff; color: #7e57c2; border: 2px solid #7e57c2; }
+    .plan-btn.outline:hover { background: #ede7f6; }
+    .plan-btn.current { background: #e0e0e0; color: #9e9e9e; cursor: default; }
+
+    .billing-toggle { display: flex; justify-content: center; gap: 8px; align-items: center; }
+    .bt-opt {
+        padding: 6px 16px; border-radius: 16px; font-size: 0.85rem; font-weight: 600;
+        cursor: pointer; border: 1.5px solid #e0e0e0; color: #616161; transition: all 0.15s;
+    }
+    .bt-opt.active { background: #7e57c2; color: #fff; border-color: #7e57c2; }
+
+    .current-plan-bar {
+        display: flex; align-items: center; gap: 12px; padding: 14px 18px;
+        background: #fafafa; border-radius: 8px; margin-bottom: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="sub-wrap">
+    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
+        <a href="{% url 'admin_partners_edit' pk=partner.pk %}" style="display: inline-flex; align-items: center; gap: 5px; background: #546e7a; border-radius: 18px; padding: 6px 16px; text-decoration: none; font-size: 0.82rem; font-weight: 600; color: #fff;" onmouseover="this.style.background='#455a64'" onmouseout="this.style.background='#546e7a'">
+            <i class="material-icons" style="font-size: 1rem;">arrow_back</i> Back to Partner
+        </a>
+    </div>
+
+    <div style="text-align: center; margin-bottom: 20px;">
+        <h5 style="font-weight: 700; color: #455a64; margin: 0 0 4px; display: inline-flex; align-items: center; gap: 8px;">
+            <i class="material-icons">card_membership</i> Manage Subscription
+        </h5>
+        <p class="grey-text" style="margin: 4px 0 0;">{{ partner.business_name }}</p>
+    </div>
+
+    <!-- Current Plan -->
+    <div class="current-plan-bar">
+        <div style="width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; {% if partner.tier == 'platinum' %}background: #e8eaf6; color: #283593;{% elif partner.tier == 'gold' %}background: #fff8e1; color: #f57f17;{% elif partner.tier == 'silver' %}background: #eceff1; color: #546e7a;{% else %}background: #f5f5f5; color: #bdbdbd;{% endif %}">
+            <i class="material-icons">{% if partner.tier == 'free' %}card_membership{% else %}workspace_premium{% endif %}</i>
+        </div>
+        <div style="flex: 1;">
+            <div style="font-weight: 700; font-size: 1rem;">Current: {{ partner.get_tier_display }}</div>
+            {% if partner.subscription_plan %}
+            <div style="font-size: 0.82rem; color: #9e9e9e;">{{ partner.subscription_plan }} &middot; {{ partner.get_subscription_status_display }}</div>
+            {% else %}
+            <div style="font-size: 0.82rem; color: #9e9e9e;">No active subscription</div>
+            {% endif %}
+        </div>
+        {% if partner.stripe_customer_id and partner.has_active_subscription %}
+        <form method="post" action="{% url 'admin_partner_stripe_portal' pk=partner.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="btn-flat waves-effect" style="color: #7e57c2; font-weight: 600; font-size: 0.82rem;">
+                <i class="material-icons left" style="margin-right: 4px;">settings</i> Billing Portal
+            </button>
+        </form>
+        {% endif %}
+    </div>
+
+    <!-- Billing Toggle -->
+    <div class="billing-toggle" style="margin-bottom: 8px;">
+        <span class="bt-opt active" onclick="setBilling('monthly')">Monthly</span>
+        <span class="bt-opt" onclick="setBilling('yearly')">Yearly <span style="font-size: 0.72rem; color: #43a047;">(Save 20%)</span></span>
+    </div>
+
+    <!-- Plan Cards -->
+    <div class="plan-grid">
+        <div class="plan-card {% if partner.tier == 'free' %}current{% endif %}">
+            <div class="plan-tier">Free</div>
+            <div class="plan-price">$0 <span>/mo</span></div>
+            <ul class="plan-features">
+                <li><i class="material-icons">check</i> 1 place</li>
+                <li><i class="material-icons">check</i> Basic profile</li>
+                <li class="off"><i class="material-icons">close</i> Promotions</li>
+                <li class="off"><i class="material-icons">close</i> Analytics</li>
+            </ul>
+            {% if partner.tier == 'free' %}
+            <button class="plan-btn current" disabled>Current Plan</button>
+            {% else %}
+            <button class="plan-btn outline" disabled>Included</button>
+            {% endif %}
+        </div>
+
+        <div class="plan-card {% if partner.tier == 'silver' %}current{% endif %}">
+            <div class="plan-tier">Silver</div>
+            <div class="plan-price" data-monthly="$49" data-yearly="$39">$49 <span>/mo</span></div>
+            <ul class="plan-features">
+                <li><i class="material-icons">check</i> 1 place</li>
+                <li><i class="material-icons">check</i> Enhanced profile</li>
+                <li><i class="material-icons">check</i> 2 promotions/mo</li>
+                <li><i class="material-icons">check</i> Basic analytics</li>
+            </ul>
+            {% if partner.tier == 'silver' %}
+            <button class="plan-btn current" disabled>Current Plan</button>
+            {% else %}
+            <button class="plan-btn outline" onclick="subscribe('silver')">{% if partner.tier == 'free' %}Upgrade{% else %}Switch{% endif %} to Silver</button>
+            {% endif %}
+        </div>
+
+        <div class="plan-card popular {% if partner.tier == 'gold' %}current{% endif %}">
+            <div class="popular-tag">Most Popular</div>
+            <div class="plan-tier">Gold</div>
+            <div class="plan-price" data-monthly="$99" data-yearly="$79">$99 <span>/mo</span></div>
+            <ul class="plan-features">
+                <li><i class="material-icons">check</i> 3 places</li>
+                <li><i class="material-icons">check</i> 10 promotions/mo</li>
+                <li><i class="material-icons">check</i> Full analytics</li>
+                <li><i class="material-icons">check</i> Featured badge</li>
+            </ul>
+            {% if partner.tier == 'gold' %}
+            <button class="plan-btn current" disabled>Current Plan</button>
+            {% else %}
+            <button class="plan-btn primary" onclick="subscribe('gold')">{% if partner.tier == 'platinum' %}Switch{% else %}Upgrade{% endif %} to Gold</button>
+            {% endif %}
+        </div>
+
+        <div class="plan-card {% if partner.tier == 'platinum' %}current{% endif %}">
+            <div class="plan-tier">Platinum</div>
+            <div class="plan-price" data-monthly="$199" data-yearly="$159">$199 <span>/mo</span></div>
+            <ul class="plan-features">
+                <li><i class="material-icons">check</i> Unlimited places</li>
+                <li><i class="material-icons">check</i> Unlimited promotions</li>
+                <li><i class="material-icons">check</i> Full analytics + export</li>
+                <li><i class="material-icons">check</i> Trip recommendations</li>
+            </ul>
+            {% if partner.tier == 'platinum' %}
+            <button class="plan-btn current" disabled>Current Plan</button>
+            {% else %}
+            <button class="plan-btn outline" onclick="subscribe('platinum')">Upgrade to Platinum</button>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+var csrfToken = '{{ csrf_token }}';
+var billingPeriod = 'monthly';
+var partnerId = '{{ partner.pk }}';
+
+function setBilling(period) {
+    billingPeriod = period;
+    document.querySelectorAll('.bt-opt').forEach(function(el) {
+        el.classList.toggle('active', el.textContent.toLowerCase().indexOf(period) >= 0);
+    });
+    document.querySelectorAll('.plan-price[data-monthly]').forEach(function(el) {
+        var price = period === 'yearly' ? el.dataset.yearly : el.dataset.monthly;
+        el.innerHTML = price + ' <span>/' + (period === 'yearly' ? 'mo (billed yearly)' : 'mo') + '</span>';
+    });
+}
+
+function subscribe(tier) {
+    var plan = tier + '_' + billingPeriod;
+    fetch('{% url "admin_partner_checkout" pk=partner.pk %}', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: plan })
+    }).then(function(r) { return r.json(); }).then(function(data) {
+        if (data.url) window.location.href = data.url;
+        else if (data.error) M.toast({ html: data.error });
+    });
+}
+</script>
+{% endblock %}

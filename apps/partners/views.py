@@ -20,7 +20,29 @@ from apps.partners.forms import (
 )
 from apps.partners.models import Partner, PlaceClaim, Promotion, PromotionImpression
 
+from apps.partners.models import PartnerOwner
+
 User = get_user_model()
+
+
+def _get_user_partner(user):
+    """Return the first approved Partner the user owns, or None."""
+    po = (
+        PartnerOwner.objects.filter(user=user, is_active=True, partner__status=Partner.Status.APPROVED, partner__is_active=True)
+        .select_related("partner")
+        .first()
+    )
+    return po.partner if po else None
+
+
+def _get_any_user_partner(user):
+    """Return any Partner the user owns (any status), or None."""
+    po = (
+        PartnerOwner.objects.filter(user=user, is_active=True, partner__is_active=True)
+        .select_related("partner")
+        .first()
+    )
+    return po.partner if po else None
 
 
 # ── Mixins ──
@@ -32,14 +54,14 @@ class ApprovedPartnerRequiredMixin(LoginRequiredMixin):
     def dispatch(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             return self.handle_no_permission()
-        partner = getattr(request.user, "partner_profile", None)
-        if not partner or partner.status != Partner.Status.APPROVED:
+        partner = _get_user_partner(request.user)
+        if not partner:
             messages.warning(request, "You need an approved partner account to access this page.")
             return redirect("partner_apply")
         return super().dispatch(request, *args, **kwargs)
 
     def get_partner(self):
-        return self.request.user.partner_profile
+        return _get_user_partner(self.request.user)
 
 
 class SuperuserRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
@@ -180,8 +202,7 @@ class PartnerApplyView(LoginRequiredMixin, View):
     template_name = "partners/apply.html"
 
     def get(self, request):
-        # If already a partner, redirect to dashboard
-        partner = getattr(request.user, "partner_profile", None)
+        partner = _get_any_user_partner(request.user)
         if partner:
             if partner.status == Partner.Status.APPROVED:
                 return redirect("partner_dashboard")
@@ -190,16 +211,21 @@ class PartnerApplyView(LoginRequiredMixin, View):
         return render(request, self.template_name, {"form": form, "partner": None})
 
     def post(self, request):
-        partner = getattr(request.user, "partner_profile", None)
+        partner = _get_any_user_partner(request.user)
         if partner:
             messages.info(request, "You have already applied for a partner account.")
             return redirect("partner_apply")
         form = PartnerApplyForm(request.POST)
         if form.is_valid():
             partner = form.save(commit=False)
-            partner.user = request.user
             partner.status = Partner.Status.PENDING
             partner.save()
+            PartnerOwner.objects.create(
+                partner=partner,
+                user=request.user,
+                role=PartnerOwner.Role.PRIMARY,
+                contact_email=request.user.email,
+            )
             messages.success(
                 request,
                 "Your partner application has been submitted! We will review it shortly.",
@@ -218,28 +244,32 @@ class AdminPartnerListView(SuperuserRequiredMixin, ListView):
     template_name = "admin/list.html"
 
     def get_queryset(self):
-        return Partner.all_objects.select_related("user", "tier").order_by("-created_at")
+        return Partner.all_objects.prefetch_related("partner_owners__user").order_by("-created_at")
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["page_title"] = "Partners"
         ctx["icon"] = "handshake"
         ctx["create_url"] = reverse("admin_partners_create")
-        ctx["columns"] = ["Business Name", "User", "Tier", "Status", "Created"]
-        ctx["rows"] = [
-            {
+        ctx["columns"] = ["Business Name", "Owners", "Tier", "Status", "Created"]
+        rows = []
+        for p in ctx["object_list"]:
+            owner_names = ", ".join(
+                o.user.full_name or o.user.email
+                for o in p.partner_owners.filter(is_active=True)[:3]
+            ) or "—"
+            rows.append({
                 "values": [
                     p.business_name,
-                    p.user.email,
-                    p.tier.label if p.tier else "—",
+                    owner_names,
+                    p.get_tier_display(),
                     p.get_status_display(),
                     p.created_at.strftime("%Y-%m-%d"),
                 ],
                 "edit_url": reverse("admin_partners_edit", args=[p.pk]),
                 "delete_url": reverse("admin_partners_edit", args=[p.pk]),
-            }
-            for p in ctx["object_list"]
-        ]
+            })
+        ctx["rows"] = rows
         return ctx
 
 
@@ -262,35 +292,239 @@ class AdminPartnerCreateView(SuperuserRequiredMixin, CreateView):
             partner.approved_at = timezone.now()
             partner.approved_by = self.request.user
         partner.save()
-        messages.success(self.request, f'Partner "{partner.business_name}" created!')
-        return redirect(self.success_url)
+        messages.success(self.request, f'Partner "{partner.business_name}" created! Add owners on the edit page.')
+        return redirect("admin_partners_edit", pk=partner.pk)
 
 
 class AdminPartnerEditView(SuperuserRequiredMixin, UpdateView):
     model = Partner
     form_class = AdminPartnerForm
-    template_name = "admin/form.html"
+    template_name = "partners/admin_partner_edit.html"
     success_url = reverse_lazy("admin_partners_list")
 
     def get_queryset(self):
-        return Partner.all_objects.all()
+        return Partner.all_objects.select_related("approved_by", "rejected_by").all()
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["page_title"] = f"Edit Partner: {self.object.business_name}"
         ctx["icon"] = "edit"
         ctx["cancel_url"] = reverse("admin_partners_list")
+        ctx["owners"] = self.object.partner_owners.filter(is_active=True).select_related("user")
         return ctx
 
     def form_valid(self, form):
-        partner = form.save(commit=False)
-        # If status changed to approved, record who approved and when
-        if partner.status == Partner.Status.APPROVED and not partner.approved_at:
-            partner.approved_at = timezone.now()
-            partner.approved_by = self.request.user
-        partner.save()
-        messages.success(self.request, f"Partner {partner.business_name} updated.")
+        form.save()
+        messages.success(self.request, f"Partner {self.object.business_name} updated.")
         return redirect(self.success_url)
+
+
+class AdminUserSearchView(SuperuserRequiredMixin, View):
+    """AJAX: search users by email or name for owner assignment."""
+
+    def get(self, request):
+        from django.http import JsonResponse
+        q = request.GET.get("q", "").strip()
+        if len(q) < 2:
+            return JsonResponse({"results": []})
+        from django.db.models import Q
+        users = (
+            User.objects.filter(
+                Q(email__icontains=q) | Q(first_name__icontains=q) | Q(last_name__icontains=q)
+            )
+            .order_by("email")[:10]
+        )
+        return JsonResponse({
+            "results": [
+                {"id": str(u.pk), "email": u.email, "name": u.full_name}
+                for u in users
+            ]
+        })
+
+
+class AdminPartnerAddOwnerView(SuperuserRequiredMixin, View):
+    """AJAX: add an owner to a partner."""
+
+    def post(self, request, pk):
+        import json
+        from django.http import JsonResponse
+        partner = get_object_or_404(Partner.all_objects, pk=pk)
+        try:
+            body = json.loads(request.body)
+        except (ValueError, TypeError):
+            return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+        user_id = body.get("user_id")
+        if not user_id:
+            return JsonResponse({"error": "user_id required"}, status=400)
+
+        user = get_object_or_404(User, pk=user_id)
+        role = body.get("role", PartnerOwner.Role.OWNER)
+        if role not in dict(PartnerOwner.Role.choices):
+            role = PartnerOwner.Role.OWNER
+
+        po, created = PartnerOwner.all_objects.get_or_create(
+            partner=partner,
+            user=user,
+            defaults={
+                "role": role,
+                "title": body.get("title", ""),
+                "contact_email": body.get("contact_email", user.email),
+                "contact_phone": body.get("contact_phone", ""),
+                "mobile_phone": body.get("mobile_phone", ""),
+                "address": body.get("address", ""),
+                "city": body.get("city", ""),
+                "state": body.get("state", ""),
+                "zip_code": body.get("zip_code", ""),
+            },
+        )
+        if not created and not po.is_active:
+            po.is_active = True
+            po.role = role
+            po.save(update_fields=["is_active", "role", "updated_at"])
+            created = True
+        elif not created:
+            return JsonResponse({"error": "User is already an owner."}, status=400)
+
+        return JsonResponse(_owner_json(po))
+
+
+class AdminPartnerUpdateOwnerView(SuperuserRequiredMixin, View):
+    """AJAX: update an owner's details."""
+
+    def post(self, request, pk, owner_pk):
+        import json
+        from django.http import JsonResponse
+        partner = get_object_or_404(Partner.all_objects, pk=pk)
+        po = get_object_or_404(PartnerOwner, pk=owner_pk, partner=partner)
+        try:
+            body = json.loads(request.body)
+        except (ValueError, TypeError):
+            return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+        for field in ("role", "title", "contact_email", "contact_phone",
+                       "mobile_phone", "address", "city", "state", "zip_code", "notes"):
+            if field in body:
+                val = body[field]
+                if field == "role" and val not in dict(PartnerOwner.Role.choices):
+                    continue
+                setattr(po, field, val)
+        po.save()
+        return JsonResponse(_owner_json(po))
+
+
+class AdminPartnerRemoveOwnerView(SuperuserRequiredMixin, View):
+    """AJAX: remove an owner from a partner (soft delete)."""
+
+    def post(self, request, pk, owner_pk):
+        from django.http import JsonResponse
+        partner = get_object_or_404(Partner.all_objects, pk=pk)
+        po = get_object_or_404(PartnerOwner, pk=owner_pk, partner=partner)
+        po.is_active = False
+        po.save(update_fields=["is_active", "updated_at"])
+        return JsonResponse({"ok": True})
+
+
+def _owner_json(po):
+    """Serialize a PartnerOwner for JSON responses."""
+    return {
+        "ok": True,
+        "owner_id": str(po.pk),
+        "user_id": str(po.user_id),
+        "name": po.user.full_name or po.user.email,
+        "email": po.user.email,
+        "role": po.role,
+        "role_display": po.get_role_display(),
+        "title": po.title,
+        "contact_email": po.contact_email,
+        "contact_phone": po.contact_phone,
+        "mobile_phone": po.mobile_phone,
+        "address": po.address,
+        "city": po.city,
+        "state": po.state,
+        "zip_code": po.zip_code,
+        "notes": po.notes,
+    }
+
+
+class AdminPartnerDecisionView(SuperuserRequiredMixin, View):
+    """AJAX: accept or reject a partner and send notification email."""
+
+    def post(self, request, pk):
+        import json as _json
+        from django.core.mail import send_mail
+        from django.http import JsonResponse
+
+        partner = get_object_or_404(Partner.all_objects, pk=pk)
+        try:
+            body = _json.loads(request.body)
+        except (ValueError, TypeError):
+            return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+        action = body.get("action")  # "accept", "reject", or "reset"
+        if action not in ("accept", "reject", "reset"):
+            return JsonResponse({"error": "Invalid action"}, status=400)
+
+        now = timezone.now()
+
+        if action == "reset":
+            partner.status = Partner.Status.PENDING
+            partner.approved_at = None
+            partner.approved_by = None
+            partner.rejected_at = None
+            partner.rejected_by = None
+            partner.decision_email_sent_at = None
+            partner.save(update_fields=[
+                "status", "approved_at", "approved_by",
+                "rejected_at", "rejected_by", "decision_email_sent_at", "updated_at",
+            ])
+            return JsonResponse({"ok": True, "status": "pending", "status_display": "Pending"})
+
+        email_to = body.get("to", [])
+        email_subject = body.get("subject", "")
+        email_body = body.get("body", "")
+
+        if action == "accept":
+            partner.status = Partner.Status.APPROVED
+            partner.approved_at = now
+            partner.approved_by = request.user
+            partner.save(update_fields=[
+                "status", "approved_at", "approved_by", "updated_at",
+            ])
+        else:
+            partner.status = Partner.Status.REJECTED
+            partner.rejected_at = now
+            partner.rejected_by = request.user
+            partner.save(update_fields=[
+                "status", "rejected_at", "rejected_by", "updated_at",
+            ])
+
+        # Send the email
+        if email_to and email_subject and email_body:
+            try:
+                from django.conf import settings as _settings
+                from_email = getattr(_settings, "DEFAULT_FROM_EMAIL", "noreply@tripme.app")
+                send_mail(
+                    subject=email_subject,
+                    message=email_body,
+                    from_email=from_email,
+                    recipient_list=email_to if isinstance(email_to, list) else [email_to],
+                    fail_silently=False,
+                )
+                partner.decision_email_sent_at = timezone.now()
+                partner.save(update_fields=["decision_email_sent_at", "updated_at"])
+            except Exception as e:
+                return JsonResponse({
+                    "ok": True,
+                    "status": partner.status,
+                    "email_error": str(e),
+                })
+
+        return JsonResponse({
+            "ok": True,
+            "status": partner.status,
+            "status_display": partner.get_status_display(),
+        })
 
 
 class AdminClaimListView(SuperuserRequiredMixin, ListView):

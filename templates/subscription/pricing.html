@@ -1,195 +1,206 @@
 {% extends "base.html" %}
 
-{% block title %}Pricing — Vino Trip{% endblock %}
+{% block title %}My Subscription — Trip Me{% endblock %}
 
 {% block extra_css %}
 <style>
-    .pricing-header { text-align: center; padding: 30px 0 20px; }
-    .pricing-header h4 { font-weight: 700; color: #455a64; margin-bottom: 8px; }
-    .pricing-header p { color: #9e9e9e; font-size: 1rem; }
+    .sub-wrap { max-width: 960px; margin: 0 auto; padding: 20px 16px 30px; }
 
-    .pricing-cards { display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; max-width: 700px; margin: 0 auto; }
-    .pricing-card {
-        flex: 1; min-width: 280px; max-width: 320px; border-radius: 12px;
-        background: #fff; box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-        overflow: hidden; transition: transform 0.15s, box-shadow 0.15s;
+    .current-plan-bar {
+        display: flex; align-items: center; gap: 12px; padding: 14px 18px;
+        background: #fafafa; border-radius: 8px; margin-bottom: 20px;
     }
-    .pricing-card:hover { transform: translateY(-4px); box-shadow: 0 6px 24px rgba(0,0,0,0.12); }
-    .pricing-card.featured { border: 2px solid #7e57c2; }
-    .pricing-card .card-header {
-        padding: 24px 24px 16px; text-align: center;
+    .plan-icon {
+        width: 44px; height: 44px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center; flex-shrink: 0;
     }
-    .pricing-card .card-header .plan-name { font-size: 1.1rem; font-weight: 700; color: #455a64; }
-    .pricing-card .card-header .plan-price {
-        font-size: 2.4rem; font-weight: 800; color: #333; margin: 12px 0 4px;
-    }
-    .pricing-card .card-header .plan-price span { font-size: 0.9rem; font-weight: 400; color: #9e9e9e; }
-    .pricing-card .card-header .plan-savings {
-        font-size: 0.8rem; color: #43a047; font-weight: 600;
-    }
-    .pricing-card .card-body { padding: 0 24px 24px; }
-    .pricing-card .card-body ul { list-style: none; padding: 0; margin: 0 0 20px; }
-    .pricing-card .card-body li {
-        padding: 6px 0; font-size: 0.88rem; color: #616161;
-        display: flex; align-items: center; gap: 8px;
-    }
-    .pricing-card .card-body li i { font-size: 1rem; color: #43a047; }
-    .pricing-card .subscribe-btn {
-        width: 100%; padding: 12px; border: none; border-radius: 8px;
-        font-size: 0.95rem; font-weight: 600; cursor: pointer;
-        display: flex; align-items: center; justify-content: center; gap: 6px;
-        transition: background 0.15s;
-    }
-    .btn-primary { background: #7e57c2; color: #fff; }
-    .btn-primary:hover { background: #6a3fb5; }
-    .btn-outline { background: #fff; color: #7e57c2; border: 2px solid #7e57c2; }
-    .btn-outline:hover { background: #f3e5f5; }
 
-    .current-plan {
-        text-align: center; padding: 20px; background: #f5f5f5; border-radius: 10px;
-        margin-bottom: 24px; max-width: 700px; margin-left: auto; margin-right: auto;
+    .billing-toggle { display: flex; justify-content: center; gap: 8px; align-items: center; margin-bottom: 8px; }
+    .bt-opt {
+        padding: 6px 16px; border-radius: 16px; font-size: 0.85rem; font-weight: 600;
+        cursor: pointer; border: 1.5px solid #e0e0e0; color: #616161; transition: all 0.15s;
     }
-    .current-plan .status-badge {
-        display: inline-flex; align-items: center; gap: 4px; padding: 4px 14px;
-        border-radius: 14px; font-size: 0.8rem; font-weight: 600;
+    .bt-opt.active { background: #7e57c2; color: #fff; border-color: #7e57c2; }
+
+    .plan-grid { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; margin-top: 20px; }
+    .plan-card {
+        flex: 1; min-width: 280px; max-width: 400px;
+        border-radius: 12px; border: 2px solid #e0e0e0;
+        background: #fff; padding: 28px 24px; text-align: center;
+        transition: all 0.2s; position: relative;
     }
-    .status-badge.trialing { background: #fff3e0; color: #e65100; }
-    .status-badge.active { background: #e8f5e9; color: #2e7d32; }
-    .status-badge.past_due { background: #fce4ec; color: #c62828; }
-    .status-badge.canceled { background: #e0e0e0; color: #616161; }
-    .status-badge.none { background: #e0e0e0; color: #616161; }
+    .plan-card:hover { border-color: #7e57c2; box-shadow: 0 4px 16px rgba(126,87,194,0.12); }
+    .plan-card.current { border-color: #7e57c2; background: #faf5ff; }
+    .plan-card.recommended { border-color: #ff9800; }
+    .plan-card .rec-tag {
+        position: absolute; top: -11px; left: 50%; transform: translateX(-50%);
+        background: #ff9800; color: #fff; padding: 2px 12px; border-radius: 8px;
+        font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    }
+    .plan-tier { font-size: 1.3rem; font-weight: 800; color: #333; margin-bottom: 4px; }
+    .plan-price { font-size: 2rem; font-weight: 800; color: #7e57c2; }
+    .plan-price span { font-size: 0.85rem; font-weight: 400; color: #9e9e9e; }
+    .plan-features { list-style: none; padding: 0; margin: 16px 0; text-align: left; }
+    .plan-features li {
+        padding: 5px 0; font-size: 0.85rem; color: #616161;
+        display: flex; align-items: center; gap: 6px;
+    }
+    .plan-features li i { font-size: 0.95rem; color: #43a047; }
+    .plan-btn {
+        display: block; width: 100%; padding: 12px; border-radius: 8px; border: none;
+        font-size: 0.9rem; font-weight: 700; cursor: pointer; transition: all 0.15s;
+        text-align: center;
+    }
+    .plan-btn.primary { background: #7e57c2; color: #fff; }
+    .plan-btn.primary:hover { background: #6a3fb5; }
+    .plan-btn.outline { background: #fff; color: #7e57c2; border: 2px solid #7e57c2; }
+    .plan-btn.outline:hover { background: #ede7f6; }
+    .plan-btn.current-btn { background: #e0e0e0; color: #9e9e9e; cursor: default; }
+
+    .trial-banner {
+        text-align: center; padding: 16px; background: #fff3e0; border-radius: 8px;
+        margin-bottom: 20px; border: 1px solid #ffe0b2;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container" style="margin-top: 20px; padding-bottom: 40px;">
-    <div class="pricing-header">
-        <h4>Choose Your Plan</h4>
-        <p>Start exploring. Cancel anytime.</p>
+<div class="sub-wrap">
+    <div style="text-align: center; margin-bottom: 20px;">
+        <h5 style="font-weight: 700; color: #455a64; margin: 0 0 4px; display: inline-flex; align-items: center; gap: 8px;">
+            <i class="material-icons">card_membership</i> My Subscription
+        </h5>
+        <p class="grey-text" style="margin: 4px 0 0;">Planner — Standard</p>
     </div>
 
-    <!-- Current Status -->
-    <div class="current-plan">
-        {% if user.is_in_trial and user.subscription_status != 'active' %}
-        <span class="status-badge trialing"><i class="material-icons" style="font-size:0.9rem;">hourglass_top</i> Free Trial — {{ user.trial_days_remaining }} day{{ user.trial_days_remaining|pluralize }} remaining</span>
-        <p style="font-size:0.85rem;color:#9e9e9e;margin-top:6px;">Subscribe now to keep access when your trial ends.</p>
-        {% elif user.subscription_status == 'active' %}
-        <span class="status-badge active"><i class="material-icons" style="font-size:0.9rem;">check_circle</i> {{ user.subscription_plan|title }} Plan — Active</span>
-        <form method="post" action="{% url 'customer_portal' %}" style="margin-top: 10px;">
+    <!-- Trial Banner -->
+    {% if user.is_in_trial and user.subscription_status != 'active' %}
+    <div class="trial-banner">
+        <div style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: #e65100;">
+            <i class="material-icons" style="font-size: 1.1rem;">hourglass_top</i>
+            Free Trial — {{ user.trial_days_remaining }} day{{ user.trial_days_remaining|pluralize }} remaining
+        </div>
+        <p style="font-size: 0.85rem; color: #9e9e9e; margin: 6px 0 0;">Subscribe now to keep access when your trial ends.</p>
+    </div>
+    {% endif %}
+
+    <!-- Current Plan -->
+    <div class="current-plan-bar">
+        <div class="plan-icon" style="{% if user.subscription_status == 'active' %}background: #e8f5e9; color: #2e7d32;{% elif user.subscription_status == 'past_due' %}background: #fff3e0; color: #e65100;{% else %}background: #f5f5f5; color: #bdbdbd;{% endif %}">
+            <i class="material-icons">{% if user.subscription_status == 'active' %}check_circle{% elif user.subscription_status == 'past_due' %}warning{% else %}card_membership{% endif %}</i>
+        </div>
+        <div style="flex: 1;">
+            <div style="font-weight: 700; font-size: 1rem;">
+                {% if user.subscription_status == 'active' %}
+                {{ user.subscription_plan|title }} Plan — Active
+                {% elif user.subscription_status == 'past_due' %}
+                Payment Past Due
+                {% elif user.subscription_status == 'canceled' %}
+                Subscription Canceled
+                {% elif user.is_in_trial %}
+                Free Trial
+                {% else %}
+                No Active Subscription
+                {% endif %}
+            </div>
+            {% if user.subscription_status == 'active' %}
+            <div style="font-size: 0.82rem; color: #9e9e9e;">{{ user.subscription_plan }} plan</div>
+            {% elif user.subscription_status == 'canceled' %}
+            <div style="font-size: 0.82rem; color: #c62828;">Subscribe to a plan to regain access.</div>
+            {% endif %}
+        </div>
+        {% if user.stripe_customer_id and user.subscription_status == 'active' %}
+        <form method="post" action="{% url 'customer_portal' %}">
             {% csrf_token %}
-            <button type="submit" style="border:1.5px solid #7e57c2;background:#fff;color:#7e57c2;padding:6px 16px;border-radius:14px;font-size:0.8rem;font-weight:600;cursor:pointer;">
-                <i class="material-icons" style="font-size:0.85rem;vertical-align:middle;">settings</i> Manage Subscription
+            <button type="submit" style="display: inline-flex; align-items: center; gap: 5px; padding: 8px 16px; border-radius: 6px; border: 1.5px solid #7e57c2; background: #fff; color: #7e57c2; font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.15s;" onmouseover="this.style.background='#ede7f6'" onmouseout="this.style.background='#fff'">
+                <i class="material-icons" style="font-size: 1rem;">settings</i> Billing Portal
             </button>
         </form>
-        {% elif user.subscription_status == 'past_due' %}
-        <span class="status-badge past_due"><i class="material-icons" style="font-size:0.9rem;">warning</i> Payment Past Due</span>
-        <p style="font-size:0.85rem;color:#9e9e9e;margin-top:6px;">Please update your payment method to continue.</p>
-        <form method="post" action="{% url 'customer_portal' %}" style="margin-top: 6px;">
-            {% csrf_token %}
-            <button type="submit" style="border:none;background:#c62828;color:#fff;padding:8px 20px;border-radius:8px;font-size:0.85rem;font-weight:600;cursor:pointer;">Update Payment</button>
-        </form>
-        {% elif user.subscription_status == 'canceled' %}
-        <span class="status-badge canceled"><i class="material-icons" style="font-size:0.9rem;">cancel</i> Subscription Canceled</span>
-        <p style="font-size:0.85rem;color:#c62828;margin-top:6px;font-weight:600;">Your subscription has been canceled. Subscribe to a plan to regain access.</p>
-        {% else %}
-        <span class="status-badge none"><i class="material-icons" style="font-size:0.9rem;">block</i> No Active Subscription</span>
-        <p style="font-size:0.85rem;color:#c62828;margin-top:6px;font-weight:600;">You need a subscription to use Vino Trip. Choose a plan below to get started.</p>
         {% endif %}
     </div>
 
-    <!-- Pricing Cards -->
-    <div class="pricing-cards">
+    <!-- Billing Toggle -->
+    <div class="billing-toggle">
+        <span class="bt-opt active" onclick="setBilling('monthly')">Monthly</span>
+        <span class="bt-opt" onclick="setBilling('yearly')">Yearly <span style="font-size: 0.72rem; color: #43a047;">(Save 18%)</span></span>
+    </div>
+
+    <!-- Plan Cards -->
+    <div class="plan-grid">
         <!-- Monthly -->
-        <div class="pricing-card {% if user.subscription_plan == 'monthly' and user.subscription_status == 'active' %}featured{% endif %}">
-            <div class="card-header" {% if user.subscription_plan == 'monthly' and user.subscription_status == 'active' %}style="background: linear-gradient(135deg, #ede7f6, #f3e5f5);"{% endif %}>
-                <div class="plan-name">Monthly</div>
-                <div class="plan-price">$4.99 <span>/ month</span></div>
-                {% if user.subscription_plan == 'monthly' and user.subscription_status == 'active' %}
-                <div style="margin-top: 6px;"><span style="background:#e8f5e9;color:#2e7d32;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:600;">Your Current Plan</span></div>
-                {% endif %}
-            </div>
-            <div class="card-body">
-                <ul>
-                    <li><i class="material-icons">check</i> Unlimited trip planning</li>
-                    <li><i class="material-icons">check</i> Live trip tracking</li>
-                    <li><i class="material-icons">check</i> Wine & beer logging</li>
-                    <li><i class="material-icons">check</i> Menu scraping from websites</li>
-                    <li><i class="material-icons">check</i> Route maps & distances</li>
-                    <li><i class="material-icons">check</i> Invite unlimited members</li>
-                </ul>
-                {% if user.subscription_plan == 'monthly' and user.subscription_status == 'active' %}
-                <form method="post" action="{% url 'customer_portal' %}">
-                    {% csrf_token %}
-                    <button type="submit" class="subscribe-btn btn-outline">
-                        <i class="material-icons">settings</i> Manage Plan
-                    </button>
-                </form>
-                {% else %}
-                <button class="subscribe-btn btn-outline" onclick="subscribe('monthly')">
-                    <i class="material-icons">credit_card</i> Subscribe Monthly
-                </button>
-                {% endif %}
-            </div>
+        <div class="plan-card {% if user.subscription_plan == 'monthly' and user.subscription_status == 'active' %}current{% endif %}">
+            <div class="plan-tier">Monthly</div>
+            <div class="plan-price" data-monthly="$4.99" data-yearly="$4.99">$4.99 <span>/mo</span></div>
+            <ul class="plan-features">
+                <li><i class="material-icons">check</i> Unlimited trip planning</li>
+                <li><i class="material-icons">check</i> Live trip tracking</li>
+                <li><i class="material-icons">check</i> Wine & beer logging with photos</li>
+                <li><i class="material-icons">check</i> Menu scraping from websites</li>
+                <li><i class="material-icons">check</i> Route maps & drive times</li>
+                <li><i class="material-icons">check</i> Invite unlimited members</li>
+            </ul>
+            {% if user.subscription_plan == 'monthly' and user.subscription_status == 'active' %}
+            <button class="plan-btn current-btn" disabled>Current Plan</button>
+            {% else %}
+            <button class="plan-btn outline" onclick="subscribe('monthly')">Subscribe Monthly</button>
+            {% endif %}
         </div>
 
         <!-- Yearly -->
-        <div class="pricing-card {% if user.subscription_plan == 'yearly' and user.subscription_status == 'active' %}featured{% elif user.subscription_plan != 'monthly' or user.subscription_status != 'active' %}featured{% endif %}">
-            <div class="card-header" style="background: linear-gradient(135deg, #ede7f6, #f3e5f5);">
-                <div class="plan-name">Yearly</div>
-                <div class="plan-price">$49.00 <span>/ year</span></div>
-                {% if user.subscription_plan == 'yearly' and user.subscription_status == 'active' %}
-                <div style="margin-top: 6px;"><span style="background:#e8f5e9;color:#2e7d32;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:600;">Your Current Plan</span></div>
-                {% else %}
-                <div class="plan-savings">Save $10.88 vs monthly</div>
-                {% endif %}
-            </div>
-            <div class="card-body">
-                <ul>
-                    <li><i class="material-icons">check</i> Everything in Monthly</li>
-                    <li><i class="material-icons">check</i> 2 months free</li>
-                    <li><i class="material-icons">check</i> Priority support</li>
-                    <li><i class="material-icons">check</i> Early access to features</li>
-                    <li><i class="material-icons">check</i> AI-powered recommendations</li>
-                    <li><i class="material-icons">check</i> Best value</li>
-                </ul>
-                {% if user.subscription_plan == 'yearly' and user.subscription_status == 'active' %}
-                <form method="post" action="{% url 'customer_portal' %}">
-                    {% csrf_token %}
-                    <button type="submit" class="subscribe-btn btn-primary">
-                        <i class="material-icons">settings</i> Manage Plan
-                    </button>
-                </form>
-                {% else %}
-                <button class="subscribe-btn btn-primary" onclick="subscribe('yearly')">
-                    <i class="material-icons">star</i> Subscribe Yearly
-                </button>
-                {% endif %}
-            </div>
+        <div class="plan-card recommended {% if user.subscription_plan == 'yearly' and user.subscription_status == 'active' %}current{% endif %}">
+            <div class="rec-tag">Best Value</div>
+            <div class="plan-tier">Yearly</div>
+            <div class="plan-price" data-monthly="$49" data-yearly="$49">$49 <span>/year</span></div>
+            <ul class="plan-features">
+                <li><i class="material-icons">check</i> Everything in Monthly</li>
+                <li><i class="material-icons">check</i> 2 months free</li>
+                <li><i class="material-icons">check</i> Priority support</li>
+                <li><i class="material-icons">check</i> Early access to features</li>
+                <li><i class="material-icons">check</i> AI-powered recommendations</li>
+                <li><i class="material-icons">check</i> Save $10.88 vs monthly</li>
+            </ul>
+            {% if user.subscription_plan == 'yearly' and user.subscription_status == 'active' %}
+            <button class="plan-btn current-btn" disabled>Current Plan</button>
+            {% else %}
+            <button class="plan-btn primary" onclick="subscribe('yearly')">Subscribe Yearly</button>
+            {% endif %}
         </div>
     </div>
+
+    {% if user.subscription_status == 'past_due' and user.stripe_customer_id %}
+    <div style="text-align: center; margin-top: 20px;">
+        <form method="post" action="{% url 'customer_portal' %}">
+            {% csrf_token %}
+            <button type="submit" style="display: inline-flex; align-items: center; gap: 5px; padding: 10px 24px; border-radius: 8px; border: none; background: #c62828; color: #fff; font-size: 0.9rem; font-weight: 700; cursor: pointer;">
+                <i class="material-icons" style="font-size: 1rem;">credit_card</i> Update Payment Method
+            </button>
+        </form>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
+var csrfToken = '{{ csrf_token }}';
+var billingPeriod = 'monthly';
+
+function setBilling(period) {
+    billingPeriod = period;
+    document.querySelectorAll('.bt-opt').forEach(function(el) {
+        el.classList.toggle('active', el.textContent.toLowerCase().indexOf(period) >= 0);
+    });
+}
+
 function subscribe(plan) {
     fetch('{% url "create_checkout" %}', {
         method: 'POST',
-        headers: {
-            'X-CSRFToken': '{{ csrf_token }}',
-            'Content-Type': 'application/json'
-        },
+        headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
         body: JSON.stringify({ plan: plan })
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-        if (data.url) {
-            window.location.href = data.url;
-        } else if (data.error) {
-            alert(data.error);
-        }
-    })
-    .catch(function() { alert('Something went wrong. Please try again.'); });
+    }).then(function(r) { return r.json(); }).then(function(data) {
+        if (data.url) window.location.href = data.url;
+        else if (data.error) M.toast({ html: data.error });
+    });
 }
 </script>
 {% endblock %}

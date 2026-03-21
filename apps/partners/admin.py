@@ -1,14 +1,21 @@
 from django.contrib import admin
 
-from apps.partners.models import Partner, PlaceClaim, Promotion, PromotionImpression
+from apps.partners.models import Partner, PartnerOwner, PlaceClaim, Promotion, PromotionImpression
+
+
+class PartnerOwnerInline(admin.TabularInline):
+    model = PartnerOwner
+    extra = 0
+    fields = ("user", "role", "title", "contact_email", "contact_phone")
 
 
 @admin.register(Partner)
 class PartnerAdmin(admin.ModelAdmin):
-    list_display = ("business_name", "user", "tier", "status", "created_at")
+    list_display = ("business_name", "tier", "status", "created_at")
     list_filter = ("tier", "status")
-    search_fields = ("business_name", "user__email")
+    search_fields = ("business_name",)
     readonly_fields = ("id", "created_at", "updated_at")
+    inlines = [PartnerOwnerInline]
 
 
 @admin.register(PlaceClaim)

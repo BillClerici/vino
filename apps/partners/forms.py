@@ -1,19 +1,50 @@
 from django import forms
 
-from apps.lookup.models import LookupValue
 from apps.partners.models import Partner, PlaceClaim, Promotion
 from apps.wineries.models import Place
 
 
-def _tier_queryset():
-    return LookupValue.objects.filter(parent__code="PARTNER_TIER").order_by("sort_order")
+def _clean_url(value):
+    """Prepend https:// if no scheme is present."""
+    if not value:
+        return value
+    value = value.strip()
+    if value and not value.startswith(("http://", "https://")):
+        value = "https://" + value
+    return value
+
+
+class URLCleanMixin:
+    """Mixin that auto-prepends https:// to website and logo_url fields.
+    Also swaps URLInput widgets to TextInput to avoid browser-side validation."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name in ("website", "logo_url", "image_url", "cta_link"):
+            if field_name in self.fields:
+                self.fields[field_name].widget = forms.TextInput(
+                    attrs=self.fields[field_name].widget.attrs
+                )
+
+    def clean_website(self):
+        return _clean_url(self.cleaned_data.get("website", ""))
+
+    def clean_logo_url(self):
+        return _clean_url(self.cleaned_data.get("logo_url", ""))
+
+    def clean_image_url(self):
+        return _clean_url(self.cleaned_data.get("image_url", ""))
+
+    def clean_cta_link(self):
+        return _clean_url(self.cleaned_data.get("cta_link", ""))
 
 
 def _promotion_type_queryset():
+    from apps.lookup.models import LookupValue
     return LookupValue.objects.filter(parent__code="PROMOTION_TYPE").order_by("sort_order")
 
 
-class PartnerApplyForm(forms.ModelForm):
+class PartnerApplyForm(URLCleanMixin, forms.ModelForm):
     """Form for users applying to become a partner."""
 
     class Meta:
@@ -24,7 +55,7 @@ class PartnerApplyForm(forms.ModelForm):
         }
 
 
-class PartnerProfileForm(forms.ModelForm):
+class PartnerProfileForm(URLCleanMixin, forms.ModelForm):
     """Form for partners editing their business profile."""
 
     class Meta:
@@ -64,7 +95,7 @@ class PlaceClaimForm(forms.ModelForm):
         self.fields["place"].queryset = Place.objects.exclude(id__in=claimed_place_ids)
 
 
-class PromotionForm(forms.ModelForm):
+class PromotionForm(URLCleanMixin, forms.ModelForm):
     """Form for creating/editing promotions."""
 
     start_date = forms.DateField(widget=forms.DateInput(attrs={"type": "date"}))
@@ -111,57 +142,26 @@ class PromotionForm(forms.ModelForm):
         return cleaned_data
 
 
-class AdminPartnerCreateForm(forms.ModelForm):
+class AdminPartnerCreateForm(URLCleanMixin, forms.ModelForm):
     """Admin form for creating a new partner."""
 
-    from django.contrib.auth import get_user_model
-    user = forms.ModelChoiceField(
-        queryset=get_user_model().objects.all(),
-        widget=forms.Select(attrs={"class": "browser-default"}),
-        help_text="Select the user who will manage this partner account.",
-    )
-    tier = forms.ModelChoiceField(
-        queryset=_tier_queryset(),
-        required=False,
-        widget=forms.Select(attrs={"class": "browser-default"}),
-        empty_label="— Select Tier —",
-    )
-
     class Meta:
         model = Partner
         fields = [
-            "user",
             "business_name",
             "business_email",
             "business_phone",
             "website",
             "logo_url",
             "description",
-            "tier",
-            "status",
         ]
         widgets = {
             "description": forms.Textarea(attrs={"class": "materialize-textarea", "rows": 4}),
         }
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        existing_partner_user_ids = Partner.all_objects.values_list("user_id", flat=True)
-        self.fields["user"].queryset = self.fields["user"].queryset.exclude(
-            id__in=existing_partner_user_ids
-        )
-        self.fields["tier"].queryset = _tier_queryset()
 
-
-class AdminPartnerForm(forms.ModelForm):
-    """Admin form for editing a partner (includes status/tier)."""
-
-    tier = forms.ModelChoiceField(
-        queryset=_tier_queryset(),
-        required=False,
-        widget=forms.Select(attrs={"class": "browser-default"}),
-        empty_label="— Select Tier —",
-    )
+class AdminPartnerForm(URLCleanMixin, forms.ModelForm):
+    """Admin form for editing a partner."""
 
     class Meta:
         model = Partner
@@ -172,16 +172,10 @@ class AdminPartnerForm(forms.ModelForm):
             "website",
             "logo_url",
             "description",
-            "tier",
-            "status",
         ]
         widgets = {
             "description": forms.Textarea(attrs={"class": "materialize-textarea", "rows": 4}),
         }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields["tier"].queryset = _tier_queryset()
 
 
 class AdminClaimForm(forms.ModelForm):
@@ -195,7 +189,7 @@ class AdminClaimForm(forms.ModelForm):
         }
 
 
-class AdminPromotionForm(forms.ModelForm):
+class AdminPromotionForm(URLCleanMixin, forms.ModelForm):
     """Admin form for editing a promotion."""
 
     start_date = forms.DateField(widget=forms.DateInput(attrs={"type": "date"}))

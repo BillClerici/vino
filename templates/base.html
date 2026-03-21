@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Vino{% endblock %}</title>
+    <title>{% block title %}Trip Me{% endblock %}</title>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
     <style>
@@ -173,7 +173,7 @@
                     <i class="material-icons">menu</i>
                 </a>
                 {% endif %}
-                <a href="{% url 'landing' %}" class="brand-logo center">&#127863; Vino Trip</a>
+                <a href="{% url 'landing' %}" class="brand-logo center">Trip Me</a>
                 <ul class="right">
                     {% if user.is_authenticated %}
                     {% if user.is_in_trial and user.subscription_status != 'active' and not user.is_superuser %}
@@ -203,7 +203,7 @@
     <ul id="app-sidenav" class="sidenav">
         <li>
             <div class="sidenav-header">
-                <span class="brand-text">Vino</span>
+                <span class="brand-text">Main</span>
                 <a class="pin-btn" id="pin-nav-btn" title="Pin navigation">
                     <i class="material-icons">push_pin</i>
                 </a>
@@ -228,12 +228,13 @@
         <li class="{% if 'palate' in request.resolver_match.url_name %}active{% endif %}">
             <a href="{% url 'palate_profile' %}"><i class="material-icons">wine_bar</i>My Palate</a>
         </li>
-        {% if user.partner_profile and user.partner_profile.status == 'approved' %}
+        {% if is_approved_partner %}
         <li><div class="divider"></div></li>
         <li><a class="subheader">Partner Portal</a></li>
         <li><a href="/partners/dashboard/"><i class="material-icons">dashboard</i>Partner Dashboard</a></li>
         <li><a href="/partners/claims/"><i class="material-icons">store</i>My Places</a></li>
         <li><a href="/partners/promotions/"><i class="material-icons">campaign</i>Promotions</a></li>
+        <li><a href="/partners/subscription/"><i class="material-icons">card_membership</i>Subscription</a></li>
         {% endif %}
         {% else %}
         <!-- No active subscription — show subscribe prompt -->
@@ -358,7 +359,7 @@
         <div class="container">
             <div class="row">
                 <div class="col s12">
-                    <p class="grey-text text-lighten-4" style="margin: 0; font-size: 0.85rem;">&copy; {% now "Y" %} Vino. Built with the GSD Framework.</p>
+                    <p class="grey-text text-lighten-4" style="margin: 0; font-size: 0.85rem;">&copy; {% now "Y" %} Trip Me. Built with the GSD Framework.</p>
                 </div>
             </div>
         </div>
