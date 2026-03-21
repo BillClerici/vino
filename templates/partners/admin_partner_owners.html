@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block title %}Owners — {{ partner.business_name }} — Partner Admin{% endblock %}
+
+{% block extra_css %}
+<style>
+    .pd-wrap { max-width: 1000px; margin: 0 auto; padding: 20px 16px 30px; }
+    .owner-card { border: 1px solid #e0e0e0; border-radius: 8px; margin-bottom: 10px; background: #fff; transition: box-shadow 0.15s; }
+    .owner-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    .owner-header { display: flex; align-items: center; gap: 12px; padding: 14px 16px; cursor: pointer; }
+    .owner-avatar { width: 44px; height: 44px; border-radius: 50%; background: #ede7f6; color: #7e57c2; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1rem; flex-shrink: 0; }
+    .owner-name { font-weight: 600; font-size: 0.95rem; color: #333; }
+    .owner-subtitle { font-size: 0.78rem; color: #9e9e9e; margin-top: 1px; }
+    .owner-role-badge { display: inline-flex; padding: 3px 10px; border-radius: 10px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; }
+    .owner-role-badge.primary { background: #fff3e0; color: #e65100; }
+    .owner-role-badge.owner { background: #ede7f6; color: #4a148c; }
+    .owner-role-badge.manager { background: #e3f2fd; color: #1565c0; }
+    .owner-details { display: none; padding: 0 16px 16px; border-top: 1px solid #f0f0f0; margin-top: -4px; }
+    .owner-details.open { display: block; }
+    .od-field { margin-bottom: 10px; }
+    .od-field label { font-size: 0.72rem; color: #9e9e9e; text-transform: uppercase; letter-spacing: 0.3px; font-weight: 600; display: block; margin-bottom: 3px; }
+    .od-field input, .od-field select, .od-field textarea { width: 100%; border: 1px solid #e0e0e0; border-radius: 4px; padding: 7px 10px; font-size: 0.88rem; box-sizing: border-box; font-family: inherit; }
+    .od-field textarea { resize: vertical; min-height: 50px; }
+    .od-field input:focus, .od-field select:focus, .od-field textarea:focus { border-color: #7e57c2; outline: none; }
+    .od-row { display: flex; gap: 10px; }
+    .od-row > div { flex: 1; }
+    .user-search-wrap { position: relative; }
+    .user-search-results { position: absolute; top: 100%; left: 0; right: 0; z-index: 20; background: #fff; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 8px 8px; max-height: 260px; overflow-y: auto; box-shadow: 0 6px 20px rgba(0,0,0,0.12); display: none; }
+    .usr-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer; transition: background 0.1s; border-bottom: 1px solid #f8f8f8; }
+    .usr-item:last-child { border-bottom: none; }
+    .usr-item:hover { background: #f5f5f5; }
+    .usr-item .usr-avatar { width: 32px; height: 32px; border-radius: 50%; background: #e3f2fd; color: #1565c0; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.75rem; flex-shrink: 0; }
+    .usr-item .usr-name { font-weight: 600; font-size: 0.88rem; }
+    .usr-item .usr-email { font-size: 0.78rem; color: #9e9e9e; }
+    .selected-user-chip { display: flex; align-items: center; gap: 8px; padding: 8px 14px; background: #e8f5e9; border-radius: 8px; border: 1px solid #c8e6c9; margin-bottom: 12px; }
+    .add-owner-panel { border: 2px dashed #e0e0e0; border-radius: 8px; padding: 20px; margin-top: 16px; background: #fafafa; }
+    .add-owner-panel.has-user { border-color: #7e57c2; border-style: solid; background: #fff; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pd-wrap">
+    {% include "partners/_admin_partner_nav.html" %}
+
+    <div class="row">
+        <div class="col s12 m10 offset-m1">
+            <div class="card" style="border-radius: 8px;">
+                <div class="card-content">
+                    <span style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 1rem; color: #455a64; margin-bottom: 16px;">
+                        <i class="material-icons" style="color: #7e57c2;">people</i> Owners ({{ owners|length }})
+                    </span>
+
+                    <div id="owners-list">
+                        {% for po in owners %}
+                        <div class="owner-card" id="owner-{{ po.pk }}" data-owner-id="{{ po.pk }}">
+                            <div class="owner-header" onclick="toggleOwnerDetails('{{ po.pk }}')">
+                                <div class="owner-avatar">{{ po.user.first_name|first|default:po.user.email|first|upper }}</div>
+                                <div style="flex: 1;">
+                                    <div class="owner-name">{{ po.user.full_name|default:po.user.email }}</div>
+                                    <div class="owner-subtitle">{{ po.user.email }}{% if po.title %} · {{ po.title }}{% endif %}</div>
+                                </div>
+                                <span class="owner-role-badge {{ po.role }}">{{ po.get_role_display }}</span>
+                                <i class="material-icons" style="color: #bdbdbd; font-size: 1.2rem;">expand_more</i>
+                            </div>
+                            <div class="owner-details" id="details-{{ po.pk }}">
+                                <div class="od-row" style="margin-top: 12px;">
+                                    <div class="od-field"><label>Role</label><select class="browser-default" data-field="role" onchange="saveOwnerField('{{ po.pk }}')"><option value="primary" {% if po.role == 'primary' %}selected{% endif %}>Primary Owner</option><option value="owner" {% if po.role == 'owner' %}selected{% endif %}>Owner</option><option value="manager" {% if po.role == 'manager' %}selected{% endif %}>Manager</option></select></div>
+                                    <div class="od-field"><label>Title</label><input type="text" value="{{ po.title }}" data-field="title" onblur="saveOwnerField('{{ po.pk }}')"></div>
+                                </div>
+                                <div class="od-row">
+                                    <div class="od-field"><label>Contact Email</label><input type="email" value="{{ po.contact_email }}" data-field="contact_email" onblur="saveOwnerField('{{ po.pk }}')"></div>
+                                    <div class="od-field"><label>Phone</label><input type="tel" value="{{ po.contact_phone }}" data-field="contact_phone" onblur="saveOwnerField('{{ po.pk }}')"></div>
+                                    <div class="od-field"><label>Mobile</label><input type="tel" value="{{ po.mobile_phone }}" data-field="mobile_phone" onblur="saveOwnerField('{{ po.pk }}')"></div>
+                                </div>
+                                <div class="od-field"><label>Street Address</label><input type="text" value="{{ po.address }}" data-field="address" onblur="saveOwnerField('{{ po.pk }}')"></div>
+                                <div class="od-row">
+                                    <div class="od-field" style="flex: 2;"><label>City</label><input type="text" value="{{ po.city }}" data-field="city" onblur="saveOwnerField('{{ po.pk }}')"></div>
+                                    <div class="od-field"><label>State</label><input type="text" value="{{ po.state }}" data-field="state" onblur="saveOwnerField('{{ po.pk }}')"></div>
+                                    <div class="od-field"><label>ZIP</label><input type="text" value="{{ po.zip_code }}" data-field="zip_code" onblur="saveOwnerField('{{ po.pk }}')"></div>
+                                </div>
+                                <div class="od-field"><label>Notes</label><textarea data-field="notes" onblur="saveOwnerField('{{ po.pk }}')">{{ po.notes }}</textarea></div>
+                                <div style="display: flex; justify-content: flex-end; padding-top: 8px; border-top: 1px solid #f0f0f0;">
+                                    <button onclick="removeOwner('{{ po.pk }}')" style="display: inline-flex; align-items: center; gap: 4px; padding: 6px 14px; border-radius: 4px; border: 1px solid #e0e0e0; background: #fff; color: #c62828; font-size: 0.82rem; cursor: pointer;" onmouseover="this.style.background='#fce4ec'" onmouseout="this.style.background='#fff'">
+                                        <i class="material-icons" style="font-size: 0.95rem;">delete</i> Remove
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div id="no-owners-msg" style="text-align: center; padding: 24px 0; color: #bdbdbd;">
+                            <i class="material-icons" style="font-size: 2.5rem;">person_add</i>
+                            <p style="margin: 6px 0 0;">No owners yet. Add one below.</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="add-owner-panel" id="add-owner-panel">
+                        <div style="font-size: 0.9rem; font-weight: 600; color: #455a64; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+                            <i class="material-icons" style="font-size: 1.1rem; color: #7e57c2;">person_add</i> Add New Owner
+                        </div>
+                        <div class="user-search-wrap">
+                            <label style="font-size: 0.72rem; color: #9e9e9e; text-transform: uppercase; font-weight: 600;">Search Users</label>
+                            <input type="text" id="user-search" placeholder="Type a name or email..." style="border: 1px solid #e0e0e0; border-radius: 6px; padding: 10px 14px; width: 100%; box-sizing: border-box; font-size: 0.9rem; margin-top: 4px;" autocomplete="off">
+                            <div class="user-search-results" id="search-results"></div>
+                        </div>
+                        <div id="selected-user" style="display: none;">
+                            <div class="selected-user-chip">
+                                <div class="owner-avatar" style="width: 36px; height: 36px; font-size: 0.85rem; background: #c8e6c9; color: #2e7d32;" id="selected-avatar"></div>
+                                <div style="flex: 1;"><div style="font-weight: 600; color: #2e7d32;" id="selected-name"></div><div style="font-size: 0.78rem; color: #66bb6a;" id="selected-email"></div></div>
+                                <button onclick="clearSelectedUser()" style="border: none; background: none; cursor: pointer; color: #66bb6a;"><i class="material-icons" style="font-size: 1.1rem;">close</i></button>
+                            </div>
+                            <div class="od-row">
+                                <div class="od-field"><label>Role</label><select id="new-role" class="browser-default"><option value="primary">Primary Owner</option><option value="owner" selected>Owner</option><option value="manager">Manager</option></select></div>
+                                <div class="od-field"><label>Title</label><input type="text" id="new-title" placeholder="e.g. Head Winemaker"></div>
+                            </div>
+                            <div class="od-row">
+                                <div class="od-field"><label>Contact Email</label><input type="email" id="new-contact-email"></div>
+                                <div class="od-field"><label>Phone</label><input type="tel" id="new-contact-phone"></div>
+                                <div class="od-field"><label>Mobile</label><input type="tel" id="new-mobile-phone"></div>
+                            </div>
+                            <div class="od-field"><label>Street Address</label><input type="text" id="new-address"></div>
+                            <div class="od-row">
+                                <div class="od-field" style="flex: 2;"><label>City</label><input type="text" id="new-city"></div>
+                                <div class="od-field"><label>State</label><input type="text" id="new-state"></div>
+                                <div class="od-field"><label>ZIP</label><input type="text" id="new-zip"></div>
+                            </div>
+                            <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px;">
+                                <button onclick="clearSelectedUser()" class="btn-flat waves-effect">Cancel</button>
+                                <button onclick="addOwner()" class="btn waves-effect waves-light" style="background: #7e57c2;"><i class="material-icons left" style="margin-right: 4px;">person_add</i> Add Owner</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+var partnerId = '{{ partner.pk }}';
+var csrfToken = '{{ csrf_token }}';
+var selectedUserId = null;
+var searchTimer = null;
+var saveTimers = {};
+
+function api(url, body) { return fetch(url, { method: 'POST', headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }).then(function(r) { return r.json(); }); }
+
+function toggleOwnerDetails(id) { var d = document.getElementById('details-' + id); d.classList.toggle('open'); var a = d.previousElementSibling.querySelector('.material-icons:last-child'); a.textContent = d.classList.contains('open') ? 'expand_less' : 'expand_more'; }
+
+function saveOwnerField(id) { clearTimeout(saveTimers[id]); saveTimers[id] = setTimeout(function() { var card = document.getElementById('owner-' + id); var body = {}; card.querySelectorAll('[data-field]').forEach(function(el) { body[el.dataset.field] = el.value; }); api('/manage/partners/' + partnerId + '/owners/' + id + '/update/', body); }, 500); }
+
+function removeOwner(id) { if (!confirm('Remove this owner?')) return; api('/manage/partners/' + partnerId + '/owners/' + id + '/remove/', {}).then(function(data) { if (data.ok) { document.getElementById('owner-' + id).remove(); M.toast({ html: 'Removed' }); } }); }
+
+document.getElementById('user-search').addEventListener('input', function() { var q = this.value.trim(); clearTimeout(searchTimer); if (q.length < 2) { document.getElementById('search-results').style.display = 'none'; return; } searchTimer = setTimeout(function() { fetch('/manage/users/search/?q=' + encodeURIComponent(q), { headers: { 'X-CSRFToken': csrfToken } }).then(function(r) { return r.json(); }).then(function(data) { var c = document.getElementById('search-results'); if (!data.results || data.results.length === 0) { c.innerHTML = '<div style="padding:14px;color:#9e9e9e;text-align:center;">No users found</div>'; c.style.display = 'block'; return; } c.innerHTML = data.results.map(function(u) { var i = (u.name || u.email).charAt(0).toUpperCase(); return '<div class="usr-item" onclick="selectUser(\'' + u.id + '\',\'' + u.name.replace(/'/g,"\\'") + '\',\'' + u.email.replace(/'/g,"\\'") + '\')"><div class="usr-avatar">' + i + '</div><div><div class="usr-name">' + u.name + '</div><div class="usr-email">' + u.email + '</div></div></div>'; }).join(''); c.style.display = 'block'; }); }, 300); });
+document.addEventListener('click', function(e) { if (!e.target.closest('.user-search-wrap')) document.getElementById('search-results').style.display = 'none'; });
+
+function selectUser(id, name, email) { selectedUserId = id; document.getElementById('selected-avatar').textContent = (name||email).charAt(0).toUpperCase(); document.getElementById('selected-name').textContent = name; document.getElementById('selected-email').textContent = email; document.getElementById('new-contact-email').value = email; document.getElementById('selected-user').style.display = 'block'; document.getElementById('user-search').value = ''; document.getElementById('search-results').style.display = 'none'; document.getElementById('add-owner-panel').classList.add('has-user'); }
+function clearSelectedUser() { selectedUserId = null; document.getElementById('selected-user').style.display = 'none'; document.getElementById('add-owner-panel').classList.remove('has-user'); }
+
+function addOwner() { if (!selectedUserId) return; api('/manage/partners/' + partnerId + '/owners/add/', { user_id: selectedUserId, role: document.getElementById('new-role').value, title: document.getElementById('new-title').value.trim(), contact_email: document.getElementById('new-contact-email').value.trim(), contact_phone: document.getElementById('new-contact-phone').value.trim(), mobile_phone: document.getElementById('new-mobile-phone').value.trim(), address: document.getElementById('new-address').value.trim(), city: document.getElementById('new-city').value.trim(), state: document.getElementById('new-state').value.trim(), zip_code: document.getElementById('new-zip').value.trim() }).then(function(data) { if (data.error) { M.toast({ html: data.error }); return; } M.toast({ html: data.name + ' added' }); setTimeout(function() { location.reload(); }, 1000); }); }
+</script>
+{% endblock %}

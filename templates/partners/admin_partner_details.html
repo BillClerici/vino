@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+
+{% block title %}Details — {{ partner.business_name }} — Partner Admin{% endblock %}
+
+{% block extra_css %}
+<style>
+    .pd-wrap { max-width: 1000px; margin: 0 auto; padding: 20px 16px 30px; }
+    .status-badge-lg {
+        display: inline-flex; align-items: center; gap: 5px;
+        padding: 6px 16px; border-radius: 14px; font-size: 0.85rem; font-weight: 700;
+        text-transform: uppercase;
+    }
+    .status-badge-lg.pending { background: #fff3e0; color: #e65100; }
+    .status-badge-lg.approved { background: #e8f5e9; color: #2e7d32; }
+    .status-badge-lg.rejected { background: #fce4ec; color: #c62828; }
+    .decision-btn {
+        display: inline-flex; align-items: center; gap: 5px;
+        padding: 8px 20px; border-radius: 6px; border: none;
+        font-size: 0.88rem; font-weight: 700; cursor: pointer; transition: all 0.15s;
+    }
+    .decision-btn.accept { background: #43a047; color: #fff; }
+    .decision-btn.accept:hover { background: #388e3c; }
+    .decision-btn.reject { background: #c62828; color: #fff; }
+    .decision-btn.reject:hover { background: #b71c1c; }
+    .decision-timestamp { font-size: 0.78rem; color: #9e9e9e; margin-top: 6px; }
+    .decision-timestamp i { font-size: 0.85rem; vertical-align: middle; }
+
+    .email-overlay {
+        display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+        z-index: 1000; align-items: center; justify-content: center;
+    }
+    .email-overlay.open { display: flex; }
+    .email-modal {
+        background: #fff; border-radius: 12px; width: 90%; max-width: 640px;
+        max-height: 90vh; overflow-y: auto; box-shadow: 0 8px 40px rgba(0,0,0,0.2);
+    }
+    .email-modal-header { padding: 20px 24px 16px; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; justify-content: space-between; }
+    .email-modal-body { padding: 20px 24px; }
+    .email-modal-footer { padding: 16px 24px; border-top: 1px solid #f0f0f0; display: flex; justify-content: flex-end; gap: 8px; }
+    .em-field { margin-bottom: 14px; }
+    .em-field label { font-size: 0.72rem; color: #9e9e9e; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 3px; }
+    .em-field input, .em-field textarea { width: 100%; border: 1px solid #e0e0e0; border-radius: 4px; padding: 8px 10px; font-size: 0.88rem; box-sizing: border-box; font-family: inherit; }
+    .em-field textarea { resize: vertical; min-height: 180px; }
+    .em-field input:focus, .em-field textarea:focus { border-color: #7e57c2; outline: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pd-wrap">
+    {% include "partners/_admin_partner_nav.html" %}
+
+    <div class="row">
+        <div class="col s12 m8 offset-m2">
+            <!-- Application Status -->
+            <div class="card" style="border-radius: 8px;">
+                <div class="card-content">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 1rem; color: #455a64;">
+                            <i class="material-icons" style="color: #7e57c2;">verified</i> Application Status
+                        </span>
+                        <span class="status-badge-lg {{ object.status }}" id="status-badge">
+                            <i class="material-icons" style="font-size: 1rem;">{% if object.status == 'approved' %}check_circle{% elif object.status == 'rejected' %}cancel{% else %}hourglass_top{% endif %}</i>
+                            {{ object.get_status_display }}
+                        </span>
+                    </div>
+                    {% if object.status == 'pending' %}
+                    <div style="margin-top: 16px; padding: 16px; background: #fff8e1; border-radius: 8px; border: 1px solid #ffe082;">
+                        <div style="font-size: 0.88rem; color: #f57f17; font-weight: 600; margin-bottom: 12px;">
+                            <i class="material-icons" style="font-size: 1rem; vertical-align: middle;">pending_actions</i> Awaiting review.
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <button class="decision-btn accept" onclick="openDecisionModal('accept')"><i class="material-icons" style="font-size: 1rem;">check</i> Accept</button>
+                            <button class="decision-btn reject" onclick="openDecisionModal('reject')"><i class="material-icons" style="font-size: 1rem;">close</i> Reject</button>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div style="margin-top: 16px; display: flex; gap: 10px;">
+                        {% if object.status == 'rejected' %}
+                        <button class="decision-btn accept" onclick="openDecisionModal('accept')"><i class="material-icons" style="font-size: 1rem;">check</i> Accept</button>
+                        {% endif %}
+                        <button onclick="resetStatus()" style="display: inline-flex; align-items: center; gap: 5px; padding: 8px 20px; border-radius: 6px; border: 1.5px solid #e0e0e0; background: #fff; color: #616161; font-size: 0.88rem; font-weight: 600; cursor: pointer;">
+                            <i class="material-icons" style="font-size: 1rem;">restart_alt</i> Reset to Pending
+                        </button>
+                    </div>
+                    {% endif %}
+                    <div style="margin-top: 12px;">
+                        {% if object.approved_at %}<div class="decision-timestamp"><i class="material-icons">check_circle</i> Approved {{ object.approved_at|date:"M j, Y \a\t g:i A" }}{% if object.approved_by %} by {{ object.approved_by.full_name|default:object.approved_by.email }}{% endif %}</div>{% endif %}
+                        {% if object.rejected_at %}<div class="decision-timestamp"><i class="material-icons">cancel</i> Rejected {{ object.rejected_at|date:"M j, Y \a\t g:i A" }}{% if object.rejected_by %} by {{ object.rejected_by.full_name|default:object.rejected_by.email }}{% endif %}</div>{% endif %}
+                        {% if object.decision_email_sent_at %}<div class="decision-timestamp"><i class="material-icons">email</i> Notification sent {{ object.decision_email_sent_at|date:"M j, Y \a\t g:i A" }}</div>{% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Email Decision Modal -->
+            <div class="email-overlay" id="email-modal">
+                <div class="email-modal">
+                    <div class="email-modal-header">
+                        <span style="font-weight: 700; font-size: 1.1rem; display: inline-flex; align-items: center; gap: 6px;" id="modal-title">
+                            <i class="material-icons" id="modal-icon">email</i> <span id="modal-title-text">Send Notification</span>
+                        </span>
+                        <button onclick="closeDecisionModal()" style="border: none; background: none; cursor: pointer; color: #9e9e9e;"><i class="material-icons">close</i></button>
+                    </div>
+                    <div class="email-modal-body">
+                        <div class="em-field"><label>To</label><input type="text" id="em-to" readonly style="background: #fafafa;"></div>
+                        <div class="em-field"><label>Subject</label><input type="text" id="em-subject"></div>
+                        <div class="em-field"><label>Message</label><textarea id="em-body"></textarea></div>
+                    </div>
+                    <div class="email-modal-footer">
+                        <button onclick="closeDecisionModal()" class="btn-flat waves-effect">Cancel</button>
+                        <button onclick="sendDecision()" class="btn waves-effect waves-light" style="background: #7e57c2;" id="em-send-btn">
+                            <i class="material-icons left" style="margin-right: 4px;">send</i> Send & <span id="em-action-label">Accept</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Partner Form -->
+            <div class="card" style="border-radius: 8px;">
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="card-content">
+                        <span style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 1rem; color: #455a64;">
+                            <i class="material-icons" style="color: #7e57c2;">business</i> Business Information
+                        </span>
+                        {% if form.errors %}
+                        <div class="card-panel red lighten-4" style="padding: 10px; margin-top: 10px;">
+                            <ul class="browser-default">{% for field, errors in form.errors.items %}{% for error in errors %}<li><strong>{{ field }}:</strong> {{ error }}</li>{% endfor %}{% endfor %}</ul>
+                        </div>
+                        {% endif %}
+                        {% for field in form %}
+                        <div class="row" style="margin-bottom: 0;">
+                            <div class="input-field col s12">
+                                {{ field }}
+                                <label for="{{ field.id_for_label }}" class="{% if field.value %}active{% endif %}">{{ field.label }}</label>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="card-action right-align">
+                        <button type="submit" class="btn blue-grey darken-1 waves-effect waves-light"><i class="material-icons left">save</i>Save</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Delete -->
+            <div style="text-align: right; margin-top: 8px;">
+                <a href="{% url 'admin_partners_delete' pk=object.pk %}" style="font-size: 0.82rem; color: #c62828; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
+                    <i class="material-icons" style="font-size: 0.9rem;">delete</i> Delete Partner
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+var partnerId = '{{ object.pk }}';
+var csrfToken = '{{ csrf_token }}';
+var currentDecisionAction = null;
+var ownerEmails = [{% for po in partner.partner_owners.all %}'{{ po.contact_email|default:po.user.email|escapejs }}'{% if not forloop.last %}, {% endif %}{% endfor %}];
+var businessName = '{{ object.business_name|escapejs }}';
+
+function api(url, body) {
+    return fetch(url, { method: 'POST', headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }).then(function(r) { return r.json(); });
+}
+
+function openDecisionModal(action) {
+    currentDecisionAction = action;
+    document.getElementById('em-to').value = ownerEmails.join(', ');
+    var titleText = document.getElementById('modal-title-text');
+    var modalIcon = document.getElementById('modal-icon');
+    var actionLabel = document.getElementById('em-action-label');
+    var sendBtn = document.getElementById('em-send-btn');
+    var subjectField = document.getElementById('em-subject');
+    var bodyField = document.getElementById('em-body');
+    if (action === 'accept') {
+        titleText.textContent = 'Accept — Send Notification'; modalIcon.textContent = 'check_circle'; modalIcon.style.color = '#43a047';
+        actionLabel.textContent = 'Accept'; sendBtn.style.background = '#43a047';
+        subjectField.value = 'Your Trip Me Partner Application Has Been Approved!';
+        bodyField.value = 'Dear ' + businessName + ' Team,\n\nGreat news! Your partner application has been approved.\n\nNext steps:\n1. Sign in to Trip Me\n2. Access your Partner Dashboard\n3. Claim your business location(s)\n4. Start creating promotions\n\nWelcome aboard!\nThe Trip Me Team';
+    } else {
+        titleText.textContent = 'Reject — Send Notification'; modalIcon.textContent = 'cancel'; modalIcon.style.color = '#c62828';
+        actionLabel.textContent = 'Reject'; sendBtn.style.background = '#c62828';
+        subjectField.value = 'Update on Your Trip Me Partner Application';
+        bodyField.value = 'Dear ' + businessName + ' Team,\n\nThank you for your interest in partnering with Trip Me.\n\nAfter review, we are unable to approve your partner account at this time.\n\nReason:\n[Please provide reason]\n\nBest regards,\nThe Trip Me Team';
+    }
+    document.getElementById('email-modal').classList.add('open');
+}
+function closeDecisionModal() { document.getElementById('email-modal').classList.remove('open'); currentDecisionAction = null; }
+function sendDecision() {
+    if (!currentDecisionAction) return;
+    var toList = document.getElementById('em-to').value.split(',').map(function(e) { return e.trim(); }).filter(function(e) { return e; });
+    api('/manage/partners/' + partnerId + '/decision/', { action: currentDecisionAction, to: toList, subject: document.getElementById('em-subject').value, body: document.getElementById('em-body').value })
+    .then(function(data) { if (data.ok) { M.toast({ html: 'Done!' }); setTimeout(function() { location.reload(); }, 1000); } });
+}
+function resetStatus() {
+    if (!confirm('Reset to Pending?')) return;
+    api('/manage/partners/' + partnerId + '/decision/', { action: 'reset' }).then(function(data) { if (data.ok) { M.toast({ html: 'Reset' }); setTimeout(function() { location.reload(); }, 1000); } });
+}
+document.getElementById('email-modal').addEventListener('click', function(e) { if (e.target === this) closeDecisionModal(); });
+document.addEventListener('DOMContentLoaded', function() { M.updateTextFields(); });
+</script>
+{% endblock %}

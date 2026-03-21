@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}Places — {{ partner.business_name }} — Partner Admin{% endblock %}
+
+{% block extra_css %}
+<style>
+    .pd-wrap { max-width: 1000px; margin: 0 auto; padding: 20px 16px 30px; }
+    .user-search-wrap { position: relative; }
+    .user-search-results { position: absolute; top: 100%; left: 0; right: 0; z-index: 20; background: #fff; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 8px 8px; max-height: 260px; overflow-y: auto; box-shadow: 0 6px 20px rgba(0,0,0,0.12); display: none; }
+    .usr-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer; transition: background 0.1s; border-bottom: 1px solid #f8f8f8; }
+    .usr-item:last-child { border-bottom: none; }
+    .usr-item:hover { background: #f5f5f5; }
+    .usr-item .usr-avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.75rem; flex-shrink: 0; }
+    .usr-item .usr-name { font-weight: 600; font-size: 0.88rem; }
+    .usr-item .usr-email { font-size: 0.78rem; color: #9e9e9e; }
+    .selected-user-chip { display: flex; align-items: center; gap: 8px; padding: 8px 14px; background: #e8f5e9; border-radius: 8px; border: 1px solid #c8e6c9; margin-bottom: 12px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pd-wrap">
+    {% include "partners/_admin_partner_nav.html" %}
+
+    <div class="row">
+        <div class="col s12 m10 offset-m1">
+            <div class="card" style="border-radius: 8px;">
+                <div class="card-content">
+                    <span style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 1rem; color: #455a64; margin-bottom: 16px;">
+                        <i class="material-icons" style="color: #7e57c2;">store</i> Claimed Places ({{ claims|length }})
+                    </span>
+
+                    <div id="claims-list">
+                        {% for claim in claims %}
+                        <div style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid #e0e0e0; border-radius: 8px; margin-bottom: 8px;" id="claim-{{ claim.pk }}">
+                            <i class="material-icons" style="color: #7e57c2; font-size: 1.3rem;">place</i>
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; font-size: 0.95rem;">{{ claim.place.name }}</div>
+                                <div style="font-size: 0.78rem; color: #9e9e9e;">{% if claim.place.city %}{{ claim.place.city }}{% if claim.place.state %}, {{ claim.place.state }}{% endif %}{% endif %}</div>
+                            </div>
+                            <span style="display: inline-flex; padding: 3px 10px; border-radius: 10px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; {% if claim.status == 'approved' %}background: #e8f5e9; color: #2e7d32;{% elif claim.status == 'pending' %}background: #fff3e0; color: #e65100;{% else %}background: #fce4ec; color: #c62828;{% endif %}">{{ claim.get_status_display }}</span>
+                            <button onclick="removeClaim('{{ claim.pk }}')" style="border: none; background: none; cursor: pointer; color: #bdbdbd; padding: 4px;" title="Remove"><i class="material-icons" style="font-size: 1.1rem;">close</i></button>
+                        </div>
+                        {% empty %}
+                        <p class="grey-text" id="no-claims-msg" style="text-align: center; padding: 16px 0;">No places claimed yet.</p>
+                        {% endfor %}
+                    </div>
+
+                    <!-- Add Place -->
+                    <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #f0f0f0;">
+                        <div style="font-size: 0.9rem; font-weight: 600; color: #455a64; margin-bottom: 10px;">Add a Place</div>
+                        <div class="user-search-wrap">
+                            <label style="font-size: 0.72rem; color: #9e9e9e; text-transform: uppercase; font-weight: 600;">Search Existing Places</label>
+                            <input type="text" id="place-search" placeholder="Type a place name, city, or address..." style="border: 1px solid #e0e0e0; border-radius: 6px; padding: 10px 14px; width: 100%; box-sizing: border-box; font-size: 0.9rem; margin-top: 4px;" autocomplete="off">
+                            <div class="user-search-results" id="place-search-results"></div>
+                        </div>
+                        <div id="selected-place" style="display: none;">
+                            <div class="selected-user-chip">
+                                <i class="material-icons" style="color: #2e7d32;">place</i>
+                                <div style="flex: 1;"><div style="font-weight: 600; color: #2e7d32;" id="selected-place-name"></div><div style="font-size: 0.78rem; color: #66bb6a;" id="selected-place-loc"></div></div>
+                                <button onclick="clearSelectedPlace()" style="border: none; background: none; cursor: pointer; color: #66bb6a;"><i class="material-icons" style="font-size: 1.1rem;">close</i></button>
+                            </div>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <label style="display: flex; align-items: center; gap: 4px; font-size: 0.82rem; color: #616161;"><input type="checkbox" id="claim-auto-approve" checked><span>Auto-approve</span></label>
+                                <button onclick="submitClaim()" class="btn-small waves-effect waves-light" style="background: #7e57c2;"><i class="material-icons left" style="margin-right: 4px;">add_location</i> Claim Place</button>
+                            </div>
+                        </div>
+
+                        {% if google_maps_api_key %}
+                        <div style="margin-top: 14px;">
+                            <button onclick="toggleMapSearch()" style="display: inline-flex; align-items: center; gap: 5px; padding: 6px 14px; border-radius: 16px; border: 1.5px solid #e0e0e0; background: #fff; color: #616161; font-size: 0.82rem; font-weight: 600; cursor: pointer;" onmouseover="this.style.borderColor='#7e57c2';this.style.color='#7e57c2'" onmouseout="this.style.borderColor='#e0e0e0';this.style.color='#616161'">
+                                <i class="material-icons" style="font-size: 1rem;">map</i> Find on Google Maps
+                            </button>
+                            <div id="map-search-panel" style="display: none; margin-top: 10px; border: 1px solid #e0e0e0; border-radius: 8px; padding: 14px;">
+                                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                                    <input type="text" id="gmap-search-input" placeholder="Search Google Maps..." style="flex: 1; border: 1px solid #e0e0e0; border-radius: 4px; padding: 8px 12px; font-size: 0.88rem;">
+                                    <button onclick="searchGooglePlaces()" class="btn-small waves-effect waves-light" style="background: #1565c0;"><i class="material-icons">search</i></button>
+                                </div>
+                                <div id="gmap-results" style="max-height: 200px; overflow-y: auto;"></div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+var partnerId = '{{ partner.pk }}';
+var csrfToken = '{{ csrf_token }}';
+var selectedPlaceId = null;
+var placeSearchTimer = null;
+
+function api(url, body) { return fetch(url, { method: 'POST', headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }).then(function(r) { return r.json(); }); }
+
+document.getElementById('place-search').addEventListener('input', function() { var q = this.value.trim(); clearTimeout(placeSearchTimer); if (q.length < 2) { document.getElementById('place-search-results').style.display = 'none'; return; } placeSearchTimer = setTimeout(function() { fetch('/manage/places/search/?q=' + encodeURIComponent(q), { headers: { 'X-CSRFToken': csrfToken } }).then(function(r) { return r.json(); }).then(function(data) { var c = document.getElementById('place-search-results'); if (!data.results || data.results.length === 0) { c.innerHTML = '<div style="padding:12px;color:#9e9e9e;text-align:center;">No places found. Try Google Maps below.</div>'; c.style.display = 'block'; return; } c.innerHTML = data.results.map(function(p) { var loc = p.city ? p.city + (p.state ? ', ' + p.state : '') : (p.address || ''); var badge = p.claimed ? ' <span style="font-size:0.7rem;color:#e65100;">(claimed)</span>' : ''; return '<div class="usr-item" onclick="selectPlace(\'' + p.id + '\',\'' + p.name.replace(/'/g,"\\'") + '\',\'' + loc.replace(/'/g,"\\'") + '\')" style="' + (p.claimed ? 'opacity:0.5;' : '') + '"><div class="usr-avatar" style="background:#ede7f6;color:#7e57c2;"><i class="material-icons" style="font-size:0.9rem;">place</i></div><div><div class="usr-name">' + p.name + badge + '</div><div class="usr-email">' + loc + '</div></div></div>'; }).join(''); c.style.display = 'block'; }); }, 300); });
+document.addEventListener('click', function(e) { if (!e.target.closest('#place-search') && !e.target.closest('#place-search-results')) document.getElementById('place-search-results').style.display = 'none'; });
+
+function selectPlace(id, name, loc) { selectedPlaceId = id; document.getElementById('selected-place-name').textContent = name; document.getElementById('selected-place-loc').textContent = loc; document.getElementById('selected-place').style.display = 'block'; document.getElementById('place-search').value = ''; document.getElementById('place-search-results').style.display = 'none'; }
+function clearSelectedPlace() { selectedPlaceId = null; document.getElementById('selected-place').style.display = 'none'; }
+
+function submitClaim() { if (!selectedPlaceId) return; api('/manage/partners/' + partnerId + '/claims/add/', { place_id: selectedPlaceId, auto_approve: document.getElementById('claim-auto-approve').checked }).then(function(data) { if (data.error) { M.toast({ html: data.error }); return; } M.toast({ html: data.place_name + ' claimed!' }); setTimeout(function() { location.reload(); }, 1000); }); }
+
+function removeClaim(id) { if (!confirm('Remove this claim?')) return; api('/manage/partners/' + partnerId + '/claims/' + id + '/remove/', {}).then(function(data) { if (data.ok) { document.getElementById('claim-' + id).remove(); M.toast({ html: 'Removed' }); } }); }
+
+function toggleMapSearch() { var p = document.getElementById('map-search-panel'); p.style.display = p.style.display === 'none' ? 'block' : 'none'; }
+
+async function searchGooglePlaces() {
+    var query = document.getElementById('gmap-search-input').value.trim(); if (!query) return;
+    var c = document.getElementById('gmap-results'); c.innerHTML = '<div style="padding:10px;color:#9e9e9e;">Searching...</div>';
+    try { var lib = await google.maps.importLibrary('places'); var Place = lib.Place;
+        var result = await Place.searchByText({ textQuery: query, fields: ['displayName','location','formattedAddress','websiteURI','nationalPhoneNumber','photos'], maxResultCount: 8 });
+        var places = result.places || []; if (places.length === 0) { c.innerHTML = '<div style="padding:10px;color:#9e9e9e;">No results.</div>'; return; }
+        c.innerHTML = places.map(function(p, idx) { var lat = typeof p.location.lat === 'function' ? p.location.lat() : p.location.lat; var lng = typeof p.location.lng === 'function' ? p.location.lng() : p.location.lng; var photo = (p.photos && p.photos.length > 0) ? p.photos[0].getURI({maxWidth:100}) : '';
+            return '<div class="usr-item" onclick="claimGooglePlace(' + idx + ')" data-gidx="' + idx + '" data-name="' + (p.displayName||'').replace(/"/g,'&quot;') + '" data-addr="' + (p.formattedAddress||'').replace(/"/g,'&quot;') + '" data-lat="' + lat + '" data-lng="' + lng + '" data-website="' + (p.websiteURI||'') + '" data-phone="' + (p.nationalPhoneNumber||'') + '" data-photo="' + (photo||'') + '">' + (photo ? '<img src="'+photo+'" style="width:40px;height:40px;border-radius:6px;object-fit:cover;">' : '<div class="usr-avatar" style="background:#e3f2fd;color:#1565c0;"><i class="material-icons" style="font-size:0.9rem;">place</i></div>') + '<div><div class="usr-name">' + p.displayName + '</div><div class="usr-email">' + (p.formattedAddress||'') + '</div></div></div>'; }).join('');
+    } catch(e) { c.innerHTML = '<div style="padding:10px;color:#ef9a9a;">Error: ' + e.message + '</div>'; }
+}
+
+function claimGooglePlace(idx) { var el = document.querySelector('[data-gidx="'+idx+'"]');
+    api('/manage/partners/' + partnerId + '/claims/create-place/', { name: el.dataset.name, address: el.dataset.addr, lat: parseFloat(el.dataset.lat)||null, lng: parseFloat(el.dataset.lng)||null, website: el.dataset.website, phone: el.dataset.phone, photo_url: el.dataset.photo, auto_approve: true }).then(function(data) { if (data.error) { M.toast({html:data.error}); return; } M.toast({html:data.place_name+' claimed!'}); setTimeout(function(){location.reload();},1000); });
+}
+</script>
+{% if google_maps_api_key %}
+<script>(g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]);for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.googleapis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?console.warn(p+" only loads once."):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({ key: "{{ google_maps_api_key }}", v: "weekly", loading: "async" });</script>
+{% endif %}
+{% endblock %}

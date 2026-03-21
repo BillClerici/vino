@@ -245,9 +245,16 @@ class AdminPartnerSubscriptionView(SuperuserRequiredMixin, View):
 
     def get(self, request, pk):
         partner = get_object_or_404(Partner.all_objects, pk=pk)
+        owners_count = partner.partner_owners.filter(is_active=True).count()
+        claims_count = partner.claims.filter(is_active=True).count()
+        promos_count = partner.promotions.filter(is_active=True).count()
         return render(request, "partners/admin_partner_subscription.html", {
             "partner": partner,
             "stripe_publishable_key": settings.STRIPE_PUBLISHABLE_KEY,
+            "active_tab": "subscription",
+            "owners_count": owners_count,
+            "claims_count": claims_count,
+            "promos_count": promos_count,
         })
 
 

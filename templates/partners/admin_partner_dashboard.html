@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+
+{% block title %}{{ partner.business_name }} — Partner Admin{% endblock %}
+
+{% block extra_css %}
+<style>
+    .pd-wrap { max-width: 1000px; margin: 0 auto; padding: 20px 16px 30px; }
+    .stat-pills { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+    .stat-pill {
+        flex: 1; min-width: 130px; padding: 18px; border-radius: 10px;
+        background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.06); text-align: center;
+    }
+    .stat-pill .sp-num { font-size: 1.6rem; font-weight: 800; color: #333; }
+    .stat-pill .sp-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; color: #9e9e9e; font-weight: 600; margin-top: 2px; }
+    .stat-pill .sp-icon { font-size: 1.3rem; margin-bottom: 4px; }
+    .summary-card { border-radius: 8px; margin-bottom: 16px; }
+    .summary-card .card-content { padding: 16px 20px; }
+    .dash-cols { display: flex; gap: 16px; }
+    .dash-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+    .dash-col .summary-card { flex: 1; display: flex; flex-direction: column; }
+    .dash-col .summary-card .card-content { flex: 1; }
+    @media only screen and (max-width: 600px) { .dash-cols { flex-direction: column; } }
+    .sc-header {
+        display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;
+    }
+    .sc-title {
+        display: inline-flex; align-items: center; gap: 6px;
+        font-weight: 700; font-size: 1rem; color: #455a64;
+    }
+    .sc-title i { font-size: 1.1rem; color: #7e57c2; }
+    .sc-link {
+        display: inline-flex; align-items: center; gap: 3px;
+        font-size: 0.82rem; font-weight: 600; color: #7e57c2; text-decoration: none;
+    }
+    .sc-link:hover { text-decoration: underline; }
+    .sc-item {
+        display: flex; align-items: center; gap: 10px;
+        padding: 8px 0; border-bottom: 1px solid #f5f5f5;
+    }
+    .sc-item:last-child { border-bottom: none; }
+    .sc-item-icon {
+        width: 36px; height: 36px; border-radius: 8px;
+        display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .sc-item-name { font-weight: 600; font-size: 0.9rem; color: #333; }
+    .sc-item-meta { font-size: 0.78rem; color: #9e9e9e; }
+    .sc-empty { text-align: center; padding: 20px 0; color: #bdbdbd; font-size: 0.88rem; }
+    .status-badge-sm {
+        display: inline-flex; padding: 2px 8px; border-radius: 8px;
+        font-size: 0.68rem; font-weight: 600; text-transform: uppercase;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pd-wrap">
+    {% include "partners/_admin_partner_nav.html" %}
+
+    <!-- Stat Pills -->
+    <div class="stat-pills">
+        <div class="stat-pill">
+            <div class="sp-icon" style="color: #7e57c2;"><i class="material-icons">people</i></div>
+            <div class="sp-num">{{ owners_count }}</div>
+            <div class="sp-label">Owners</div>
+        </div>
+        <div class="stat-pill">
+            <div class="sp-icon" style="color: #43a047;"><i class="material-icons">store</i></div>
+            <div class="sp-num">{{ claims_count }}</div>
+            <div class="sp-label">Places</div>
+        </div>
+        <div class="stat-pill">
+            <div class="sp-icon" style="color: #ff9800;"><i class="material-icons">campaign</i></div>
+            <div class="sp-num">{{ promos_count }}</div>
+            <div class="sp-label">Promotions</div>
+        </div>
+        <div class="stat-pill">
+            <div class="sp-icon" style="color: #1565c0;"><i class="material-icons">visibility</i></div>
+            <div class="sp-num">{{ impressions_count }}</div>
+            <div class="sp-label">Impressions</div>
+        </div>
+        <div class="stat-pill">
+            <div class="sp-icon" style="{% if partner.tier == 'platinum' %}color: #283593;{% elif partner.tier == 'gold' %}color: #f57f17;{% elif partner.tier == 'silver' %}color: #546e7a;{% else %}color: #bdbdbd;{% endif %}">
+                <i class="material-icons">{% if partner.tier == 'free' %}card_membership{% else %}workspace_premium{% endif %}</i>
+            </div>
+            <div class="sp-num">{{ partner.get_tier_display }}</div>
+            <div class="sp-label">Tier</div>
+        </div>
+    </div>
+
+    <div class="dash-cols">
+        <!-- Left Column -->
+        <div class="dash-col">
+            <!-- Application Status -->
+            <div class="card summary-card">
+                <div class="card-content">
+                    <div class="sc-header">
+                        <span class="sc-title"><i class="material-icons">verified</i> Application</span>
+                        <a href="{% url 'admin_partners_details' pk=partner.pk %}" class="sc-link">Manage <i class="material-icons" style="font-size: 0.85rem;">arrow_forward</i></a>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 1.1rem; font-weight: 700; {% if partner.status == 'approved' %}color: #2e7d32;{% elif partner.status == 'rejected' %}color: #c62828;{% else %}color: #e65100;{% endif %}">
+                            {{ partner.get_status_display }}
+                        </span>
+                        {% if partner.approved_at %}
+                        <span style="font-size: 0.78rem; color: #9e9e9e;">{{ partner.approved_at|date:"M j, Y" }}</span>
+                        {% endif %}
+                    </div>
+                    {% if partner.business_email %}
+                    <div style="font-size: 0.82rem; color: #9e9e9e; margin-top: 4px;">{{ partner.business_email }}</div>
+                    {% endif %}
+                    {% if partner.website %}
+                    <div style="font-size: 0.82rem; margin-top: 2px;"><a href="{{ partner.website }}" target="_blank" style="color: #7e57c2;">{{ partner.website }}</a></div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Owners -->
+            <div class="card summary-card">
+                <div class="card-content">
+                    <div class="sc-header">
+                        <span class="sc-title"><i class="material-icons">people</i> Owners</span>
+                        <a href="{% url 'admin_partners_owners' pk=partner.pk %}" class="sc-link">Manage <i class="material-icons" style="font-size: 0.85rem;">arrow_forward</i></a>
+                    </div>
+                    {% for po in owners %}
+                    <div class="sc-item">
+                        <div class="sc-item-icon" style="background: #ede7f6; color: #7e57c2; font-weight: 700; font-size: 0.85rem;">
+                            {{ po.user.first_name|first|default:po.user.email|first|upper }}
+                        </div>
+                        <div style="flex: 1;">
+                            <div class="sc-item-name">{{ po.user.full_name|default:po.user.email }}</div>
+                            <div class="sc-item-meta">{{ po.get_role_display }}{% if po.title %} · {{ po.title }}{% endif %}</div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="sc-empty">No owners assigned</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column -->
+        <div class="dash-col">
+            <!-- Claimed Places -->
+            <div class="card summary-card">
+                <div class="card-content">
+                    <div class="sc-header">
+                        <span class="sc-title"><i class="material-icons">store</i> Places</span>
+                        <a href="{% url 'admin_partners_places' pk=partner.pk %}" class="sc-link">Manage <i class="material-icons" style="font-size: 0.85rem;">arrow_forward</i></a>
+                    </div>
+                    {% for claim in claims %}
+                    <div class="sc-item">
+                        <div class="sc-item-icon" style="background: #e8f5e9; color: #2e7d32;">
+                            <i class="material-icons" style="font-size: 1rem;">place</i>
+                        </div>
+                        <div style="flex: 1;">
+                            <div class="sc-item-name">{{ claim.place.name }}</div>
+                            <div class="sc-item-meta">{% if claim.place.city %}{{ claim.place.city }}{% if claim.place.state %}, {{ claim.place.state }}{% endif %}{% endif %}</div>
+                        </div>
+                        <span class="status-badge-sm" style="{% if claim.status == 'approved' %}background: #e8f5e9; color: #2e7d32;{% else %}background: #fff3e0; color: #e65100;{% endif %}">
+                            {{ claim.get_status_display }}
+                        </span>
+                    </div>
+                    {% empty %}
+                    <div class="sc-empty">No places claimed</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Promotions -->
+            <div class="card summary-card">
+                <div class="card-content">
+                    <div class="sc-header">
+                        <span class="sc-title"><i class="material-icons">campaign</i> Promotions</span>
+                        <a href="{% url 'admin_partners_promotions' pk=partner.pk %}" class="sc-link">Manage <i class="material-icons" style="font-size: 0.85rem;">arrow_forward</i></a>
+                    </div>
+                    {% for promo in promotions %}
+                    <div class="sc-item">
+                        <div class="sc-item-icon" style="background: #fff3e0; color: #ff9800;">
+                            <i class="material-icons" style="font-size: 1rem;">campaign</i>
+                        </div>
+                        <div style="flex: 1;">
+                            <div class="sc-item-name">{{ promo.name }}</div>
+                            <div class="sc-item-meta">{{ promo.place.name }} · {{ promo.start_date|date:"M j" }} — {{ promo.end_date|date:"M j" }}</div>
+                        </div>
+                        <span class="status-badge-sm" style="{% if promo.status == 'active' %}background: #e8f5e9; color: #2e7d32;{% elif promo.status == 'draft' %}background: #e0e0e0; color: #616161;{% else %}background: #f5f5f5; color: #9e9e9e;{% endif %}">
+                            {{ promo.get_status_display }}
+                        </span>
+                    </div>
+                    {% empty %}
+                    <div class="sc-empty">No promotions yet</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

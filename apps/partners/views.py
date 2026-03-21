@@ -297,37 +297,105 @@ class AdminPartnerCreateView(SuperuserRequiredMixin, CreateView):
         return redirect("admin_partners_edit", pk=partner.pk)
 
 
-class AdminPartnerEditView(SuperuserRequiredMixin, UpdateView):
+class _AdminPartnerBaseMixin(SuperuserRequiredMixin):
+    """Base mixin for all partner sub-pages — loads the partner and nav context."""
+
+    def get_partner(self):
+        return get_object_or_404(
+            Partner.all_objects.select_related("approved_by", "rejected_by"),
+            pk=self.kwargs["pk"],
+        )
+
+    def get_partner_nav(self, partner, active_tab="dashboard"):
+        owners_count = partner.partner_owners.filter(is_active=True).count()
+        claims_count = partner.claims.filter(is_active=True).count()
+        promos_count = partner.promotions.filter(is_active=True).count()
+        return {
+            "partner": partner,
+            "active_tab": active_tab,
+            "owners_count": owners_count,
+            "claims_count": claims_count,
+            "promos_count": promos_count,
+        }
+
+
+class AdminPartnerEditView(_AdminPartnerBaseMixin, View):
+    """Partner dashboard — overview of all sections."""
+
+    def get(self, request, pk):
+        partner = self.get_partner()
+        owners = partner.partner_owners.filter(is_active=True).select_related("user")[:5]
+        claims = partner.claims.filter(is_active=True).select_related("place").order_by("-claimed_at")[:5]
+        promotions = partner.promotions.filter(is_active=True).select_related("place", "promotion_type").order_by("-start_date")[:5]
+        from django.db.models import Count
+        impressions_count = PromotionImpression.objects.filter(promotion__partner=partner).count()
+
+        ctx = self.get_partner_nav(partner, "dashboard")
+        ctx.update({
+            "owners": owners,
+            "claims": claims,
+            "promotions": promotions,
+            "impressions_count": impressions_count,
+        })
+        return render(request, "partners/admin_partner_dashboard.html", ctx)
+
+
+class AdminPartnerDetailsView(_AdminPartnerBaseMixin, UpdateView):
+    """Partner details — edit form + application status."""
     model = Partner
     form_class = AdminPartnerForm
-    template_name = "partners/admin_partner_edit.html"
-    success_url = reverse_lazy("admin_partners_list")
+    template_name = "partners/admin_partner_details.html"
 
     def get_queryset(self):
         return Partner.all_objects.select_related("approved_by", "rejected_by").all()
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx["page_title"] = f"Edit Partner: {self.object.business_name}"
-        ctx["icon"] = "edit"
-        ctx["cancel_url"] = reverse("admin_partners_list")
-        ctx["owners"] = self.object.partner_owners.filter(is_active=True).select_related("user")
-        ctx["claims"] = self.object.claims.select_related("place").order_by("-claimed_at")
-        ctx["promotions"] = self.object.promotions.select_related("place", "promotion_type").order_by("-start_date")
-        # Available places for claiming (not already claimed by anyone)
-        claimed_place_ids = PlaceClaim.objects.filter(
-            status__in=["pending", "approved"],
-        ).values_list("place_id", flat=True)
-        from apps.wineries.models import Place
-        from apps.lookup.models import LookupValue
-        ctx["promotion_types"] = LookupValue.objects.filter(parent__code="PROMOTION_TYPE").order_by("sort_order")
-        ctx["google_maps_api_key"] = settings.GOOGLE_MAPS_API_KEY
+        ctx.update(self.get_partner_nav(self.object, "details"))
         return ctx
 
     def form_valid(self, form):
         form.save()
         messages.success(self.request, f"Partner {self.object.business_name} updated.")
-        return redirect(self.success_url)
+        return redirect("admin_partners_edit", pk=self.object.pk)
+
+
+class AdminPartnerOwnersView(_AdminPartnerBaseMixin, View):
+    """Partner owners management page."""
+
+    def get(self, request, pk):
+        partner = self.get_partner()
+        owners = partner.partner_owners.filter(is_active=True).select_related("user")
+        ctx = self.get_partner_nav(partner, "owners")
+        ctx["owners"] = owners
+        return render(request, "partners/admin_partner_owners.html", ctx)
+
+
+class AdminPartnerPlacesView(_AdminPartnerBaseMixin, View):
+    """Partner places/claims management page."""
+
+    def get(self, request, pk):
+        partner = self.get_partner()
+        claims = partner.claims.filter(is_active=True).select_related("place").order_by("-claimed_at")
+        ctx = self.get_partner_nav(partner, "places")
+        ctx["claims"] = claims
+        ctx["google_maps_api_key"] = settings.GOOGLE_MAPS_API_KEY
+        return render(request, "partners/admin_partner_places.html", ctx)
+
+
+class AdminPartnerPromotionsView(_AdminPartnerBaseMixin, View):
+    """Partner promotions management page."""
+
+    def get(self, request, pk):
+        partner = self.get_partner()
+        claims = partner.claims.filter(status="approved", is_active=True).select_related("place")
+        promotions = partner.promotions.filter(is_active=True).select_related("place", "promotion_type").order_by("-start_date")
+        from apps.lookup.models import LookupValue
+        ctx = self.get_partner_nav(partner, "promotions")
+        ctx["claims"] = claims
+        ctx["promotions"] = promotions
+        ctx["promotion_types"] = LookupValue.objects.filter(parent__code="PROMOTION_TYPE").order_by("sort_order")
+        return render(request, "partners/admin_partner_promotions.html", ctx)
 
 
 class AdminUserSearchView(SuperuserRequiredMixin, View):
