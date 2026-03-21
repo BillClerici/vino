@@ -184,25 +184,18 @@ class FavoritePlaceView(LoginRequiredMixin, View):
             )
 
         if not place:
-            # Parse city/state from address (last parts before zip)
-            city, state = "", ""
-            if addr:
-                parts = [p.strip() for p in addr.split(",")]
-                if len(parts) >= 3:
-                    city = parts[-3]
-                    state_zip = parts[-2].strip().split(" ")
-                    state = state_zip[0] if state_zip else ""
-                elif len(parts) == 2:
-                    city = parts[0]
+            from apps.core.utils import parse_google_address
+            parsed = parse_google_address(addr)
 
             place_type = body.get("place_type", "winery")
             if place_type not in dict(Place.PlaceType.choices):
                 place_type = "winery"
             place = Place.objects.create(
                 name=name,
-                address=addr,
-                city=city,
-                state=state,
+                address=parsed["address"],
+                city=parsed["city"],
+                state=parsed["state"],
+                zip_code=parsed["zip_code"],
                 latitude=lat,
                 longitude=lng,
                 website=website,
@@ -279,24 +272,18 @@ class FindOrCreatePlaceView(LoginRequiredMixin, View):
             )
 
         if not place:
-            city, state = "", ""
-            if addr:
-                parts = [p.strip() for p in addr.split(",")]
-                if len(parts) >= 3:
-                    city = parts[-3]
-                    state_zip = parts[-2].strip().split(" ")
-                    state = state_zip[0] if state_zip else ""
-                elif len(parts) == 2:
-                    city = parts[0]
+            from apps.core.utils import parse_google_address
+            parsed = parse_google_address(addr)
 
             place_type = body.get("place_type", "winery")
             if place_type not in dict(Place.PlaceType.choices):
                 place_type = "winery"
             place = Place.objects.create(
                 name=name,
-                address=addr,
-                city=city,
-                state=state,
+                address=parsed["address"],
+                city=parsed["city"],
+                state=parsed["state"],
+                zip_code=parsed["zip_code"],
                 latitude=lat,
                 longitude=lng,
                 website=website,
@@ -579,11 +566,19 @@ class PlaceAdminFetchGoogleView(AppAdminRequiredMixin, View):
             if not places:
                 return JsonResponse({"error": "Place not found on Google"}, status=404)
 
+            from apps.core.utils import parse_google_address
+
             google_place = places[0]
+            raw_address = google_place.get("formattedAddress", "")
+            parsed = parse_google_address(raw_address)
             result = {
                 "ok": True,
                 "name": google_place.get("displayName", {}).get("text", ""),
-                "address": google_place.get("formattedAddress", ""),
+                "address": parsed["address"],
+                "city": parsed["city"],
+                "state": parsed["state"],
+                "zip_code": parsed["zip_code"],
+                "full_address": raw_address,
                 "phone": google_place.get("nationalPhoneNumber", ""),
                 "website": google_place.get("websiteUri", ""),
                 "description": google_place.get("editorialSummary", {}).get("text", "") if google_place.get("editorialSummary") else "",

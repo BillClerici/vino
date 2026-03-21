@@ -136,17 +136,13 @@
                         </div>
                         {% endfor %}
                     </div>
-                    <div class="card-action right-align">
+                    <div class="card-action" style="display: flex; justify-content: space-between; align-items: center;">
                         <button type="submit" class="btn blue-grey darken-1 waves-effect waves-light"><i class="material-icons left">save</i>Save</button>
+                        <a href="{% url 'admin_partners_delete' pk=object.pk %}" class="btn blue-grey darken-1 waves-effect waves-light">
+                            <i class="material-icons left">delete</i>Delete Partner
+                        </a>
                     </div>
                 </form>
-            </div>
-
-            <!-- Delete -->
-            <div style="text-align: right; margin-top: 8px;">
-                <a href="{% url 'admin_partners_delete' pk=object.pk %}" style="font-size: 0.82rem; color: #c62828; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
-                    <i class="material-icons" style="font-size: 0.9rem;">delete</i> Delete Partner
-                </a>
             </div>
         </div>
     </div>

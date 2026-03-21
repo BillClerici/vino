@@ -678,15 +678,8 @@ class AdminPartnerCreatePlaceAndClaimView(SuperuserRequiredMixin, View):
             ).first()
 
         if not place:
-            city, state = "", ""
-            if addr:
-                parts = [p.strip() for p in addr.split(",")]
-                if len(parts) >= 3:
-                    city = parts[-3]
-                    state_zip = parts[-2].strip().split(" ")
-                    state = state_zip[0] if state_zip else ""
-                elif len(parts) == 2:
-                    city = parts[0]
+            from apps.core.utils import parse_google_address
+            parsed = parse_google_address(addr)
 
             place_type = body.get("place_type", "winery")
             if place_type not in dict(Place.PlaceType.choices):
@@ -694,9 +687,10 @@ class AdminPartnerCreatePlaceAndClaimView(SuperuserRequiredMixin, View):
 
             place = Place.objects.create(
                 name=name,
-                address=addr,
-                city=city,
-                state=state,
+                address=parsed["address"],
+                city=parsed["city"],
+                state=parsed["state"],
+                zip_code=parsed["zip_code"],
                 latitude=lat,
                 longitude=lng,
                 website=body.get("website", ""),

@@ -229,37 +229,27 @@
                 if (label) label.classList.add('active');
             }
 
+            // forceField overwrites even if field has a value
+            function forceField(fieldId, value) {
+                if (!value) return;
+                var el = document.getElementById(fieldId);
+                if (!el) return;
+                el.value = value;
+                filled.push(el);
+                var label = el.parentElement.querySelector('label');
+                if (label) label.classList.add('active');
+            }
+
             fillField('id_description', data.description);
-            fillField('id_address', data.address);
+            forceField('id_address', data.address);
             fillField('id_phone', data.phone);
             fillField('id_website', data.website);
             fillField('id_image_url', data.image_url);
-            if (data.latitude) fillField('id_latitude', parseFloat(data.latitude).toFixed(6));
-            if (data.longitude) fillField('id_longitude', parseFloat(data.longitude).toFixed(6));
-
-            // Parse city/state from address if empty
-            if (data.address) {
-                var cityEl = document.getElementById('id_city');
-                var stateEl = document.getElementById('id_state');
-                if (cityEl && !cityEl.value.trim()) {
-                    var parts = data.address.split(',');
-                    if (parts.length >= 3) {
-                        cityEl.value = parts[parts.length - 3].trim();
-                        var label = cityEl.parentElement.querySelector('label');
-                        if (label) label.classList.add('active');
-                        filled.push(cityEl);
-                    }
-                    if (stateEl && !stateEl.value.trim() && parts.length >= 2) {
-                        var stateZip = parts[parts.length - 2].trim().split(' ');
-                        if (stateZip.length >= 1) {
-                            stateEl.value = stateZip[0];
-                            var label2 = stateEl.parentElement.querySelector('label');
-                            if (label2) label2.classList.add('active');
-                            filled.push(stateEl);
-                        }
-                    }
-                }
-            }
+            if (data.latitude) forceField('id_latitude', parseFloat(data.latitude).toFixed(6));
+            if (data.longitude) forceField('id_longitude', parseFloat(data.longitude).toFixed(6));
+            forceField('id_city', data.city);
+            forceField('id_state', data.state);
+            forceField('id_zip_code', data.zip_code);
 
             // Flash filled fields
             filled.forEach(function(el) {
