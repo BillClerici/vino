@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
@@ -267,7 +268,7 @@ class AdminPartnerListView(SuperuserRequiredMixin, ListView):
                     p.created_at.strftime("%Y-%m-%d"),
                 ],
                 "edit_url": reverse("admin_partners_edit", args=[p.pk]),
-                "delete_url": reverse("admin_partners_edit", args=[p.pk]),
+                "delete_url": reverse("admin_partners_delete", args=[p.pk]),
             })
         ctx["rows"] = rows
         return ctx
@@ -311,6 +312,16 @@ class AdminPartnerEditView(SuperuserRequiredMixin, UpdateView):
         ctx["icon"] = "edit"
         ctx["cancel_url"] = reverse("admin_partners_list")
         ctx["owners"] = self.object.partner_owners.filter(is_active=True).select_related("user")
+        ctx["claims"] = self.object.claims.select_related("place").order_by("-claimed_at")
+        ctx["promotions"] = self.object.promotions.select_related("place", "promotion_type").order_by("-start_date")
+        # Available places for claiming (not already claimed by anyone)
+        claimed_place_ids = PlaceClaim.objects.filter(
+            status__in=["pending", "approved"],
+        ).values_list("place_id", flat=True)
+        from apps.wineries.models import Place
+        from apps.lookup.models import LookupValue
+        ctx["promotion_types"] = LookupValue.objects.filter(parent__code="PROMOTION_TYPE").order_by("sort_order")
+        ctx["google_maps_api_key"] = settings.GOOGLE_MAPS_API_KEY
         return ctx
 
     def form_valid(self, form):
@@ -527,6 +538,308 @@ class AdminPartnerDecisionView(SuperuserRequiredMixin, View):
         })
 
 
+class AdminPlaceSearchView(SuperuserRequiredMixin, View):
+    """AJAX: search places by name, city, or state."""
+
+    def get(self, request):
+        from django.http import JsonResponse
+        from django.db.models import Q
+        from apps.wineries.models import Place
+
+        q = request.GET.get("q", "").strip()
+        if len(q) < 2:
+            return JsonResponse({"results": []})
+
+        places = (
+            Place.objects.filter(
+                Q(name__icontains=q) | Q(city__icontains=q) | Q(state__icontains=q) | Q(address__icontains=q)
+            )
+            .order_by("name")[:15]
+        )
+        # Mark which are already claimed
+        claimed_ids = set(
+            PlaceClaim.objects.filter(status__in=["pending", "approved"]).values_list("place_id", flat=True)
+        )
+        return JsonResponse({
+            "results": [
+                {
+                    "id": str(p.pk),
+                    "name": p.name,
+                    "city": p.city,
+                    "state": p.state,
+                    "address": p.address,
+                    "place_type": p.get_place_type_display(),
+                    "claimed": str(p.pk) in {str(x) for x in claimed_ids},
+                }
+                for p in places
+            ]
+        })
+
+
+class AdminPartnerCreatePlaceAndClaimView(SuperuserRequiredMixin, View):
+    """AJAX: create a place from Google Maps data and claim it for a partner."""
+
+    def post(self, request, pk):
+        import json as _json
+        from django.http import JsonResponse
+        from decimal import Decimal
+        from apps.wineries.models import Place
+
+        partner = get_object_or_404(Partner.all_objects, pk=pk)
+        try:
+            body = _json.loads(request.body)
+        except (ValueError, TypeError):
+            return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+        name = body.get("name", "").strip()
+        if not name:
+            return JsonResponse({"error": "Name is required"}, status=400)
+
+        lat = body.get("lat")
+        lng = body.get("lng")
+        addr = body.get("address", "")
+
+        # Try to find existing place by name + coordinates
+        place = None
+        if lat and lng:
+            lat_d, lng_d = Decimal(str(lat)), Decimal(str(lng))
+            place = Place.objects.filter(
+                name__iexact=name,
+                latitude__range=(lat_d - Decimal("0.001"), lat_d + Decimal("0.001")),
+                longitude__range=(lng_d - Decimal("0.001"), lng_d + Decimal("0.001")),
+            ).first()
+
+        if not place:
+            city, state = "", ""
+            if addr:
+                parts = [p.strip() for p in addr.split(",")]
+                if len(parts) >= 3:
+                    city = parts[-3]
+                    state_zip = parts[-2].strip().split(" ")
+                    state = state_zip[0] if state_zip else ""
+                elif len(parts) == 2:
+                    city = parts[0]
+
+            place_type = body.get("place_type", "winery")
+            if place_type not in dict(Place.PlaceType.choices):
+                place_type = "winery"
+
+            place = Place.objects.create(
+                name=name,
+                address=addr,
+                city=city,
+                state=state,
+                latitude=lat,
+                longitude=lng,
+                website=body.get("website", ""),
+                image_url=body.get("photo_url", ""),
+                place_type=place_type,
+                phone=body.get("phone", ""),
+            )
+
+        # Check if actively claimed
+        active_claim = PlaceClaim.all_objects.filter(place=place, status__in=["pending", "approved"], is_active=True).first()
+        if active_claim:
+            return JsonResponse({"error": "This place is already claimed."}, status=400)
+
+        auto_approve = body.get("auto_approve", True)
+
+        existing = PlaceClaim.all_objects.filter(place=place).first()
+        if existing:
+            existing.partner = partner
+            existing.status = "approved" if auto_approve else "pending"
+            existing.is_active = True
+            existing.approved_at = timezone.now() if auto_approve else None
+            existing.approved_by = request.user if auto_approve else None
+            existing.save()
+            claim = existing
+        else:
+            claim = PlaceClaim.objects.create(
+                partner=partner,
+                place=place,
+                status="approved" if auto_approve else "pending",
+                approved_at=timezone.now() if auto_approve else None,
+                approved_by=request.user if auto_approve else None,
+            )
+
+        return JsonResponse({
+            "ok": True,
+            "claim_id": str(claim.pk),
+            "place_id": str(place.pk),
+            "place_name": place.name,
+            "place_city": place.city,
+            "place_state": place.state,
+            "status": claim.status,
+            "status_display": claim.get_status_display(),
+        })
+
+
+class AdminPartnerAddPromotionView(SuperuserRequiredMixin, View):
+    """AJAX: create a promotion for a partner."""
+
+    def post(self, request, pk):
+        import json as _json
+        from django.http import JsonResponse
+        from apps.wineries.models import Place
+        from apps.lookup.models import LookupValue
+
+        partner = get_object_or_404(Partner.all_objects, pk=pk)
+        try:
+            body = _json.loads(request.body)
+        except (ValueError, TypeError):
+            return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+        place_id = body.get("place_id")
+        name = body.get("name", "").strip()
+        promo_type_id = body.get("promotion_type_id")
+        start_date = body.get("start_date")
+        end_date = body.get("end_date")
+
+        if not all([place_id, name, start_date, end_date]):
+            return JsonResponse({"error": "Name, place, start date, and end date are required."}, status=400)
+
+        place = get_object_or_404(Place, pk=place_id)
+        promo_type = get_object_or_404(LookupValue, pk=promo_type_id) if promo_type_id else None
+
+        from datetime import date as _date
+        promo = Promotion.objects.create(
+            partner=partner,
+            place=place,
+            name=name,
+            promotion_type=promo_type,
+            start_date=_date.fromisoformat(start_date),
+            end_date=_date.fromisoformat(end_date),
+            headline=body.get("headline", ""),
+            description=body.get("description", ""),
+            status="active",
+        )
+
+        return JsonResponse({
+            "ok": True,
+            "promo_id": str(promo.pk),
+            "name": promo.name,
+            "place_name": place.name,
+            "type_label": promo_type.label if promo_type else "—",
+            "status_display": promo.get_status_display(),
+            "start_date": promo.start_date.strftime("%b %d"),
+            "end_date": promo.end_date.strftime("%b %d, %Y"),
+        })
+
+
+class AdminPartnerRemovePromotionView(SuperuserRequiredMixin, View):
+    """AJAX: remove a promotion (soft delete)."""
+
+    def post(self, request, pk, promo_pk):
+        from django.http import JsonResponse
+        partner = get_object_or_404(Partner.all_objects, pk=pk)
+        promo = get_object_or_404(Promotion, pk=promo_pk, partner=partner)
+        promo.is_active = False
+        promo.save(update_fields=["is_active", "updated_at"])
+        return JsonResponse({"ok": True})
+
+
+class AdminPartnerAddClaimView(SuperuserRequiredMixin, View):
+    """AJAX: create a place claim for a partner."""
+
+    def post(self, request, pk):
+        import json as _json
+        from django.http import JsonResponse
+        from apps.wineries.models import Place
+
+        partner = get_object_or_404(Partner.all_objects, pk=pk)
+        try:
+            body = _json.loads(request.body)
+        except (ValueError, TypeError):
+            return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+        place_id = body.get("place_id")
+        if not place_id:
+            return JsonResponse({"error": "place_id required"}, status=400)
+
+        place = get_object_or_404(Place, pk=place_id)
+
+        # Check if actively claimed by someone else
+        active_claim = PlaceClaim.all_objects.filter(place=place, status__in=["pending", "approved"], is_active=True).first()
+        if active_claim:
+            return JsonResponse({"error": "This place is already claimed."}, status=400)
+
+        auto_approve = body.get("auto_approve", False)
+
+        # Reactivate soft-deleted claim or create new (OneToOne constraint)
+        existing = PlaceClaim.all_objects.filter(place=place).first()
+        if existing:
+            existing.partner = partner
+            existing.status = "approved" if auto_approve else "pending"
+            existing.is_active = True
+            existing.approved_at = timezone.now() if auto_approve else None
+            existing.approved_by = request.user if auto_approve else None
+            existing.save()
+            claim = existing
+        else:
+            claim = PlaceClaim.objects.create(
+                partner=partner,
+                place=place,
+                status="approved" if auto_approve else "pending",
+                approved_at=timezone.now() if auto_approve else None,
+                approved_by=request.user if auto_approve else None,
+            )
+
+        return JsonResponse({
+            "ok": True,
+            "claim_id": str(claim.pk),
+            "place_name": place.name,
+            "place_city": place.city,
+            "place_state": place.state,
+            "status": claim.status,
+            "status_display": claim.get_status_display(),
+        })
+
+
+class AdminPartnerRemoveClaimView(SuperuserRequiredMixin, View):
+    """AJAX: remove a claim (soft delete)."""
+
+    def post(self, request, pk, claim_pk):
+        from django.http import JsonResponse
+        partner = get_object_or_404(Partner.all_objects, pk=pk)
+        claim = get_object_or_404(PlaceClaim, pk=claim_pk, partner=partner)
+        claim.status = "revoked"
+        claim.is_active = False
+        claim.save(update_fields=["status", "is_active", "updated_at"])
+        return JsonResponse({"ok": True})
+
+
+class AdminPartnerDeleteView(SuperuserRequiredMixin, View):
+    """Delete a partner — soft or hard."""
+
+    def get(self, request, pk):
+        partner = get_object_or_404(Partner.all_objects, pk=pk)
+        return render(request, "admin/delete.html", {
+            "object_name": partner.business_name,
+            "cancel_url": reverse("admin_partners_edit", args=[pk]),
+            "can_hard_delete": True,
+        })
+
+    def post(self, request, pk):
+        partner = get_object_or_404(Partner.all_objects, pk=pk)
+        delete_type = request.POST.get("delete_type", "soft")
+
+        if delete_type == "hard":
+            name = partner.business_name
+            # Delete related records first
+            PromotionImpression.objects.filter(promotion__partner=partner).delete()
+            Promotion.all_objects.filter(partner=partner).delete()
+            PlaceClaim.all_objects.filter(partner=partner).delete()
+            PartnerOwner.all_objects.filter(partner=partner).delete()
+            partner.delete()
+            messages.success(request, f'Partner "{name}" permanently deleted.')
+        else:
+            partner.is_active = False
+            partner.save(update_fields=["is_active", "updated_at"])
+            messages.success(request, f'Partner "{partner.business_name}" deactivated.')
+
+        return redirect("admin_partners_list")
+
+
 class AdminClaimListView(SuperuserRequiredMixin, ListView):
     model = PlaceClaim
     template_name = "admin/list.html"
@@ -588,7 +901,7 @@ class AdminPromotionListView(SuperuserRequiredMixin, ListView):
     template_name = "admin/list.html"
 
     def get_queryset(self):
-        return Promotion.all_objects.select_related("partner", "place").order_by("-created_at")
+        return Promotion.all_objects.select_related("partner", "place", "promotion_type").order_by("-created_at")
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -602,7 +915,7 @@ class AdminPromotionListView(SuperuserRequiredMixin, ListView):
                     p.name,
                     p.partner.business_name,
                     p.place.name,
-                    p.get_promotion_type_display(),
+                    p.promotion_type.label if p.promotion_type else "—",
                     p.get_status_display(),
                     f"{p.start_date} — {p.end_date}",
                 ],

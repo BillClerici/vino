@@ -642,16 +642,47 @@ class PlaceAdminMenuView(AppAdminRequiredMixin, View):
 
 
 class PlaceAdminDeleteView(AppAdminRequiredMixin, View):
-    def post(self, request, pk):
-        place = get_object_or_404(Place.all_objects, pk=pk)
-        place.is_active = False
-        place.save(update_fields=["is_active", "updated_at"])
-        messages.success(request, f'Place "{place.name}" deactivated.')
-        return redirect("admin_places_list")
+    def _can_hard_delete(self, place):
+        """Check if place has no trips or visits referencing it."""
+        from apps.trips.models import TripStop
+        has_trips = TripStop.all_objects.filter(place=place).exists()
+        has_visits = VisitLog.all_objects.filter(place=place).exists()
+        if has_trips:
+            return False, "This place is referenced by trip stops."
+        if has_visits:
+            return False, "This place has visit records."
+        return True, ""
 
     def get(self, request, pk):
         place = get_object_or_404(Place.all_objects, pk=pk)
+        can_hard, reason = self._can_hard_delete(place)
         return render(request, "admin/delete.html", {
             "object_name": place.name,
             "cancel_url": reverse("admin_places_list"),
+            "can_hard_delete": can_hard,
+            "hard_delete_reason": reason,
         })
+
+    def post(self, request, pk):
+        place = get_object_or_404(Place.all_objects, pk=pk)
+        delete_type = request.POST.get("delete_type", "soft")
+
+        if delete_type == "hard":
+            can_hard, reason = self._can_hard_delete(place)
+            if not can_hard:
+                messages.error(request, f'Cannot permanently delete: {reason}')
+                return redirect("admin_places_list")
+            name = place.name
+            place.menu_items.all().delete()
+            place.favorited_by.all().delete()
+            from apps.partners.models import PlaceClaim, Promotion
+            PlaceClaim.all_objects.filter(place=place).delete()
+            Promotion.all_objects.filter(place=place).delete()
+            place.delete()
+            messages.success(request, f'Place "{name}" permanently deleted.')
+        else:
+            place.is_active = False
+            place.save(update_fields=["is_active", "updated_at"])
+            messages.success(request, f'Place "{place.name}" deactivated.')
+
+        return redirect("admin_places_list")

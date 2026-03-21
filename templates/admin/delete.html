@@ -11,10 +11,38 @@
                     {% csrf_token %}
                     <div class="card-content">
                         <span class="card-title red-text">
-                            <i class="material-icons">warning</i> Confirm Delete
+                            <i class="material-icons">warning</i> Delete {{ object_name }}
                         </span>
+
+                        {% if can_hard_delete %}
+                        <p>Choose how to delete <strong>{{ object_name }}</strong>:</p>
+                        <div style="margin-top: 16px;">
+                            <label style="display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 1.5px solid #e0e0e0; border-radius: 8px; cursor: pointer; margin-bottom: 10px; transition: border-color 0.15s;" onclick="this.style.borderColor='#7e57c2'">
+                                <input name="delete_type" type="radio" value="soft" checked style="margin-top: 3px;">
+                                <div>
+                                    <div style="font-weight: 600; font-size: 0.95rem;">Soft Delete (Deactivate)</div>
+                                    <div style="font-size: 0.82rem; color: #9e9e9e;">Sets is_active = False. Record is hidden but preserved in the database and can be restored.</div>
+                                </div>
+                            </label>
+                            <label style="display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 1.5px solid #e0e0e0; border-radius: 8px; cursor: pointer; transition: border-color 0.15s;" onclick="this.style.borderColor='#c62828'">
+                                <input name="delete_type" type="radio" value="hard" style="margin-top: 3px;">
+                                <div>
+                                    <div style="font-weight: 600; font-size: 0.95rem; color: #c62828;">Permanently Delete</div>
+                                    <div style="font-size: 0.82rem; color: #9e9e9e;">Removes the record and all related data from the database. <strong>This cannot be undone.</strong></div>
+                                </div>
+                            </label>
+                        </div>
+                        {% else %}
                         <p>Are you sure you want to delete <strong>{{ object_name }}</strong>?</p>
-                        <p class="grey-text">This action will soft-delete the record (set is_active = False).</p>
+                        <p class="grey-text" style="font-size: 0.85rem;">This action will soft-delete the record (set is_active = False).</p>
+                        <input type="hidden" name="delete_type" value="soft">
+                        {% if hard_delete_reason %}
+                        <div style="margin-top: 10px; padding: 10px 14px; background: #fff3e0; border-radius: 6px; font-size: 0.82rem; color: #e65100;">
+                            <i class="material-icons" style="font-size: 0.9rem; vertical-align: middle;">info</i>
+                            Permanent delete is not available: {{ hard_delete_reason }}
+                        </div>
+                        {% endif %}
+                        {% endif %}
                     </div>
                     <div class="card-action right-align">
                         <a href="{{ cancel_url }}" class="btn-flat waves-effect">Cancel</a>
