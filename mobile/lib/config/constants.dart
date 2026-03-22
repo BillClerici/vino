@@ -44,6 +44,24 @@ class ApiPaths {
   /// Sippy trip planner (LangGraph): POST /api/v1/trips/plan/
   static const tripPlan = '/api/v1/trips/plan/';
 
+  /// Smart recommendations for a place: POST /api/v1/places/{placeId}/recommend/
+  static String placeRecommend(String placeId) =>
+      '/api/v1/places/$placeId/recommend/';
+
+  /// Tasting flight for a place: POST /api/v1/places/{placeId}/flight/
+  static String placeFlight(String placeId) =>
+      '/api/v1/places/$placeId/flight/';
+
+  /// Save tasting flight to a visit
+  static String liveFlight(String tripId, String visitId) =>
+      '/api/v1/trips/$tripId/live/flight/$visitId/';
+
+  /// Wine wishlist
+  static const wishlist = '/api/v1/wishlist/';
+  static String wishlistDetail(String id) => '/api/v1/wishlist/$id/';
+  static String wishlistCheck(String placeId) =>
+      '/api/v1/wishlist/check/$placeId/';
+
   /// Sippy conversations
   static const conversations = '/api/v1/conversations/';
   static String conversationDetail(String id) => '/api/v1/conversations/$id/';

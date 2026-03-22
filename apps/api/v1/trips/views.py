@@ -267,10 +267,37 @@ class TripViewSet(ModelViewSet):
             place=stop.place,
             visited_at=timezone.now(),
         )
+
+        # Check for wishlist matches at this place
+        from apps.wineries.models import WineWishlist, MenuItem
+        wishlist_matches = []
+        # Direct menu_item matches
+        direct = WineWishlist.objects.filter(
+            user=request.user, is_active=True,
+            menu_item__place=stop.place, menu_item__is_active=True,
+        ).values_list("wine_name", flat=True)
+        wishlist_matches.extend(direct)
+        # Name matches against menu
+        wishlist_names = list(
+            WineWishlist.objects.filter(user=request.user, is_active=True)
+            .exclude(wine_name="")
+            .values_list("wine_name", flat=True)
+        )
+        if wishlist_names:
+            from django.db.models import Q as WQ
+            q = WQ()
+            for wn in wishlist_names:
+                q |= WQ(name__icontains=wn)
+            found = MenuItem.objects.filter(
+                q, place=stop.place, is_active=True
+            ).values_list("name", flat=True)
+            wishlist_matches.extend(found)
+
         return Response({
             "visit_id": str(visit.id),
             "place_name": stop.place.name,
             "stop_order": stop.order,
+            "wishlist_matches": list(set(wishlist_matches)),
         }, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"], url_path="live/rate/(?P<visit_pk>[^/.]+)")
@@ -286,6 +313,24 @@ class TripViewSet(ModelViewSet):
                 setattr(visit, field, request.data[field])
         visit.save()
         return Response({"detail": "Rating saved."})
+
+    @action(detail=True, methods=["post"], url_path="live/flight/(?P<visit_pk>[^/.]+)")
+    def live_flight(self, request, pk=None, visit_pk=None):
+        """Save or clear a tasting flight for a visit."""
+        try:
+            visit = VisitLog.objects.get(pk=visit_pk, user=request.user, is_active=True)
+        except VisitLog.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        flight_data = request.data.get("flight")
+        meta = visit.metadata or {}
+        if flight_data:
+            meta["flight"] = flight_data
+        else:
+            meta.pop("flight", None)
+        visit.metadata = meta
+        visit.save(update_fields=["metadata", "updated_at"])
+        return Response({"detail": "Flight saved."})
 
     @action(detail=True, methods=["post"], url_path="live/wine")
     def live_wine(self, request, pk=None):

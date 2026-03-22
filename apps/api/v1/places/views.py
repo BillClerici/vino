@@ -157,6 +157,126 @@ class PlaceViewSet(ModelViewSet):
         serializer = FavoritePlaceSerializer(favs, many=True)
         return Response(serializer.data)
 
+    @action(detail=True, methods=["post"])
+    def recommend(self, request, pk=None):
+        """Get AI-powered wine/beer recommendations for this place based on user's palate."""
+        import json
+        import logging
+
+        logger = logging.getLogger(__name__)
+        place = self.get_object()
+        menu_items = list(
+            place.menu_items.filter(is_active=True).values(
+                "id", "name", "varietal", "vintage", "description", "price"
+            )[:30]
+        )
+
+        if not menu_items:
+            return Response({"recommendations": [], "detail": "No menu items available."})
+
+        # Get user palate
+        from apps.palate.models import PalateProfile
+        profile = PalateProfile.objects.filter(user=request.user).first()
+        palate = json.dumps(profile.preferences, indent=2) if profile and profile.preferences else "No palate profile yet"
+
+        # Get user's past wines at this place
+        from apps.visits.models import VisitWine
+        from django.db.models import F
+        past_wines = list(
+            VisitWine.objects.filter(
+                visit__user=request.user, visit__place=place, is_active=True
+            ).values(varietal=F("wine_type"), rating=F("rating"), name=F("wine_name"))[:10]
+        )
+
+        prompt = f"""Based on this user's palate profile and the menu below, recommend the top 3 items they should try. Return ONLY valid JSON array.
+
+Palate: {palate}
+
+Past wines here: {json.dumps(past_wines) if past_wines else 'First visit'}
+
+Menu at {place.name}:
+{json.dumps(menu_items, default=str)}
+
+Return JSON array of exactly 3 objects:
+[{{"menu_item_id": "uuid", "name": "...", "why": "1 sentence why this matches their palate"}}]"""
+
+        try:
+            from apps.api.ai_utils import get_claude
+            from langchain_core.messages import HumanMessage
+
+            llm = get_claude()
+            response = llm.invoke([HumanMessage(content=prompt)])
+            raw = response.content.strip()
+            if raw.startswith("```"):
+                raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
+                if raw.endswith("```"):
+                    raw = raw[:-3]
+                raw = raw.strip()
+
+            recommendations = json.loads(raw)
+            return Response({"recommendations": recommendations})
+        except Exception:
+            logger.exception("Recommendation failed")
+            return Response({"recommendations": [], "detail": "Could not generate recommendations."})
+
+    @action(detail=True, methods=["post"])
+    def flight(self, request, pk=None):
+        """Build an AI-powered tasting flight from this place's menu."""
+        import json
+        import logging
+
+        logger = logging.getLogger(__name__)
+        place = self.get_object()
+        menu_items = list(
+            place.menu_items.filter(is_active=True).values(
+                "id", "name", "varietal", "vintage", "description", "price"
+            )[:30]
+        )
+
+        if len(menu_items) < 3:
+            return Response({"flight": [], "detail": "Not enough menu items for a flight."})
+
+        from apps.palate.models import PalateProfile
+        profile = PalateProfile.objects.filter(user=request.user).first()
+        palate = json.dumps(profile.preferences, indent=2) if profile and profile.preferences else "No palate profile yet"
+
+        flight_size = int(request.data.get("size", 4))
+
+        prompt = f"""You are a sommelier building a tasting flight of {flight_size} wines/beers from this menu for a customer.
+
+Customer's palate: {palate}
+
+Menu at {place.name}:
+{json.dumps(menu_items, default=str)}
+
+Build a flight that:
+1. Starts with something light/approachable (their comfort zone)
+2. Progresses in intensity
+3. Includes one "stretch" pick to expand their horizons
+4. Ends with something bold/memorable
+
+Return ONLY valid JSON:
+{{"flight_name": "Creative name for this flight", "description": "1 sentence theme", "items": [{{"menu_item_id": "uuid", "name": "...", "order": 1, "role": "opener|comfort|stretch|finisher", "tasting_tip": "1 sentence tasting guidance"}}]}}"""
+
+        try:
+            from apps.api.ai_utils import get_claude
+            from langchain_core.messages import HumanMessage
+
+            llm = get_claude()
+            response = llm.invoke([HumanMessage(content=prompt)])
+            raw = response.content.strip()
+            if raw.startswith("```"):
+                raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
+                if raw.endswith("```"):
+                    raw = raw[:-3]
+                raw = raw.strip()
+
+            flight = json.loads(raw)
+            return Response(flight)
+        except Exception:
+            logger.exception("Flight builder failed")
+            return Response({"flight": [], "detail": "Could not build a flight."})
+
     @action(detail=False, methods=["get"])
     def map(self, request):
         """Lightweight endpoint for map markers."""

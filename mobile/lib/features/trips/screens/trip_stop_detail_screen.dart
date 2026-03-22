@@ -191,6 +191,25 @@ class _TripStopDetailScreenState extends ConsumerState<TripStopDetailScreen> {
         _checkedIn = true;
         _checkingIn = false;
       });
+
+      // Show wishlist matches notification
+      final wishlistMatches = (data['wishlist_matches'] as List?)?.cast<String>() ?? [];
+      if (wishlistMatches.isNotEmpty && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Wishlist match! This place has: ${wishlistMatches.join(", ")}',
+            ),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'Nice!',
+              textColor: Colors.white,
+              onPressed: () {},
+            ),
+          ),
+        );
+      }
     } catch (e) {
       setState(() => _checkingIn = false);
       if (mounted) {
@@ -509,54 +528,45 @@ class _StopViewState extends State<_StopView> {
                 onPressed: onToggleFavorite,
               ),
               if (checkedIn)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(12),
-                    onTap: () async {
-                      final confirmed = await showDialog<bool>(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: const Text('Undo Check-In?'),
-                          content: const Text(
-                            'This will remove your check-in and clear all drinks, ratings, and notes for this stop. You can check in again afterwards.',
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.of(ctx).pop(false),
-                              child: const Text('Cancel'),
-                            ),
-                            FilledButton(
-                              style: FilledButton.styleFrom(
-                                backgroundColor: Colors.red,
-                              ),
-                              onPressed: () => Navigator.of(ctx).pop(true),
-                              child: const Text('Undo Check-In'),
-                            ),
-                          ],
+                TextButton(
+                  style: TextButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () async {
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Undo Check-In?'),
+                        content: const Text(
+                          'This will remove your check-in and clear all drinks, ratings, and notes for this stop. You can check in again afterwards.',
                         ),
-                      );
-                      if (confirmed == true) onUncheckIn();
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.green,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.check_circle, color: Colors.white, size: 14),
-                          SizedBox(width: 4),
-                          Text('Checked In',
-                              style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold)),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(ctx).pop(false),
+                            child: const Text('Cancel'),
+                          ),
+                          FilledButton(
+                            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                            onPressed: () => Navigator.of(ctx).pop(true),
+                            child: const Text('Undo Check-In'),
+                          ),
                         ],
                       ),
-                    ),
+                    );
+                    if (confirmed == true) onUncheckIn();
+                  },
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.check_circle, size: 14),
+                      SizedBox(width: 4),
+                      Text('Checked In', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                    ],
                   ),
                 ),
               // Trip navigation drawer toggle
@@ -735,11 +745,24 @@ class _StopViewState extends State<_StopView> {
                     onSelectItem: (checkedIn && visitId != null)
                         ? (item) => drinksSectionKey.currentState?.addFromMenu(item)
                         : null,
+                    showFlightBuilder: checkedIn,
+                    tripId: checkedIn ? tripId : null,
+                    visitId: checkedIn ? visitId : null,
+                    existingVisitData: existingVisitData,
                   ),
+
+                  // ── Smart Recommendations (after check-in) ──
+                  if (checkedIn && visitId != null) ...[
+                    const SizedBox(height: 24),
+                    _SmartRecommendationsCard(
+                      place: place,
+                      onAddDrink: (item) => drinksSectionKey.currentState?.addFromMenu(item),
+                    ),
+                  ],
 
                   // ── My Drinks (only after check-in during live trip) ──
                   if (checkedIn && visitId != null) ...[
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 12),
                     _DrinksSection(
                       key: drinksSectionKey,
                       tripId: tripId,
@@ -1875,6 +1898,41 @@ class _DrinkFormSheetState extends ConsumerState<_DrinkFormSheet> {
               contentPadding: EdgeInsets.zero,
             ),
 
+            // Wishlist / Want to Try
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.bookmark_add_outlined, color: Theme.of(context).colorScheme.secondary),
+              title: const Text('Add to Wishlist'),
+              subtitle: const Text('Save to try again later', style: TextStyle(fontSize: 11)),
+              trailing: const Icon(Icons.chevron_right, size: 18),
+              dense: true,
+              onTap: () async {
+                if (_nameCtl.text.isEmpty) return;
+                try {
+                  final api = ref.read(apiClientProvider);
+                  await api.post(ApiPaths.wishlist, data: {
+                    'wine_name': _nameCtl.text,
+                    'wine_type': _type,
+                  });
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('${_nameCtl.text} added to wishlist!'),
+                        backgroundColor: Colors.green,
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                } catch (_) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Could not add to wishlist')),
+                    );
+                  }
+                }
+              },
+            ),
+
             // Purchased toggle + details
             SwitchListTile(
               title: Text(widget.placeType == 'brewery' ? 'Bought to go?' : 'Bought a bottle?'),
@@ -2159,7 +2217,18 @@ class _RatingRow extends StatelessWidget {
 class _DrinkMenuSection extends ConsumerStatefulWidget {
   final Place place;
   final ValueChanged<Map<String, dynamic>>? onSelectItem;
-  const _DrinkMenuSection({required this.place, this.onSelectItem});
+  final bool showFlightBuilder;
+  final String? tripId;
+  final String? visitId;
+  final Map<String, dynamic>? existingVisitData;
+  const _DrinkMenuSection({
+    required this.place,
+    this.onSelectItem,
+    this.showFlightBuilder = false,
+    this.tripId,
+    this.visitId,
+    this.existingVisitData,
+  });
 
   @override
   ConsumerState<_DrinkMenuSection> createState() => _DrinkMenuSectionState();
@@ -2169,11 +2238,14 @@ class _DrinkMenuSectionState extends ConsumerState<_DrinkMenuSection> {
   List<Map<String, dynamic>>? _menuItems;
   bool _fetching = false;
   bool _expanded = true;
+  Map<String, dynamic>? _flight;
+  bool _buildingFlight = false;
 
   @override
   void initState() {
     super.initState();
     _loadExistingMenu();
+    _loadSavedFlight();
   }
 
   @override
@@ -2181,7 +2253,16 @@ class _DrinkMenuSectionState extends ConsumerState<_DrinkMenuSection> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.place.id != widget.place.id) {
       _menuItems = null;
+      _flight = null;
       _loadExistingMenu();
+      _loadSavedFlight();
+    }
+  }
+
+  void _loadSavedFlight() {
+    final meta = widget.existingVisitData?['metadata'] as Map<String, dynamic>?;
+    if (meta != null && meta['flight'] != null) {
+      _flight = meta['flight'] as Map<String, dynamic>;
     }
   }
 
@@ -2262,22 +2343,35 @@ class _DrinkMenuSectionState extends ConsumerState<_DrinkMenuSection> {
         ),
         const SizedBox(height: 8),
 
-        // Fetch button (show if no menu items and place has a website)
+        // Action buttons row (fetch menu + build flight)
         if ((_menuItems == null || _menuItems!.isEmpty) &&
             widget.place.website.isNotEmpty)
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: _fetching ? null : _fetchFromWebsite,
-              icon: _fetching
-                  ? const SizedBox(
-                      height: 16, width: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.auto_awesome, size: 18),
-              label: Text(_fetching
-                  ? 'Scanning website for drinks...'
-                  : 'Fetch Drink Menu from Website'),
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _fetching ? null : _fetchFromWebsite,
+                  icon: _fetching
+                      ? const SizedBox(height: 14, width: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.auto_awesome, size: 16),
+                  label: Text(_fetching ? 'Scanning...' : 'Fetch Menu',
+                      style: const TextStyle(fontSize: 12)),
+                ),
+              ),
+              if (widget.showFlightBuilder) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _buildingFlight ? null : _buildFlight,
+                    icon: _buildingFlight
+                        ? const SizedBox(height: 14, width: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.local_bar, size: 16),
+                    label: Text(_buildingFlight ? 'Building...' : 'Build Flight',
+                        style: const TextStyle(fontSize: 12)),
+                  ),
+                ),
+              ],
+            ],
           )
         else if ((_menuItems == null || _menuItems!.isEmpty) &&
             widget.place.website.isEmpty)
@@ -2322,17 +2416,176 @@ class _DrinkMenuSectionState extends ConsumerState<_DrinkMenuSection> {
               ),
             ),
           ),
-          // Refresh button
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton.icon(
-              onPressed: _fetching ? null : _fetchFromWebsite,
-              icon: const Icon(Icons.refresh, size: 14),
-              label: const Text('Refresh Menu', style: TextStyle(fontSize: 12)),
-            ),
+          // Refresh + Build Flight row
+          Row(
+            children: [
+              TextButton.icon(
+                onPressed: _fetching ? null : _fetchFromWebsite,
+                icon: const Icon(Icons.refresh, size: 14),
+                label: const Text('Refresh', style: TextStyle(fontSize: 12)),
+              ),
+              if (widget.showFlightBuilder) ...[
+                const Spacer(),
+                TextButton.icon(
+                  onPressed: _buildingFlight ? null : _buildFlight,
+                  icon: _buildingFlight
+                      ? const SizedBox(height: 14, width: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.local_bar, size: 14),
+                  label: Text(_buildingFlight ? 'Building...' : 'Build Flight',
+                      style: const TextStyle(fontSize: 12)),
+                ),
+              ],
+            ],
           ),
         ],
+
+        // Flight display (persisted)
+        if (_flight != null) _buildFlightCard(),
       ],
+    );
+  }
+
+  Future<void> _buildFlight() async {
+    setState(() => _buildingFlight = true);
+    try {
+      final api = ref.read(apiClientProvider);
+      final resp = await api.dio.post(
+        ApiPaths.placeFlight(widget.place.id),
+        data: {'size': 4},
+        options: Options(receiveTimeout: const Duration(seconds: 30)),
+      );
+      final data = resp.data['data'] as Map<String, dynamic>? ??
+          resp.data as Map<String, dynamic>;
+      if (mounted) {
+        setState(() { _flight = data; _buildingFlight = false; });
+        _saveFlight(data);
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _buildingFlight = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not build flight')),
+        );
+      }
+    }
+  }
+
+  Future<void> _saveFlight(Map<String, dynamic>? flightData) async {
+    if (widget.tripId == null || widget.visitId == null) return;
+    try {
+      final api = ref.read(apiClientProvider);
+      await api.post(
+        ApiPaths.liveFlight(widget.tripId!, widget.visitId!),
+        data: {'flight': flightData},
+      );
+    } catch (_) {}
+  }
+
+  Widget _buildFlightCard() {
+    final colorScheme = Theme.of(context).colorScheme;
+    final flightName = _flight!['flight_name'] as String? ?? 'Your Flight';
+    final description = _flight!['description'] as String? ?? '';
+    final items = (_flight!['items'] as List?) ?? [];
+
+    Color roleColor(String? role) {
+      switch (role) {
+        case 'opener': return Colors.green;
+        case 'comfort': return Colors.blue;
+        case 'stretch': return Colors.orange;
+        case 'finisher': return Colors.purple;
+        default: return Colors.grey;
+      }
+    }
+
+    return Card(
+      color: Colors.white,
+      margin: const EdgeInsets.only(top: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: colorScheme.primary.withValues(alpha: 0.4), width: 1.5),
+      ),
+      elevation: 0,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.local_bar, size: 16, color: colorScheme.primary),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(flightName,
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: colorScheme.primary)),
+                ),
+                IconButton(
+                  onPressed: () {
+                    setState(() => _flight = null);
+                    _saveFlight(null);
+                  },
+                  icon: const Icon(Icons.close, size: 16),
+                  constraints: const BoxConstraints(),
+                  padding: EdgeInsets.zero,
+                ),
+              ],
+            ),
+            if (description.isNotEmpty)
+              Text(description, style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+            const SizedBox(height: 6),
+            ...items.asMap().entries.map((entry) {
+              final i = entry.key;
+              final item = entry.value as Map<String, dynamic>;
+              final role = item['role'] as String? ?? '';
+              final name = item['name'] as String? ?? '';
+              final tip = item['tasting_tip'] as String? ?? '';
+
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 20, height: 20,
+                      decoration: BoxDecoration(
+                        color: roleColor(role).withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text('${i + 1}',
+                            style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: roleColor(role))),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(child: Text(name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12))),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: roleColor(role).withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(role.toUpperCase(),
+                                    style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: roleColor(role))),
+                              ),
+                            ],
+                          ),
+                          if (tip.isNotEmpty)
+                            Text(tip, style: TextStyle(fontSize: 10, color: Colors.grey[600], fontStyle: FontStyle.italic)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -3314,10 +3567,45 @@ class _StopMapWidgetState extends State<_StopMapWidget> {
 
 // ── Menu Item Card (from website scrape) ────────────────────────
 
-class _MenuItemCard extends StatelessWidget {
+class _MenuItemCard extends ConsumerStatefulWidget {
   final Map<String, dynamic> item;
   final VoidCallback onSelect;
   const _MenuItemCard({required this.item, required this.onSelect});
+
+  @override
+  ConsumerState<_MenuItemCard> createState() => _MenuItemCardState();
+}
+
+class _MenuItemCardState extends ConsumerState<_MenuItemCard> {
+  bool _wishlisted = false;
+
+  Map<String, dynamic> get item => widget.item;
+  VoidCallback get onSelect => widget.onSelect;
+
+  Future<void> _toggleWishlist() async {
+    final name = item['name'] as String? ?? '';
+    if (name.isEmpty) return;
+    try {
+      final api = ref.read(apiClientProvider);
+      final resp = await api.post('${ApiPaths.wishlist}toggle/', data: {
+        'wine_name': name,
+        'wine_type': item['varietal'] as String? ?? '',
+        'menu_item': item['id'],
+      });
+      final data = resp.data['data'] as Map<String, dynamic>? ??
+          resp.data as Map<String, dynamic>;
+      if (mounted) {
+        setState(() => _wishlisted = data['wishlisted'] as bool? ?? !_wishlisted);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_wishlisted ? '$name added to wishlist!' : '$name removed from wishlist'),
+            backgroundColor: _wishlisted ? Colors.green : Colors.orange,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (_) {}
+  }
 
   /// On web, third-party image URLs fail due to CORS.
   /// Only show images from our own domain or known CORS-friendly hosts.
@@ -3352,15 +3640,38 @@ class _MenuItemCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image
-            SizedBox(
-              height: 70,
-              width: double.infinity,
-              child: imageUrl != null
-                  ? Image.network(imageUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _placeholder(cs))
-                  : _placeholder(cs),
+            // Image with wishlist button overlay
+            Stack(
+              children: [
+                SizedBox(
+                  height: 70,
+                  width: double.infinity,
+                  child: imageUrl != null
+                      ? Image.network(imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => _placeholder(cs))
+                      : _placeholder(cs),
+                ),
+                Positioned(
+                  top: 2,
+                  right: 2,
+                  child: GestureDetector(
+                    onTap: _toggleWishlist,
+                    child: Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.85),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        _wishlisted ? Icons.bookmark : Icons.bookmark_add_outlined,
+                        size: 14,
+                        color: _wishlisted ? cs.secondary : Colors.grey[600],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
             // Details
             Expanded(
@@ -3409,3 +3720,143 @@ class _MenuItemCard extends StatelessWidget {
     );
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// SMART RECOMMENDATIONS CARD
+// ═══════════════════════════════════════════════════════════════════
+
+class _SmartRecommendationsCard extends ConsumerStatefulWidget {
+  final Place place;
+  final ValueChanged<Map<String, dynamic>>? onAddDrink;
+  const _SmartRecommendationsCard({required this.place, this.onAddDrink});
+
+  @override
+  ConsumerState<_SmartRecommendationsCard> createState() =>
+      _SmartRecommendationsCardState();
+}
+
+class _SmartRecommendationsCardState
+    extends ConsumerState<_SmartRecommendationsCard> {
+  List<Map<String, dynamic>>? _recommendations;
+  bool _loading = true;
+  bool _dismissed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetch();
+  }
+
+  @override
+  void didUpdateWidget(_SmartRecommendationsCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.place.id != widget.place.id) {
+      _recommendations = null;
+      _dismissed = false;
+      _fetch();
+    }
+  }
+
+  Future<void> _fetch() async {
+    try {
+      final api = ref.read(apiClientProvider);
+      final resp = await api.dio.post(
+        ApiPaths.placeRecommend(widget.place.id),
+        options: Options(receiveTimeout: const Duration(seconds: 30)),
+      );
+      final data = resp.data['data'] as Map<String, dynamic>? ??
+          resp.data as Map<String, dynamic>;
+      final recs = (data['recommendations'] as List?)
+              ?.map((e) => e as Map<String, dynamic>)
+              .toList() ??
+          [];
+      if (mounted) setState(() { _recommendations = recs; _loading = false; });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_dismissed) return const SizedBox.shrink();
+    if (_loading) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+              const SizedBox(width: 12),
+              Text('Getting recommendations...', style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+            ],
+          ),
+        ),
+      );
+    }
+    if (_recommendations == null || _recommendations!.isEmpty) return const SizedBox.shrink();
+
+    final colorScheme = Theme.of(context).colorScheme;
+    return Card(
+      color: colorScheme.secondaryContainer.withValues(alpha: 0.3),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.auto_awesome, size: 16, color: colorScheme.secondary),
+                const SizedBox(width: 6),
+                Text('Recommended for You',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: colorScheme.secondary)),
+                const Spacer(),
+                IconButton(
+                  onPressed: () => setState(() => _dismissed = true),
+                  icon: const Icon(Icons.close, size: 16),
+                  constraints: const BoxConstraints(),
+                  padding: EdgeInsets.zero,
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            ..._recommendations!.map((rec) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: widget.onAddDrink != null
+                        ? () {
+                            widget.onAddDrink!({
+                              'id': rec['menu_item_id'],
+                              'name': rec['name'],
+                            });
+                          }
+                        : null,
+                    child: Row(
+                      children: [
+                        Icon(Icons.wine_bar, size: 16, color: colorScheme.primary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(rec['name'] as String? ?? '',
+                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                              Text(rec['why'] as String? ?? '',
+                                  style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+                            ],
+                          ),
+                        ),
+                        if (widget.onAddDrink != null)
+                          Icon(Icons.add_circle_outline, size: 18, color: colorScheme.primary),
+                      ],
+                    ),
+                  ),
+                )),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+

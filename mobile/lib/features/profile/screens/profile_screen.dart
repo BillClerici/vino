@@ -130,6 +130,13 @@ class ProfileScreen extends ConsumerWidget {
                 onTap: () => context.push('/profile/palate'),
               ),
               ListTile(
+                leading: const Icon(Icons.bookmark),
+                title: const Text('My Wishlist'),
+                subtitle: const Text('Wines to try later', style: TextStyle(fontSize: 12)),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/profile/wishlist'),
+              ),
+              ListTile(
                 leading: const Icon(Icons.credit_card),
                 title: const Text('Subscription'),
                 trailing: const Icon(Icons.chevron_right),

@@ -19,6 +19,7 @@ from .users.views import UserProfileViewSet
 from .scan_label import ScanLabelView
 from .conversations.views import SippyConversationViewSet
 from .visits.views import VisitLogViewSet
+from .wishlist.views import WishlistViewSet
 
 router = DefaultRouter()
 router.register(r"places", PlaceViewSet, basename="place")
@@ -26,6 +27,7 @@ router.register(r"visits", VisitLogViewSet, basename="visit")
 router.register(r"trips", TripViewSet, basename="trip")
 router.register(r"lookups", LookupValueViewSet, basename="lookup")
 router.register(r"conversations", SippyConversationViewSet, basename="conversation")
+router.register(r"wishlist", WishlistViewSet, basename="wishlist")
 
 
 @api_view(["GET"])

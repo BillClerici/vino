@@ -73,3 +73,36 @@ class FavoritePlace(BaseModel):
 
     def __str__(self):
         return f"{self.user} ♥ {self.place}"
+
+
+class WineWishlist(BaseModel):
+    """Wines the user wants to try in the future."""
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="wine_wishlist"
+    )
+    # Link to a specific menu item if known
+    menu_item = models.ForeignKey(
+        MenuItem, on_delete=models.SET_NULL, null=True, blank=True, related_name="wishlisted_by"
+    )
+    # Ad-hoc wine details (when not from a menu)
+    wine_name = models.CharField(max_length=255)
+    wine_type = models.CharField(max_length=100, blank=True)  # varietal
+    wine_vintage = models.PositiveIntegerField(null=True, blank=True)
+    notes = models.TextField(blank=True)
+    # Where they discovered it
+    source_place = models.ForeignKey(
+        Place, on_delete=models.SET_NULL, null=True, blank=True, related_name="wishlist_sources"
+    )
+
+    class Meta:
+        db_table = "places_winewishlist"
+        ordering = ["-created_at"]
+
+    @property
+    def display_name(self):
+        if self.menu_item:
+            return self.menu_item.name
+        return self.wine_name
+
+    def __str__(self):
+        return f"{self.user} wants: {self.display_name}"

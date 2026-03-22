@@ -16,6 +16,7 @@ import 'features/trips/screens/live_trip_screen.dart';
 import 'features/trips/screens/trip_create_screen.dart';
 import 'features/trips/screens/trip_detail_screen.dart';
 import 'features/trips/screens/trip_recap_screen.dart';
+import 'features/trips/screens/wishlist_screen.dart';
 import 'features/trips/screens/trip_stop_detail_screen.dart';
 import 'features/trips/screens/trips_screen.dart';
 import 'features/help/screens/getting_started_screen.dart';
@@ -144,6 +145,10 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: 'palate',
                 builder: (_, __) => const PalateScreen(),
+              ),
+              GoRoute(
+                path: 'wishlist',
+                builder: (_, __) => const WishlistScreen(),
               ),
               GoRoute(
                 path: 'subscription',
