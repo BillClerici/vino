@@ -12,13 +12,18 @@ final visitsProvider =
 class VisitsNotifier extends AsyncNotifier<PaginatedResponse<VisitLog>> {
   String _query = '';
   int? _ratingMin;
+  String _ordering = '-visited_at';
 
   @override
   Future<PaginatedResponse<VisitLog>> build() => _fetch();
 
   Future<PaginatedResponse<VisitLog>> _fetch({int page = 1}) async {
     final api = ref.read(apiClientProvider);
-    final params = <String, dynamic>{'page': page};
+    final params = <String, dynamic>{
+      'page': page,
+      'page_size': 100,
+      'ordering': _ordering,
+    };
     if (_query.isNotEmpty) params['q'] = _query;
     if (_ratingMin != null) params['rating_min'] = _ratingMin;
 
@@ -37,6 +42,12 @@ class VisitsNotifier extends AsyncNotifier<PaginatedResponse<VisitLog>> {
 
   Future<void> filterByRating(int? min) async {
     _ratingMin = min;
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() => _fetch());
+  }
+
+  Future<void> setOrdering(String ordering) async {
+    _ordering = ordering;
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() => _fetch());
   }

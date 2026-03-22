@@ -1,4 +1,4 @@
-from django.db.models import Avg, Count, Exists, OuterRef
+from django.db.models import Avg, Count, Exists, OuterRef, Q
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -29,10 +29,30 @@ class PlaceViewSet(ModelViewSet):
         qs = Place.objects.filter(is_active=True)
         user = self.request.user
 
-        qs = qs.annotate(
-            visit_count=Count("visits", distinct=True),
-            avg_rating=Avg("visits__rating_overall"),
-        )
+        if user.is_authenticated:
+            qs = qs.annotate(
+                visit_count=Count(
+                    "visits",
+                    filter=Q(visits__user=user, visits__is_active=True),
+                    distinct=True,
+                ),
+                avg_rating=Avg(
+                    "visits__rating_overall",
+                    filter=Q(visits__user=user, visits__is_active=True),
+                ),
+            )
+        else:
+            qs = qs.annotate(
+                visit_count=Count(
+                    "visits",
+                    filter=Q(visits__is_active=True),
+                    distinct=True,
+                ),
+                avg_rating=Avg(
+                    "visits__rating_overall",
+                    filter=Q(visits__is_active=True),
+                ),
+            )
 
         if user.is_authenticated:
             qs = qs.annotate(

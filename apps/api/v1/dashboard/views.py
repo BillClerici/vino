@@ -24,8 +24,8 @@ class DashboardView(APIView):
             "visit_count": my_visits.count(),
             "unique_places": my_visits.values("place").distinct().count(),
             "avg_rating": my_visits.aggregate(avg=Avg("rating_overall"))["avg"],
-            "trips_completed": Trip.objects.filter(
-                members=user, is_active=True, status="completed"
+            "trip_count": Trip.objects.filter(
+                members=user, is_active=True,
             ).count(),
         }
 

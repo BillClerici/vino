@@ -571,13 +571,14 @@ class _StatsRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        _StatCard(label: 'Visits', value: '${stats['visit_count'] ?? 0}'),
-        _StatCard(label: 'Places', value: '${stats['unique_places'] ?? 0}'),
+        _StatCard(label: 'Trips', value: '${stats['trip_count'] ?? 0}', color: Colors.blue),
+        _StatCard(label: 'Visits', value: '${stats['visit_count'] ?? 0}', color: Colors.teal),
+        _StatCard(label: 'Places', value: '${stats['unique_places'] ?? 0}', color: Colors.deepPurple),
         _StatCard(
           label: 'Avg Rating',
           value: (stats['avg_rating'] as num?)?.toStringAsFixed(1) ?? '-',
+          color: Colors.amber,
         ),
-        _StatCard(label: 'Trips', value: '${stats['trips_completed'] ?? 0}'),
       ],
     );
   }
@@ -586,12 +587,18 @@ class _StatsRow extends StatelessWidget {
 class _StatCard extends StatelessWidget {
   final String label;
   final String value;
-  const _StatCard({required this.label, required this.value});
+  final Color color;
+  const _StatCard({required this.label, required this.value, required this.color});
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
       child: Card(
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: color.withValues(alpha: 0.3)),
+        ),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
           child: Column(
@@ -599,6 +606,7 @@ class _StatCard extends StatelessWidget {
               Text(value,
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.bold,
+                        color: color,
                       )),
               const SizedBox(height: 4),
               Text(label, style: Theme.of(context).textTheme.bodySmall),
