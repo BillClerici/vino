@@ -54,19 +54,19 @@ class AppDrawer extends ConsumerWidget {
             _DrawerItem(
               icon: Icons.bookmark,
               label: 'My Wishlist',
-              subtitle: 'Wines to try later',
+              subtitle: 'Drinks to try later',
               onTap: (ctx) => ctx.push('/profile/wishlist'),
             ),
             _DrawerItem(
               icon: Icons.inventory_2,
               label: 'My Cellar',
-              subtitle: 'Wines purchased',
+              subtitle: 'Drinks purchased',
               onTap: (ctx) => ctx.push('/profile/cellar'),
             ),
             _DrawerItem(
               icon: Icons.insights,
               label: 'My Palate',
-              subtitle: 'Taste profile & AI sommelier',
+              subtitle: 'My taste profile',
               onTap: (ctx) => ctx.push('/profile/palate'),
             ),
             _DrawerItem(

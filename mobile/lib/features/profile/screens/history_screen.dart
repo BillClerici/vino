@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/services/trip_service.dart';
+
 import '../../../config/constants.dart';
 import '../../../core/api/api_client.dart';
 
@@ -59,16 +61,16 @@ class HistoryScreen extends ConsumerWidget {
   }
 }
 
-class _HistoryMap extends StatefulWidget {
+class _HistoryMap extends ConsumerStatefulWidget {
   final List<Map<String, dynamic>> places;
   final int totalPlaces;
   const _HistoryMap({required this.places, required this.totalPlaces});
 
   @override
-  State<_HistoryMap> createState() => _HistoryMapState();
+  ConsumerState<_HistoryMap> createState() => _HistoryMapState();
 }
 
-class _HistoryMapState extends State<_HistoryMap> {
+class _HistoryMapState extends ConsumerState<_HistoryMap> {
   GoogleMapController? _mapController;
   Map<String, dynamic>? _selectedPlace;
 
@@ -218,6 +220,18 @@ class _HistoryMapState extends State<_HistoryMap> {
                   context.push('/visits/$visitId');
                 }
               },
+              onStartTrip: () {
+                final placeId = _selectedPlace!['place_id'] as String?;
+                final name = _selectedPlace!['name'] as String? ?? '';
+                if (placeId != null) {
+                  startTripFromPlace(
+                    context: context,
+                    ref: ref,
+                    placeId: placeId,
+                    placeName: name,
+                  );
+                }
+              },
             ),
           ),
       ],
@@ -229,7 +243,8 @@ class _PlaceCard extends StatelessWidget {
   final Map<String, dynamic> place;
   final VoidCallback onClose;
   final VoidCallback onViewVisit;
-  const _PlaceCard({required this.place, required this.onClose, required this.onViewVisit});
+  final VoidCallback onStartTrip;
+  const _PlaceCard({required this.place, required this.onClose, required this.onViewVisit, required this.onStartTrip});
 
   Color _placeTypeColor(String? type) {
     switch (type) {
@@ -400,17 +415,31 @@ class _PlaceCard extends StatelessWidget {
                   ),
 
                 const SizedBox(height: 8),
-                // View last visit button
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: onViewVisit,
-                    icon: const Icon(Icons.history, size: 16),
-                    label: const Text('View Last Visit', style: TextStyle(fontSize: 13)),
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
+                // Action buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: onViewVisit,
+                        icon: const Icon(Icons.history, size: 16),
+                        label: const Text('Last Visit', style: TextStyle(fontSize: 12)),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: onStartTrip,
+                        icon: const Icon(Icons.directions_car, size: 16),
+                        label: const Text('Start Trip', style: TextStyle(fontSize: 12)),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

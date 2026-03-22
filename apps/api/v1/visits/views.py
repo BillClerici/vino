@@ -101,7 +101,7 @@ class VisitLogViewSet(ModelViewSet):
     def history_map(self, request):
         """All visited places with visit count, last visit date, and last visit ID."""
         places = (
-            VisitLog.objects.filter(user=request.user, is_active=True)
+            VisitLog.objects.filter(user=request.user, is_active=True, place__is_active=True)
             .values(
                 "place__id", "place__name", "place__place_type",
                 "place__city", "place__state",
