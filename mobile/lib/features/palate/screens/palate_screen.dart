@@ -49,8 +49,8 @@ class _PalateScreenState extends ConsumerState<PalateScreen> {
       appBar: AppBar(title: const Text('My Palate')),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openChat(context),
-        icon: const Icon(Icons.chat),
-        label: const Text('Ask Sommelier'),
+        icon: const Icon(Icons.auto_awesome, size: 18),
+        label: const Text('Ask Sippy'),
       ),
       body: palateState.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -301,7 +301,7 @@ class _SommelierChatState extends ConsumerState<_SommelierChat> {
     _messages.add({
       'role': 'assistant',
       'content':
-          "Hi! I'm your AI sommelier. Ask me anything about wine, beer, or what you should try next based on your tasting history.",
+          "Hi! I'm Sippy. Ask me anything about wine, beer, or what you should try next based on your tasting history.",
     });
   }
 
@@ -396,7 +396,7 @@ class _SommelierChatState extends ConsumerState<_SommelierChat> {
                       Icon(Icons.auto_awesome,
                           color: Theme.of(context).colorScheme.secondary),
                       const SizedBox(width: 8),
-                      Text('AI Sommelier',
+                      Text('Ask Sippy',
                           style: Theme.of(context).textTheme.titleLarge),
                     ],
                   ),

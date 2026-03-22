@@ -15,6 +15,8 @@ import 'features/subscription/screens/subscription_screen.dart';
 import 'features/trips/screens/live_trip_screen.dart';
 import 'features/trips/screens/trip_create_screen.dart';
 import 'features/trips/screens/trip_detail_screen.dart';
+import 'features/profile/screens/badges_screen.dart';
+import 'features/profile/screens/cellar_screen.dart';
 import 'features/trips/screens/trip_recap_screen.dart';
 import 'features/trips/screens/wishlist_screen.dart';
 import 'features/trips/screens/trip_stop_detail_screen.dart';
@@ -149,6 +151,14 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: 'wishlist',
                 builder: (_, __) => const WishlistScreen(),
+              ),
+              GoRoute(
+                path: 'cellar',
+                builder: (_, __) => const CellarScreen(),
+              ),
+              GoRoute(
+                path: 'badges',
+                builder: (_, __) => const BadgesScreen(),
               ),
               GoRoute(
                 path: 'subscription',

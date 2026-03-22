@@ -44,6 +44,16 @@ class ApiPaths {
   /// Sippy trip planner (LangGraph): POST /api/v1/trips/plan/
   static const tripPlan = '/api/v1/trips/plan/';
 
+  /// Badges
+  static const badges = '/api/v1/badges/';
+
+  /// Cellar / Purchase Dashboard
+  static const cellar = '/api/v1/cellar/';
+
+  /// Wine & Food Pairings: POST /api/v1/places/{placeId}/pairings/
+  static String placePairings(String placeId) =>
+      '/api/v1/places/$placeId/pairings/';
+
   /// Smart recommendations for a place: POST /api/v1/places/{placeId}/recommend/
   static String placeRecommend(String placeId) =>
       '/api/v1/places/$placeId/recommend/';
@@ -52,9 +62,9 @@ class ApiPaths {
   static String placeFlight(String placeId) =>
       '/api/v1/places/$placeId/flight/';
 
-  /// Save tasting flight to a visit
-  static String liveFlight(String tripId, String visitId) =>
-      '/api/v1/trips/$tripId/live/flight/$visitId/';
+  /// Save AI results (flight, recommendations, pairings) to visit metadata
+  static String liveMetadata(String tripId, String visitId) =>
+      '/api/v1/trips/$tripId/live/metadata/$visitId/';
 
   /// Wine wishlist
   static const wishlist = '/api/v1/wishlist/';

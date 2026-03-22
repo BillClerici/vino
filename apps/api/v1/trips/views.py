@@ -314,23 +314,26 @@ class TripViewSet(ModelViewSet):
         visit.save()
         return Response({"detail": "Rating saved."})
 
-    @action(detail=True, methods=["post"], url_path="live/flight/(?P<visit_pk>[^/.]+)")
-    def live_flight(self, request, pk=None, visit_pk=None):
-        """Save or clear a tasting flight for a visit."""
+    @action(detail=True, methods=["post"], url_path="live/metadata/(?P<visit_pk>[^/.]+)")
+    def live_metadata(self, request, pk=None, visit_pk=None):
+        """Save AI results (flight, recommendations, pairings) to visit metadata."""
         try:
             visit = VisitLog.objects.get(pk=visit_pk, user=request.user, is_active=True)
         except VisitLog.DoesNotExist:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
-        flight_data = request.data.get("flight")
         meta = visit.metadata or {}
-        if flight_data:
-            meta["flight"] = flight_data
-        else:
-            meta.pop("flight", None)
+        # Merge provided keys into metadata
+        for key in ("flight", "recommendations", "pairings"):
+            if key in request.data:
+                value = request.data[key]
+                if value:
+                    meta[key] = value
+                else:
+                    meta.pop(key, None)
         visit.metadata = meta
         visit.save(update_fields=["metadata", "updated_at"])
-        return Response({"detail": "Flight saved."})
+        return Response({"detail": "Saved."})
 
     @action(detail=True, methods=["post"], url_path="live/wine")
     def live_wine(self, request, pk=None):

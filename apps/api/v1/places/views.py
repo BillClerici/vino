@@ -165,11 +165,13 @@ class PlaceViewSet(ModelViewSet):
 
         logger = logging.getLogger(__name__)
         place = self.get_object()
-        menu_items = list(
-            place.menu_items.filter(is_active=True).values(
-                "id", "name", "varietal", "vintage", "description", "price"
-            )[:30]
-        )
+        menu_items_qs = place.menu_items.filter(is_active=True)[:30]
+        menu_items = [
+            {"id": str(m.id), "name": m.name, "varietal": m.varietal,
+             "vintage": m.vintage, "description": m.description,
+             "price": float(m.price) if m.price else None}
+            for m in menu_items_qs
+        ]
 
         if not menu_items:
             return Response({"recommendations": [], "detail": "No menu items available."})
@@ -181,11 +183,10 @@ class PlaceViewSet(ModelViewSet):
 
         # Get user's past wines at this place
         from apps.visits.models import VisitWine
-        from django.db.models import F
         past_wines = list(
             VisitWine.objects.filter(
                 visit__user=request.user, visit__place=place, is_active=True
-            ).values(varietal=F("wine_type"), rating=F("rating"), name=F("wine_name"))[:10]
+            ).values_list("wine_name", flat=True)[:10]
         )
 
         prompt = f"""Based on this user's palate profile and the menu below, recommend the top 3 items they should try. Return ONLY valid JSON array.
@@ -195,10 +196,10 @@ Palate: {palate}
 Past wines here: {json.dumps(past_wines) if past_wines else 'First visit'}
 
 Menu at {place.name}:
-{json.dumps(menu_items, default=str)}
+{json.dumps(menu_items)}
 
-Return JSON array of exactly 3 objects:
-[{{"menu_item_id": "uuid", "name": "...", "why": "1 sentence why this matches their palate"}}]"""
+Return ONLY a JSON array of exactly 3 objects with these exact keys:
+[{{"name": "Wine name from menu", "why": "1 sentence why this matches their palate"}}]"""
 
         try:
             from apps.api.ai_utils import get_claude
@@ -227,11 +228,12 @@ Return JSON array of exactly 3 objects:
 
         logger = logging.getLogger(__name__)
         place = self.get_object()
-        menu_items = list(
-            place.menu_items.filter(is_active=True).values(
-                "id", "name", "varietal", "vintage", "description", "price"
-            )[:30]
-        )
+        menu_items_qs = place.menu_items.filter(is_active=True)[:30]
+        menu_items = [
+            {"name": m.name, "varietal": m.varietal, "vintage": m.vintage,
+             "description": m.description, "price": float(m.price) if m.price else None}
+            for m in menu_items_qs
+        ]
 
         if len(menu_items) < 3:
             return Response({"flight": [], "detail": "Not enough menu items for a flight."})
@@ -276,6 +278,98 @@ Return ONLY valid JSON:
         except Exception:
             logger.exception("Flight builder failed")
             return Response({"flight": [], "detail": "Could not build a flight."})
+
+    @action(detail=True, methods=["post"])
+    def pairings(self, request, pk=None):
+        """Get AI-powered wine & food pairing suggestions for this place."""
+        import json
+        import logging
+
+        logger = logging.getLogger(__name__)
+        place = self.get_object()
+        menu_items = list(
+            place.menu_items.filter(is_active=True).values(
+                "name", "varietal", "vintage", "description", "price"
+            )[:20]
+        )
+
+        # What the user is eating/drinking (optional context)
+        context = request.data.get("context", "")
+        place_type = place.place_type
+
+        if place_type in ("winery", "brewery"):
+            direction = "food"
+            prompt_intro = f"The user is at {place.name}, a {place_type}. Suggest food pairings for their drinks."
+        else:
+            direction = "wine"
+            prompt_intro = f"The user is at {place.name}, a restaurant. Suggest wine/beer pairings for their food."
+
+        from apps.palate.models import PalateProfile
+        profile = PalateProfile.objects.filter(user=request.user).first()
+        palate = json.dumps(profile.preferences, indent=2) if profile and profile.preferences else "No palate profile"
+
+        prompt = f"""{prompt_intro}
+
+User's palate: {palate}
+{f'User context: {context}' if context else ''}
+
+Menu at {place.name}:
+{json.dumps(menu_items, default=str) if menu_items else 'No menu available — suggest general pairings based on the place type.'}
+
+Return ONLY valid JSON with EXACTLY these keys (do not rename them):
+{{
+  "pairings": [
+    {{
+      "item": "The wine or beer name from the menu",
+      "pairs_with": "The food that goes well with it",
+      "why": "1 sentence explanation",
+      "tip": "Optional tasting or serving tip"
+    }}
+  ],
+  "general_tip": "1 sentence general pairing advice"
+}}
+
+IMPORTANT: Use exactly "item" and "pairs_with" as the key names. Provide 3-5 pairings."""
+
+        try:
+            from apps.api.ai_utils import get_claude
+            from langchain_core.messages import HumanMessage
+
+            llm = get_claude()
+            response = llm.invoke([HumanMessage(content=prompt)])
+            raw = response.content.strip()
+            if raw.startswith("```"):
+                raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
+                if raw.endswith("```"):
+                    raw = raw[:-3]
+                raw = raw.strip()
+
+            result = json.loads(raw)
+
+            # Normalize keys — Claude sometimes uses different names
+            if "pairings" in result:
+                normalized = []
+                for p in result["pairings"]:
+                    normalized.append({
+                        "item": p.get("item") or p.get("wine") or p.get("drink") or p.get("name") or "",
+                        "pairs_with": p.get("pairs_with") or p.get("food_pairings") or p.get("food") or p.get("pairing") or "",
+                        "why": p.get("why") or p.get("reason") or p.get("explanation") or "",
+                        "tip": p.get("tip") or p.get("tasting_tip") or p.get("serving_tip") or "",
+                    })
+                    # Handle case where pairs_with is a list
+                    if isinstance(normalized[-1]["pairs_with"], list):
+                        normalized[-1]["pairs_with"] = ", ".join(normalized[-1]["pairs_with"])
+                result["pairings"] = normalized
+
+            result["direction"] = direction
+            return Response(result)
+        except Exception:
+            logger.exception("Pairing generation failed")
+            return Response({
+                "pairings": [],
+                "direction": direction,
+                "detail": "Could not generate pairings.",
+            })
 
     @action(detail=False, methods=["get"])
     def map(self, request):

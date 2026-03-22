@@ -20,6 +20,7 @@ import '../../../core/providers/lookup_provider.dart';
 import '../../../core/widgets/rating_stars.dart';
 import '../../help/help_launcher.dart';
 import '../providers/trips_provider.dart';
+import '../widgets/flight_builder_button.dart';
 import '../widgets/sippy_chat.dart';
 import '../widgets/sippy_history.dart';
 import '../widgets/trip_stop_drawer.dart';
@@ -745,20 +746,12 @@ class _StopViewState extends State<_StopView> {
                     onSelectItem: (checkedIn && visitId != null)
                         ? (item) => drinksSectionKey.currentState?.addFromMenu(item)
                         : null,
-                    showFlightBuilder: checkedIn,
+                    showAiTools: checkedIn && visitId != null,
                     tripId: checkedIn ? tripId : null,
                     visitId: checkedIn ? visitId : null,
                     existingVisitData: existingVisitData,
                   ),
 
-                  // ── Smart Recommendations (after check-in) ──
-                  if (checkedIn && visitId != null) ...[
-                    const SizedBox(height: 24),
-                    _SmartRecommendationsCard(
-                      place: place,
-                      onAddDrink: (item) => drinksSectionKey.currentState?.addFromMenu(item),
-                    ),
-                  ],
 
                   // ── My Drinks (only after check-in during live trip) ──
                   if (checkedIn && visitId != null) ...[
@@ -2217,14 +2210,14 @@ class _RatingRow extends StatelessWidget {
 class _DrinkMenuSection extends ConsumerStatefulWidget {
   final Place place;
   final ValueChanged<Map<String, dynamic>>? onSelectItem;
-  final bool showFlightBuilder;
+  final bool showAiTools;
   final String? tripId;
   final String? visitId;
   final Map<String, dynamic>? existingVisitData;
   const _DrinkMenuSection({
     required this.place,
     this.onSelectItem,
-    this.showFlightBuilder = false,
+    this.showAiTools = false,
     this.tripId,
     this.visitId,
     this.existingVisitData,
@@ -2238,14 +2231,13 @@ class _DrinkMenuSectionState extends ConsumerState<_DrinkMenuSection> {
   List<Map<String, dynamic>>? _menuItems;
   bool _fetching = false;
   bool _expanded = true;
-  Map<String, dynamic>? _flight;
-  bool _buildingFlight = false;
+  Set<String> _wishlistedNames = {};
 
   @override
   void initState() {
     super.initState();
     _loadExistingMenu();
-    _loadSavedFlight();
+    _loadWishlistMatches();
   }
 
   @override
@@ -2253,17 +2245,29 @@ class _DrinkMenuSectionState extends ConsumerState<_DrinkMenuSection> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.place.id != widget.place.id) {
       _menuItems = null;
-      _flight = null;
+      _wishlistedNames = {};
       _loadExistingMenu();
-      _loadSavedFlight();
+      _loadWishlistMatches();
     }
   }
 
-  void _loadSavedFlight() {
-    final meta = widget.existingVisitData?['metadata'] as Map<String, dynamic>?;
-    if (meta != null && meta['flight'] != null) {
-      _flight = meta['flight'] as Map<String, dynamic>;
-    }
+  Future<void> _loadWishlistMatches() async {
+    try {
+      final api = ref.read(apiClientProvider);
+      final resp = await api.get(ApiPaths.wishlistCheck(widget.place.id));
+      final data = resp.data['data'] as Map<String, dynamic>? ??
+          resp.data as Map<String, dynamic>;
+      final names = <String>{};
+      for (final m in (data['direct_matches'] as List?) ?? []) {
+        final n = (m is Map ? m['wine_name'] : m) as String?;
+        if (n != null && n.isNotEmpty) names.add(n.toLowerCase());
+      }
+      for (final m in (data['name_matches'] as List?) ?? []) {
+        final n = (m as Map)['menu_item_name'] as String?;
+        if (n != null) names.add(n.toLowerCase());
+      }
+      if (mounted) setState(() => _wishlistedNames = names);
+    } catch (_) {}
   }
 
   Future<void> _loadExistingMenu() async {
@@ -2343,35 +2347,19 @@ class _DrinkMenuSectionState extends ConsumerState<_DrinkMenuSection> {
         ),
         const SizedBox(height: 8),
 
-        // Action buttons row (fetch menu + build flight)
+        // Fetch menu button
         if ((_menuItems == null || _menuItems!.isEmpty) &&
             widget.place.website.isNotEmpty)
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _fetching ? null : _fetchFromWebsite,
-                  icon: _fetching
-                      ? const SizedBox(height: 14, width: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Icon(Icons.auto_awesome, size: 16),
-                  label: Text(_fetching ? 'Scanning...' : 'Fetch Menu',
-                      style: const TextStyle(fontSize: 12)),
-                ),
-              ),
-              if (widget.showFlightBuilder) ...[
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _buildingFlight ? null : _buildFlight,
-                    icon: _buildingFlight
-                        ? const SizedBox(height: 14, width: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Icon(Icons.local_bar, size: 16),
-                    label: Text(_buildingFlight ? 'Building...' : 'Build Flight',
-                        style: const TextStyle(fontSize: 12)),
-                  ),
-                ),
-              ],
-            ],
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _fetching ? null : _fetchFromWebsite,
+              icon: _fetching
+                  ? const SizedBox(height: 14, width: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.auto_awesome, size: 16),
+              label: Text(_fetching ? 'Scanning website...' : 'Fetch Menu from Website',
+                  style: const TextStyle(fontSize: 12)),
+            ),
           )
         else if ((_menuItems == null || _menuItems!.isEmpty) &&
             widget.place.website.isEmpty)
@@ -2409,183 +2397,55 @@ class _DrinkMenuSectionState extends ConsumerState<_DrinkMenuSection> {
                 separatorBuilder: (_, __) => const SizedBox(width: 8),
                 itemBuilder: (_, i) {
                   final item = _menuItems![i];
-                  return _MenuItemCard(item: item, onSelect: () {
-                    widget.onSelectItem?.call(item);
-                  });
+                  final itemName = (item['name'] as String? ?? '').toLowerCase();
+                  return _MenuItemCard(
+                    item: item,
+                    initialWishlisted: _wishlistedNames.contains(itemName),
+                    onSelect: () {
+                      widget.onSelectItem?.call(item);
+                    },
+                  );
                 },
               ),
             ),
           ),
-          // Refresh + Build Flight row
-          Row(
-            children: [
-              TextButton.icon(
-                onPressed: _fetching ? null : _fetchFromWebsite,
-                icon: const Icon(Icons.refresh, size: 14),
-                label: const Text('Refresh', style: TextStyle(fontSize: 12)),
-              ),
-              if (widget.showFlightBuilder) ...[
-                const Spacer(),
-                TextButton.icon(
-                  onPressed: _buildingFlight ? null : _buildFlight,
-                  icon: _buildingFlight
-                      ? const SizedBox(height: 14, width: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Icon(Icons.local_bar, size: 14),
-                  label: Text(_buildingFlight ? 'Building...' : 'Build Flight',
-                      style: const TextStyle(fontSize: 12)),
-                ),
-              ],
-            ],
-          ),
-        ],
-
-        // Flight display (persisted)
-        if (_flight != null) _buildFlightCard(),
-      ],
-    );
-  }
-
-  Future<void> _buildFlight() async {
-    setState(() => _buildingFlight = true);
-    try {
-      final api = ref.read(apiClientProvider);
-      final resp = await api.dio.post(
-        ApiPaths.placeFlight(widget.place.id),
-        data: {'size': 4},
-        options: Options(receiveTimeout: const Duration(seconds: 30)),
-      );
-      final data = resp.data['data'] as Map<String, dynamic>? ??
-          resp.data as Map<String, dynamic>;
-      if (mounted) {
-        setState(() { _flight = data; _buildingFlight = false; });
-        _saveFlight(data);
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() => _buildingFlight = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not build flight')),
-        );
-      }
-    }
-  }
-
-  Future<void> _saveFlight(Map<String, dynamic>? flightData) async {
-    if (widget.tripId == null || widget.visitId == null) return;
-    try {
-      final api = ref.read(apiClientProvider);
-      await api.post(
-        ApiPaths.liveFlight(widget.tripId!, widget.visitId!),
-        data: {'flight': flightData},
-      );
-    } catch (_) {}
-  }
-
-  Widget _buildFlightCard() {
-    final colorScheme = Theme.of(context).colorScheme;
-    final flightName = _flight!['flight_name'] as String? ?? 'Your Flight';
-    final description = _flight!['description'] as String? ?? '';
-    final items = (_flight!['items'] as List?) ?? [];
-
-    Color roleColor(String? role) {
-      switch (role) {
-        case 'opener': return Colors.green;
-        case 'comfort': return Colors.blue;
-        case 'stretch': return Colors.orange;
-        case 'finisher': return Colors.purple;
-        default: return Colors.grey;
-      }
-    }
-
-    return Card(
-      color: Colors.white,
-      margin: const EdgeInsets.only(top: 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: colorScheme.primary.withValues(alpha: 0.4), width: 1.5),
-      ),
-      elevation: 0,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.local_bar, size: 16, color: colorScheme.primary),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(flightName,
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: colorScheme.primary)),
-                ),
-                IconButton(
-                  onPressed: () {
-                    setState(() => _flight = null);
-                    _saveFlight(null);
-                  },
-                  icon: const Icon(Icons.close, size: 16),
-                  constraints: const BoxConstraints(),
-                  padding: EdgeInsets.zero,
-                ),
-              ],
+          // Refresh button
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: _fetching ? null : _fetchFromWebsite,
+              icon: const Icon(Icons.refresh, size: 14),
+              label: const Text('Refresh', style: TextStyle(fontSize: 12)),
             ),
-            if (description.isNotEmpty)
-              Text(description, style: TextStyle(fontSize: 11, color: Colors.grey[600])),
-            const SizedBox(height: 6),
-            ...items.asMap().entries.map((entry) {
-              final i = entry.key;
-              final item = entry.value as Map<String, dynamic>;
-              final role = item['role'] as String? ?? '';
-              final name = item['name'] as String? ?? '';
-              final tip = item['tasting_tip'] as String? ?? '';
+          ),
 
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 20, height: 20,
-                      decoration: BoxDecoration(
-                        color: roleColor(role).withValues(alpha: 0.15),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Center(
-                        child: Text('${i + 1}',
-                            style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: roleColor(role))),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(child: Text(name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12))),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                                decoration: BoxDecoration(
-                                  color: roleColor(role).withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(role.toUpperCase(),
-                                    style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: roleColor(role))),
-                              ),
-                            ],
-                          ),
-                          if (tip.isNotEmpty)
-                            Text(tip, style: TextStyle(fontSize: 10, color: Colors.grey[600], fontStyle: FontStyle.italic)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }),
+          // AI Tools (only when menu has items)
+          if (widget.showAiTools) ...[
+            const SizedBox(height: 8),
+            _SmartRecommendationsCard(
+              place: widget.place,
+              onAddDrink: widget.onSelectItem,
+              tripId: widget.tripId,
+              visitId: widget.visitId,
+              existingVisitData: widget.existingVisitData,
+            ),
+            const SizedBox(height: 8),
+            _PairingsCard(
+              place: widget.place,
+              tripId: widget.tripId,
+              visitId: widget.visitId,
+              existingVisitData: widget.existingVisitData,
+            ),
+            const SizedBox(height: 8),
+            FlightBuilderButton(
+              place: widget.place,
+              tripId: widget.tripId,
+              visitId: widget.visitId,
+              existingVisitData: widget.existingVisitData,
+            ),
           ],
-        ),
-      ),
+        ],
+      ],
     );
   }
 }
@@ -3570,14 +3430,15 @@ class _StopMapWidgetState extends State<_StopMapWidget> {
 class _MenuItemCard extends ConsumerStatefulWidget {
   final Map<String, dynamic> item;
   final VoidCallback onSelect;
-  const _MenuItemCard({required this.item, required this.onSelect});
+  final bool initialWishlisted;
+  const _MenuItemCard({required this.item, required this.onSelect, this.initialWishlisted = false});
 
   @override
   ConsumerState<_MenuItemCard> createState() => _MenuItemCardState();
 }
 
 class _MenuItemCardState extends ConsumerState<_MenuItemCard> {
-  bool _wishlisted = false;
+  late bool _wishlisted = widget.initialWishlisted;
 
   Map<String, dynamic> get item => widget.item;
   VoidCallback get onSelect => widget.onSelect;
@@ -3728,7 +3589,16 @@ class _MenuItemCardState extends ConsumerState<_MenuItemCard> {
 class _SmartRecommendationsCard extends ConsumerStatefulWidget {
   final Place place;
   final ValueChanged<Map<String, dynamic>>? onAddDrink;
-  const _SmartRecommendationsCard({required this.place, this.onAddDrink});
+  final String? tripId;
+  final String? visitId;
+  final Map<String, dynamic>? existingVisitData;
+  const _SmartRecommendationsCard({
+    required this.place,
+    this.onAddDrink,
+    this.tripId,
+    this.visitId,
+    this.existingVisitData,
+  });
 
   @override
   ConsumerState<_SmartRecommendationsCard> createState() =>
@@ -3738,13 +3608,13 @@ class _SmartRecommendationsCard extends ConsumerStatefulWidget {
 class _SmartRecommendationsCardState
     extends ConsumerState<_SmartRecommendationsCard> {
   List<Map<String, dynamic>>? _recommendations;
-  bool _loading = true;
+  bool _loading = false;
   bool _dismissed = false;
 
   @override
   void initState() {
     super.initState();
-    _fetch();
+    _loadSaved();
   }
 
   @override
@@ -3753,51 +3623,87 @@ class _SmartRecommendationsCardState
     if (oldWidget.place.id != widget.place.id) {
       _recommendations = null;
       _dismissed = false;
-      _fetch();
+      _loading = false;
+      _loadSaved();
+    }
+  }
+
+  void _loadSaved() {
+    final meta = widget.existingVisitData?['metadata'] as Map<String, dynamic>?;
+    if (meta != null && meta['recommendations'] is List) {
+      final saved = (meta['recommendations'] as List)
+          .map((e) => e as Map<String, dynamic>)
+          .toList();
+      if (saved.isNotEmpty) {
+        setState(() => _recommendations = saved);
+      }
     }
   }
 
   Future<void> _fetch() async {
+    setState(() => _loading = true);
     try {
       final api = ref.read(apiClientProvider);
-      final resp = await api.dio.post(
-        ApiPaths.placeRecommend(widget.place.id),
-        options: Options(receiveTimeout: const Duration(seconds: 30)),
-      );
+      final resp = await api.post(ApiPaths.placeRecommend(widget.place.id));
       final data = resp.data['data'] as Map<String, dynamic>? ??
           resp.data as Map<String, dynamic>;
       final recs = (data['recommendations'] as List?)
               ?.map((e) => e as Map<String, dynamic>)
               .toList() ??
           [];
-      if (mounted) setState(() { _recommendations = recs; _loading = false; });
+      if (mounted) {
+        setState(() { _recommendations = recs; _loading = false; });
+        _save(recs);
+      }
     } catch (_) {
       if (mounted) setState(() => _loading = false);
     }
   }
 
+  Future<void> _save(List<Map<String, dynamic>> recs) async {
+    if (widget.tripId == null || widget.visitId == null) return;
+    try {
+      final api = ref.read(apiClientProvider);
+      await api.post(
+        ApiPaths.liveMetadata(widget.tripId!, widget.visitId!),
+        data: {'recommendations': recs},
+      );
+    } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_dismissed) return const SizedBox.shrink();
-    if (_loading) {
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-              const SizedBox(width: 12),
-              Text('Getting recommendations...', style: TextStyle(color: Colors.grey[600], fontSize: 13)),
-            ],
+    final colorScheme = Theme.of(context).colorScheme;
+
+    // Show button if no recommendations yet
+    if (_recommendations == null) {
+      return SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          onPressed: _loading ? null : _fetch,
+          icon: _loading
+              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.auto_awesome, size: 16),
+          label: Text(_loading ? 'Getting recommendations...' : 'Get Recommendations',
+              style: const TextStyle(fontSize: 12)),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            side: BorderSide(color: colorScheme.secondary),
           ),
         ),
       );
     }
-    if (_recommendations == null || _recommendations!.isEmpty) return const SizedBox.shrink();
 
-    final colorScheme = Theme.of(context).colorScheme;
+    if (_recommendations!.isEmpty) return const SizedBox.shrink();
+
     return Card(
-      color: colorScheme.secondaryContainer.withValues(alpha: 0.3),
+      color: Colors.white,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: colorScheme.secondary.withValues(alpha: 0.4), width: 1.5),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
@@ -3810,6 +3716,14 @@ class _SmartRecommendationsCardState
                 Text('Recommended for You',
                     style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: colorScheme.secondary)),
                 const Spacer(),
+                IconButton(
+                  onPressed: _fetch,
+                  icon: const Icon(Icons.refresh, size: 16),
+                  constraints: const BoxConstraints(),
+                  padding: EdgeInsets.zero,
+                  tooltip: 'Refresh',
+                ),
+                const SizedBox(width: 4),
                 IconButton(
                   onPressed: () => setState(() => _dismissed = true),
                   icon: const Icon(Icons.close, size: 16),
@@ -3859,4 +3773,182 @@ class _SmartRecommendationsCardState
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// WINE & FOOD PAIRINGS CARD
+// ═══════════════════════════════════════════════════════════════════
 
+class _PairingsCard extends ConsumerStatefulWidget {
+  final Place place;
+  final String? tripId;
+  final String? visitId;
+  final Map<String, dynamic>? existingVisitData;
+  const _PairingsCard({required this.place, this.tripId, this.visitId, this.existingVisitData});
+
+  @override
+  ConsumerState<_PairingsCard> createState() => _PairingsCardState();
+}
+
+class _PairingsCardState extends ConsumerState<_PairingsCard> {
+  Map<String, dynamic>? _data;
+  bool _loading = false;
+  bool _dismissed = false;
+
+  @override
+  void didUpdateWidget(_PairingsCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.place.id != widget.place.id) {
+      _data = null;
+      _dismissed = false;
+      _loading = false;
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSaved();
+  }
+
+  void _loadSaved() {
+    final meta = widget.existingVisitData?['metadata'] as Map<String, dynamic>?;
+    if (meta != null && meta['pairings'] is Map) {
+      setState(() { _data = meta['pairings'] as Map<String, dynamic>; });
+    }
+  }
+
+  Future<void> _fetch() async {
+    setState(() => _loading = true);
+    try {
+      final api = ref.read(apiClientProvider);
+      final resp = await api.post(ApiPaths.placePairings(widget.place.id));
+      final data = resp.data['data'] as Map<String, dynamic>? ??
+          resp.data as Map<String, dynamic>;
+      if (mounted) {
+        setState(() { _data = data; _loading = false; });
+        _save(data);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Pairing failed: $e'), duration: const Duration(seconds: 3)),
+        );
+      }
+    }
+  }
+
+  Future<void> _save(Map<String, dynamic> pairingData) async {
+    if (widget.tripId == null || widget.visitId == null) return;
+    try {
+      final api = ref.read(apiClientProvider);
+      await api.post(
+        ApiPaths.liveMetadata(widget.tripId!, widget.visitId!),
+        data: {'pairings': pairingData},
+      );
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_dismissed) return const SizedBox.shrink();
+    final colorScheme = Theme.of(context).colorScheme;
+    final isWinery = widget.place.placeType == 'winery' || widget.place.placeType == 'brewery';
+    final label = isWinery ? 'Food Pairings' : 'Wine Pairings';
+
+    if (_data == null) {
+      return SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          onPressed: _loading ? null : _fetch,
+          icon: _loading
+              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.restaurant_menu, size: 16),
+          label: Text(_loading ? 'Finding pairings...' : 'Get $label',
+              style: const TextStyle(fontSize: 12)),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            side: BorderSide(color: colorScheme.tertiary),
+          ),
+        ),
+      );
+    }
+
+    final pairings = (_data!['pairings'] as List?) ?? [];
+    final generalTip = _data!['general_tip'] as String? ?? '';
+
+    if (pairings.isEmpty) return const SizedBox.shrink();
+
+    return Card(
+      color: Colors.white,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: colorScheme.tertiary.withValues(alpha: 0.4), width: 1.5),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.restaurant_menu, size: 16, color: colorScheme.tertiary),
+                const SizedBox(width: 6),
+                Text(label,
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: colorScheme.tertiary)),
+                const Spacer(),
+                IconButton(
+                  onPressed: () => setState(() => _dismissed = true),
+                  icon: const Icon(Icons.close, size: 16),
+                  constraints: const BoxConstraints(),
+                  padding: EdgeInsets.zero,
+                ),
+              ],
+            ),
+            if (generalTip.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(generalTip, style: TextStyle(fontSize: 11, color: Colors.grey[600], fontStyle: FontStyle.italic)),
+            ],
+            const SizedBox(height: 8),
+            ...pairings.map((p) {
+              final pairing = p as Map<String, dynamic>;
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(isWinery ? Icons.lunch_dining : Icons.wine_bar,
+                        size: 14, color: colorScheme.tertiary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          RichText(
+                            text: TextSpan(
+                              style: DefaultTextStyle.of(context).style.copyWith(fontSize: 12),
+                              children: [
+                                TextSpan(text: '${pairing['item']}',
+                                    style: const TextStyle(fontWeight: FontWeight.w600)),
+                                TextSpan(text: ' + ${pairing['pairs_with']}'),
+                              ],
+                            ),
+                          ),
+                          Text(pairing['why'] as String? ?? '',
+                              style: TextStyle(fontSize: 10, color: Colors.grey[600])),
+                          if ((pairing['tip'] as String? ?? '').isNotEmpty)
+                            Text(pairing['tip'] as String,
+                                style: TextStyle(fontSize: 10, color: colorScheme.tertiary, fontStyle: FontStyle.italic)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+}

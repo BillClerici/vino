@@ -25,8 +25,8 @@ class ApiClient {
   ApiClient(SecureStorageService storage, {void Function()? onAuthExpired}) {
     dio = Dio(BaseOptions(
       baseUrl: EnvConfig.apiBaseUrl,
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 30),
+      connectTimeout: const Duration(seconds: 15),
+      receiveTimeout: const Duration(seconds: 90),
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',

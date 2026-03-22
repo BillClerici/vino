@@ -18,6 +18,8 @@ from .trips.views import TripViewSet
 from .users.views import UserProfileViewSet
 from .scan_label import ScanLabelView
 from .conversations.views import SippyConversationViewSet
+from .badges.views import BadgesView
+from .cellar.views import CellarView
 from .visits.views import VisitLogViewSet
 from .wishlist.views import WishlistViewSet
 
@@ -187,6 +189,12 @@ urlpatterns = [
         MenuItemViewSet.as_view({"get": "retrieve", "put": "update", "delete": "destroy"}),
         name="place_menu_detail",
     ),
+
+    # Badges
+    path("badges/", BadgesView.as_view(), name="badges"),
+
+    # Cellar / Purchase Dashboard
+    path("cellar/", CellarView.as_view(), name="cellar"),
 
     # Wine label scanner (Gemini Vision)
     path("scan-label/", ScanLabelView.as_view(), name="scan_label"),
