@@ -1,7 +1,9 @@
+import 'dart:io' show File;
 import 'dart:ui' show PointerDeviceKind;
 
-import 'package:dio/dio.dart' show Dio, Options;
+import 'package:dio/dio.dart' show Dio, FormData, MultipartFile, Options;
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -897,6 +899,7 @@ class _DrinksSectionState extends ConsumerState<_DrinksSection> {
         'purchased': wine['purchased'] ?? false,
         'purchased_price': wine['purchased_price'],
         'purchased_quantity': wine['purchased_quantity'],
+        'photo': wine['photo'] ?? '',
       };
     }).toList();
   }
@@ -924,6 +927,35 @@ class _DrinksSectionState extends ConsumerState<_DrinksSection> {
     }
   }
 
+  Future<String?> _uploadPhoto(String drinkId, XFile photo) async {
+    try {
+      final api = ref.read(apiClientProvider);
+      final MultipartFile file;
+      if (kIsWeb) {
+        final bytes = await photo.readAsBytes();
+        file = MultipartFile.fromBytes(bytes, filename: 'photo.jpg');
+      } else {
+        file = await MultipartFile.fromFile(photo.path, filename: 'photo.jpg');
+      }
+      final formData = FormData.fromMap({'file': file});
+      final resp = await api.dio.post(
+        ApiPaths.winePhoto(widget.visitId, drinkId),
+        data: formData,
+        options: Options(contentType: 'multipart/form-data'),
+      );
+      final data = resp.data is Map ? resp.data : (resp.data as dynamic);
+      final nested = data['data'] as Map<String, dynamic>?;
+      return (nested?['photo_url'] ?? data['photo_url']) as String?;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Photo upload failed: $e')),
+        );
+      }
+      return null;
+    }
+  }
+
   Future<void> _editDrink(int index) async {
     final drink = Map<String, dynamic>.from(_addedDrinks[index]);
     final result = await showModalBottomSheet<Map<String, dynamic>>(
@@ -948,8 +980,20 @@ class _DrinksSectionState extends ConsumerState<_DrinksSection> {
     if (drinkId.isNotEmpty) {
       try {
         final api = ref.read(apiClientProvider);
+        final pickedPhoto = result.remove('_picked_photo') as XFile?;
         await api.patch('${ApiPaths.visits}${widget.visitId}/wines/$drinkId/', data: result);
-        setState(() => _addedDrinks[index] = {...result, 'id': drinkId});
+
+        // Upload photo if one was picked
+        String? photoUrl = result['photo'] as String?;
+        if (pickedPhoto != null) {
+          photoUrl = await _uploadPhoto(drinkId, pickedPhoto);
+        }
+
+        setState(() => _addedDrinks[index] = {
+              ...result,
+              'id': drinkId,
+              if (photoUrl != null && photoUrl.isNotEmpty) 'photo': photoUrl,
+            });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Drink updated'), backgroundColor: Colors.green, duration: Duration(seconds: 2)),
@@ -983,13 +1027,26 @@ class _DrinksSectionState extends ConsumerState<_DrinksSection> {
 
     try {
       final api = ref.read(apiClientProvider);
+      final pickedPhoto = result.remove('_picked_photo') as XFile?;
       final resp = await api.post(
         '${ApiPaths.trips}${widget.tripId}/live/wine/',
         data: {...result, 'visit_id': widget.visitId},
       );
       final respData = resp.data['data'] as Map<String, dynamic>?;
+      final drinkId = respData?['id'] as String? ?? '';
+
+      // Upload photo if one was picked
+      String? photoUrl;
+      if (pickedPhoto != null && drinkId.isNotEmpty) {
+        photoUrl = await _uploadPhoto(drinkId, pickedPhoto);
+      }
+
       setState(() {
-        _addedDrinks.add({...result, 'id': respData?['id'] ?? ''});
+        _addedDrinks.add({
+          ...result,
+          'id': drinkId,
+          if (photoUrl != null && photoUrl.isNotEmpty) 'photo': photoUrl,
+        });
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1031,6 +1088,7 @@ class _DrinksSectionState extends ConsumerState<_DrinksSection> {
 
     try {
       final api = ref.read(apiClientProvider);
+      final pickedPhoto = result.remove('_picked_photo') as XFile?;
       final resp = await api.post(
         '${ApiPaths.trips}${widget.tripId}/live/wine/',
         data: {
@@ -1040,8 +1098,19 @@ class _DrinksSectionState extends ConsumerState<_DrinksSection> {
         },
       );
       final respData = resp.data['data'] as Map<String, dynamic>?;
+      final drinkId = respData?['id'] as String? ?? '';
+
+      String? photoUrl;
+      if (pickedPhoto != null && drinkId.isNotEmpty) {
+        photoUrl = await _uploadPhoto(drinkId, pickedPhoto);
+      }
+
       setState(() {
-        _addedDrinks.add({...result, 'id': respData?['id'] ?? ''});
+        _addedDrinks.add({
+          ...result,
+          'id': drinkId,
+          if (photoUrl != null && photoUrl.isNotEmpty) 'photo': photoUrl,
+        });
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1149,6 +1218,8 @@ class _DrinkFormSheetState extends ConsumerState<_DrinkFormSheet> {
   late bool _isFavorite;
   late bool _purchased;
   late int? _purchasedQty;
+  XFile? _pickedPhoto;
+  String? _existingPhotoUrl;
 
   @override
   void initState() {
@@ -1168,6 +1239,8 @@ class _DrinkFormSheetState extends ConsumerState<_DrinkFormSheet> {
     _isFavorite = d['is_favorite'] as bool? ?? false;
     _purchased = d['purchased'] as bool? ?? false;
     _purchasedQty = d['purchased_quantity'] as int?;
+    final photo = d['photo'] as String? ?? '';
+    _existingPhotoUrl = photo.isNotEmpty ? photo : null;
   }
 
   @override
@@ -1177,6 +1250,120 @@ class _DrinkFormSheetState extends ConsumerState<_DrinkFormSheet> {
     _ratingCommentsCtl.dispose();
     _priceCtl.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    final picker = ImagePicker();
+    final photo = await picker.pickImage(
+      source: source,
+      maxWidth: 1200,
+      maxHeight: 1200,
+      imageQuality: 85,
+    );
+    if (photo != null) {
+      setState(() {
+        _pickedPhoto = photo;
+        _existingPhotoUrl = null;
+      });
+    }
+  }
+
+  Widget _buildPhotoSection() {
+    final hasPickedPhoto = _pickedPhoto != null;
+    final hasExistingPhoto = _existingPhotoUrl != null && _existingPhotoUrl!.isNotEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Photo', style: Theme.of(context).textTheme.labelMedium),
+        const SizedBox(height: 8),
+        if (hasPickedPhoto || hasExistingPhoto)
+          Stack(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: hasPickedPhoto
+                    ? kIsWeb
+                        ? Image.network(
+                            _pickedPhoto!.path,
+                            height: 160,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                          )
+                        : Image.file(
+                            File(_pickedPhoto!.path),
+                            height: 160,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                          )
+                    : Image.network(
+                        _existingPhotoUrl!,
+                        height: 160,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          height: 160,
+                          color: Colors.grey[200],
+                          child: const Center(child: Icon(Icons.broken_image)),
+                        ),
+                      ),
+              ),
+              Positioned(
+                top: 4,
+                right: 4,
+                child: CircleAvatar(
+                  radius: 14,
+                  backgroundColor: Colors.black54,
+                  child: IconButton(
+                    icon: const Icon(Icons.close, size: 14, color: Colors.white),
+                    padding: EdgeInsets.zero,
+                    onPressed: () => setState(() {
+                      _pickedPhoto = null;
+                      _existingPhotoUrl = null;
+                    }),
+                  ),
+                ),
+              ),
+            ],
+          )
+        else
+          GestureDetector(
+            onTap: () => _pickImage(ImageSource.camera),
+            child: Container(
+              height: 100,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey[400]!, style: BorderStyle.solid),
+                borderRadius: BorderRadius.circular(8),
+                color: Colors.grey[50],
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.camera_alt, size: 32, color: Colors.grey[500]),
+                  const SizedBox(height: 4),
+                  Text('Add Photo', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                ],
+              ),
+            ),
+          ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            TextButton.icon(
+              onPressed: () => _pickImage(ImageSource.camera),
+              icon: const Icon(Icons.camera_alt, size: 16),
+              label: const Text('Camera', style: TextStyle(fontSize: 12)),
+            ),
+            TextButton.icon(
+              onPressed: () => _pickImage(ImageSource.gallery),
+              icon: const Icon(Icons.photo_library, size: 16),
+              label: const Text('Gallery', style: TextStyle(fontSize: 12)),
+            ),
+          ],
+        ),
+      ],
+    );
   }
 
   void _done() {
@@ -1197,6 +1384,8 @@ class _DrinkFormSheetState extends ConsumerState<_DrinkFormSheet> {
       'purchased': _purchased,
       'purchased_quantity': _purchased ? (_purchasedQty ?? 1) : null,
       'purchased_price': _purchased ? double.tryParse(_priceCtl.text) : null,
+      'photo': _existingPhotoUrl ?? '',
+      '_picked_photo': _pickedPhoto,
     });
   }
 
@@ -1309,6 +1498,10 @@ class _DrinkFormSheetState extends ConsumerState<_DrinkFormSheet> {
               maxLines: 2,
               decoration: const InputDecoration(labelText: 'Tasting Notes'),
             ),
+            const SizedBox(height: 12),
+
+            // Photo
+            _buildPhotoSection(),
             const SizedBox(height: 12),
 
             // Rating comments
@@ -1824,6 +2017,43 @@ class _DrinkCard extends StatefulWidget {
 class _DrinkCardState extends State<_DrinkCard> {
   bool _expanded = false;
 
+  void _showFullImage(String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog.fullscreen(
+        backgroundColor: Colors.black,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            InteractiveViewer(
+              minScale: 0.5,
+              maxScale: 4.0,
+              child: Center(
+                child: Image.network(
+                  imageUrl,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const Icon(
+                    Icons.broken_image,
+                    color: Colors.white54,
+                    size: 64,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 16,
+              right: 16,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                onPressed: () => Navigator.of(ctx).pop(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final d = widget.drink;
@@ -1860,21 +2090,24 @@ class _DrinkCardState extends State<_DrinkCard> {
               Row(
                 children: [
                   hasImage
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.network(
-                            kIsWeb && (drinkImage.contains('vinoshipper') ||
-                                    drinkImage.contains('s3.amazonaws'))
-                                ? '${EnvConfig.apiBaseUrl}/api/v1/image-proxy/?url=${Uri.encodeComponent(drinkImage)}'
-                                : drinkImage,
-                            width: 36,
-                            height: 36,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => CircleAvatar(
-                              backgroundColor:
-                                  Theme.of(context).colorScheme.primaryContainer,
-                              radius: 18,
-                              child: const Icon(Icons.local_drink, size: 18),
+                      ? GestureDetector(
+                          onTap: () => _showFullImage(drinkImage),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              kIsWeb && (drinkImage.contains('vinoshipper') ||
+                                      drinkImage.contains('s3.amazonaws'))
+                                  ? '${EnvConfig.apiBaseUrl}/api/v1/image-proxy/?url=${Uri.encodeComponent(drinkImage)}'
+                                  : drinkImage,
+                              width: 36,
+                              height: 36,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => CircleAvatar(
+                                backgroundColor:
+                                    Theme.of(context).colorScheme.primaryContainer,
+                                radius: 18,
+                                child: const Icon(Icons.local_drink, size: 18),
+                              ),
                             ),
                           ),
                         )

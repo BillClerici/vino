@@ -1,6 +1,13 @@
+import io
+import uuid
+from pathlib import Path
+
+from django.conf import settings
 from django.db.models import Count
+from PIL import Image
 from rest_framework import status
 from rest_framework.decorators import action
+from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
@@ -14,6 +21,55 @@ from .serializers import (
     VisitWineSerializer,
     VisitWineWriteSerializer,
 )
+
+MAX_PHOTO_SIZE = 5 * 1024 * 1024  # 5 MB
+MAX_DIMENSION = 1200
+
+
+def _process_image(uploaded_file) -> bytes:
+    """Validate, resize, strip EXIF, and compress an uploaded image."""
+    img = Image.open(uploaded_file)
+
+    # Convert to RGB (handles RGBA PNGs, CMYK, etc.)
+    if img.mode not in ("RGB", "L"):
+        img = img.convert("RGB")
+
+    # Resize if larger than max dimension
+    if max(img.size) > MAX_DIMENSION:
+        img.thumbnail((MAX_DIMENSION, MAX_DIMENSION), Image.LANCZOS)
+
+    # Save as JPEG, stripping EXIF by not copying info
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=85, optimize=True)
+    return buf.getvalue()
+
+
+def _save_photo(user_id: str, wine_id: str, image_bytes: bytes, request=None) -> str:
+    """Save processed image to S3 or local media. Returns the public URL."""
+    filename = f"{wine_id}.jpg"
+    key = f"drink-photos/{user_id}/{filename}"
+
+    if getattr(settings, "AWS_S3_BUCKET", ""):
+        import boto3
+
+        s3 = boto3.client("s3", region_name=settings.AWS_S3_REGION)
+        s3.put_object(
+            Bucket=settings.AWS_S3_BUCKET,
+            Key=key,
+            Body=image_bytes,
+            ContentType="image/jpeg",
+        )
+        return f"https://{settings.AWS_S3_BUCKET}.s3.{settings.AWS_S3_REGION}.amazonaws.com/{key}"
+
+    # Local storage fallback
+    media_dir = Path(settings.MEDIA_ROOT) / "drink-photos" / str(user_id)
+    media_dir.mkdir(parents=True, exist_ok=True)
+    filepath = media_dir / filename
+    filepath.write_bytes(image_bytes)
+    relative_url = f"{settings.MEDIA_URL}drink-photos/{user_id}/{filename}"
+    if request:
+        return request.build_absolute_uri(relative_url)
+    return relative_url
 
 
 class VisitLogViewSet(ModelViewSet):
@@ -79,3 +135,46 @@ class VisitLogViewSet(ModelViewSet):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(VisitWineSerializer(wine).data)
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="wines/(?P<wine_pk>[^/.]+)/photo",
+        parser_classes=[MultiPartParser],
+    )
+    def wine_photo(self, request, pk=None, wine_pk=None):
+        """Upload a photo for a specific wine entry."""
+        visit = self.get_object()
+        try:
+            wine = visit.wines_tasted.get(pk=wine_pk, is_active=True)
+        except VisitWine.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        uploaded = request.FILES.get("file")
+        if not uploaded:
+            return Response(
+                {"detail": "No file provided."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if uploaded.size > MAX_PHOTO_SIZE:
+            return Response(
+                {"detail": "File too large. Maximum size is 5 MB."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            image_bytes = _process_image(uploaded)
+        except Exception:
+            return Response(
+                {"detail": "Invalid image file."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        photo_url = _save_photo(
+            str(request.user.id), str(wine.id), image_bytes, request=request
+        )
+        wine.photo = photo_url
+        wine.save(update_fields=["photo", "updated_at"])
+
+        return Response({"photo_url": photo_url})

@@ -13,6 +13,10 @@ class ApiPaths {
   static const subscriptionCheckout = '/api/v1/subscription/checkout/';
   static const subscriptionPortal = '/api/v1/subscription/portal/';
   static const config = '/api/v1/config/';
+
+  /// Upload drink photo: POST /api/v1/visits/{visitId}/wines/{wineId}/photo/
+  static String winePhoto(String visitId, String wineId) =>
+      '/api/v1/visits/$visitId/wines/$wineId/photo/';
 }
 
 class StorageKeys {

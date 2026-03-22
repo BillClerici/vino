@@ -185,6 +185,16 @@ STORAGES = {
     },
 }
 
+# Media files (user uploads)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
+
+# AWS S3 (for production media storage)
+AWS_S3_BUCKET = env('AWS_S3_BUCKET', default='')
+AWS_S3_REGION = env('AWS_REGION', default='us-east-1')
+
 # Internationalization
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'

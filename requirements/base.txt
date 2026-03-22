@@ -34,6 +34,9 @@ stripe>=8.0
 # HTTP client
 httpx>=0.27
 
+# AWS
+boto3>=1.34
+
 # AI / LLM
 langchain-anthropic>=0.3
 langchain-google-genai>=2.1
