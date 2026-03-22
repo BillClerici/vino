@@ -7,6 +7,29 @@ LOOKUP_SEED = {
     'EMPLOYEE_TYPE': ['Full-time', 'Part-time', 'Contractor', 'Intern'],
     'BUSINESS_CATEGORY': ['Financial Services', 'Healthcare', 'Technology', 'Retail'],
     'STATUS': ['Active', 'Inactive', 'Pending', 'Suspended'],
+    # Wine drink types
+    'WINE_TYPE': [
+        'Red', 'White', 'Rosé', 'Sparkling', 'Dessert',
+        'Fortified', 'Orange', 'Natural', 'Blend', 'Other',
+    ],
+    # Wine serving sizes
+    'WINE_SERVING': [
+        'Tasting', 'Glass', 'Flight', 'Half Bottle', 'Bottle', 'Split', 'Magnum',
+    ],
+    # Beer drink types
+    'BEER_TYPE': [
+        'IPA', 'Pale Ale', 'Lager', 'Pilsner', 'Stout', 'Porter',
+        'Wheat', 'Sour', 'Amber', 'Brown Ale', 'Belgian',
+        'Saison', 'Kolsch', 'Hazy IPA', 'Double IPA',
+        'Cider', 'Mead', 'Seltzer', 'Other',
+    ],
+    # Beer serving sizes
+    'BEER_SERVING': [
+        'Tasting', 'Half Pint', 'Pint', 'Flight', 'Can', 'Bottle',
+        'Crowler', 'Growler', 'Pitcher',
+    ],
+    # Promotion types (existing)
+    'PROMOTION_TYPE': ['Discount', 'Event', 'Happy Hour', 'New Release', 'Seasonal'],
 }
 
 

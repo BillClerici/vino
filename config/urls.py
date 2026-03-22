@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.urls import include, path
 from rest_framework_simplejwt.views import TokenRefreshView
 
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from apps.api.views import auth_callback, health_check
 from apps.core.views import AppSettingsView, LandingPageView, SetTimezoneView
 from apps.rbac.views import (
@@ -46,6 +47,8 @@ from apps.partners.urls import partner_portal_patterns
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('health/', health_check, name='health_check'),
+    # REST API v1
+    path('api/v1/', include('apps.api.v1.urls')),
     path('api/auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('auth/jwt-callback/', auth_callback, name='auth_jwt_callback'),
     path('', LandingPageView.as_view(), name='landing'),
@@ -96,4 +99,7 @@ urlpatterns = [
     # Partner admin
     path('manage/', include(partner_admin_patterns)),
     path('auth/', include('social_django.urls', namespace='social')),
+    # OpenAPI documentation
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
 ]

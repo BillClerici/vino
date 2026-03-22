@@ -1,0 +1,2721 @@
+import 'dart:ui' show PointerDeviceKind;
+
+import 'package:dio/dio.dart' show Dio, Options;
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart' show DateFormat;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../../../config/constants.dart';
+import '../../../config/env.dart';
+import '../../../core/api/api_client.dart';
+import '../../../core/models/place.dart';
+import '../../../core/models/trip.dart';
+import '../../../core/providers/lookup_provider.dart';
+import '../../../core/widgets/rating_stars.dart';
+import '../providers/trips_provider.dart';
+
+class TripStopDetailScreen extends ConsumerStatefulWidget {
+  final String tripId;
+  final int stopIndex;
+  const TripStopDetailScreen({
+    super.key,
+    required this.tripId,
+    required this.stopIndex,
+  });
+
+  @override
+  ConsumerState<TripStopDetailScreen> createState() =>
+      _TripStopDetailScreenState();
+}
+
+class _TripStopDetailScreenState extends ConsumerState<TripStopDetailScreen> {
+  String? _visitId;
+  bool _checkedIn = false;
+  bool _isFavorited = false;
+  bool _checkingIn = false;
+  bool _checkedExisting = false;
+  bool _showMap = true;
+  Map<String, dynamic>? _existingVisitData;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkExistingVisit();
+  }
+
+  @override
+  void didUpdateWidget(TripStopDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.stopIndex != widget.stopIndex) {
+      _checkedExisting = false;
+      _checkedIn = false;
+      _visitId = null;
+      _existingVisitData = null;
+      _showMap = true;
+      _isFavorited = false;
+      _checkExistingVisit();
+    }
+  }
+
+  Future<void> _checkExistingVisit() async {
+    final tripState = ref.read(tripDetailProvider(widget.tripId));
+    final trip = tripState.valueOrNull;
+    if (trip == null) return;
+    final stops = trip.tripStops ?? [];
+    if (widget.stopIndex >= stops.length) return;
+    final place = stops[widget.stopIndex].place;
+    final placeId = place?.id;
+    if (placeId == null) return;
+
+    try {
+      final api = ref.read(apiClientProvider);
+
+      // Check favorite state from place detail (properly annotated)
+      try {
+        final placeResp = await api.get('${ApiPaths.places}$placeId/');
+        final placeData = placeResp.data['data'] as Map<String, dynamic>;
+        if (placeData['is_favorited'] == true && mounted) {
+          setState(() => _isFavorited = true);
+        }
+      } catch (_) {}
+
+      final resp = await api.get(
+        ApiPaths.visits,
+        queryParameters: {'place': placeId, 'page_size': '1'},
+      );
+      final data = resp.data['data'] as List<dynamic>?;
+      if (data != null && data.isNotEmpty) {
+        final visit = data.first as Map<String, dynamic>;
+        // Fetch full visit detail to get wines and ratings
+        final detailResp = await api.get('${ApiPaths.visits}${visit['id']}/');
+        final visitDetail = detailResp.data['data'] as Map<String, dynamic>;
+        if (mounted) {
+          setState(() {
+            _visitId = visit['id'] as String;
+            _checkedIn = true;
+            _checkedExisting = true;
+            _existingVisitData = visitDetail;
+          });
+        }
+        return;
+      }
+    } catch (_) {}
+    if (mounted) {
+      setState(() => _checkedExisting = true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tripState = ref.watch(tripDetailProvider(widget.tripId));
+
+    return tripState.when(
+      loading: () => Scaffold(
+        appBar: AppBar(),
+        body: const Center(child: CircularProgressIndicator()),
+      ),
+      error: (e, _) => Scaffold(
+        appBar: AppBar(),
+        body: Center(child: Text('Error: $e')),
+      ),
+      data: (trip) {
+        // If we haven't checked for existing visits yet, do it now
+        if (!_checkedExisting) {
+          _checkExistingVisit();
+        }
+
+        final stops = trip.tripStops ?? [];
+        if (widget.stopIndex >= stops.length) {
+          return Scaffold(
+            appBar: AppBar(),
+            body: const Center(child: Text('Stop not found')),
+          );
+        }
+        final stop = stops[widget.stopIndex];
+        final place = stop.place;
+        if (place == null) {
+          return Scaffold(
+            appBar: AppBar(),
+            body: const Center(child: Text('Place not found')),
+          );
+        }
+        return _StopView(
+          trip: trip,
+          stop: stop,
+          place: place,
+          stopIndex: widget.stopIndex,
+          totalStops: stops.length,
+          tripId: widget.tripId,
+          visitId: _visitId,
+          checkedIn: _checkedIn,
+          checkingIn: _checkingIn,
+          existingVisitData: _existingVisitData,
+          showMap: _showMap,
+          isFavorited: _isFavorited,
+          onToggleMap: () => setState(() => _showMap = !_showMap),
+          onCheckIn: () => _doCheckIn(stop),
+          onToggleFavorite: () => _toggleFavorite(place),
+          onNavigate: _navigateToStop,
+          onRemoveStop: () => _removeStop(stop),
+          onEditStop: () => _editStop(stop),
+          onCompleteTrip: _completeTrip,
+        );
+      },
+    );
+  }
+
+  Future<void> _doCheckIn(TripStop stop) async {
+    setState(() => _checkingIn = true);
+    try {
+      final api = ref.read(apiClientProvider);
+      final resp = await api.post(
+        '${ApiPaths.trips}${widget.tripId}/live/checkin/${stop.id}/',
+      );
+      final data = resp.data['data'] as Map<String, dynamic>;
+      setState(() {
+        _visitId = data['visit_id'] as String;
+        _checkedIn = true;
+        _checkingIn = false;
+      });
+    } catch (e) {
+      setState(() => _checkingIn = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Check-in failed: $e')));
+      }
+    }
+  }
+
+  Future<void> _toggleFavorite(Place place) async {
+    try {
+      final api = ref.read(apiClientProvider);
+      final resp = await api.post('${ApiPaths.places}${place.id}/favorite/');
+      final data = resp.data['data'] as Map<String, dynamic>;
+      final isFav = data['is_favorited'] as bool;
+      if (mounted) {
+        setState(() => _isFavorited = isFav);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isFav
+                ? '${place.name} added to favorites!'
+                : '${place.name} removed from favorites'),
+            backgroundColor: isFav ? Colors.green : Colors.orange,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  Future<void> _completeTrip() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Complete Trip'),
+        content: const Text('Mark this trip as completed?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Complete', style: TextStyle(color: Colors.green)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      final api = ref.read(apiClientProvider);
+      await api.post('${ApiPaths.trips}${widget.tripId}/complete/');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Trip completed!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+        ref.invalidate(tripDetailProvider(widget.tripId));
+        context.go('/trips/${widget.tripId}');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  Future<void> _editStop(TripStop stop) async {
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => ProviderScope(
+        parent: ProviderScope.containerOf(context),
+        child: Builder(builder: (_) {
+          final tripData = ref.read(tripDetailProvider(widget.tripId)).valueOrNull;
+          final stops = tripData?.tripStops ?? [];
+          final nextStop = widget.stopIndex < stops.length - 1
+              ? stops[widget.stopIndex + 1]
+              : null;
+          return _EditStopSheet(
+            tripId: widget.tripId,
+            stop: stop,
+            nextStop: nextStop,
+          );
+        }),
+      ),
+    );
+    if (result == true && mounted) {
+      ref.invalidate(tripDetailProvider(widget.tripId));
+    }
+  }
+
+  Future<void> _removeStop(TripStop stop) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Remove Stop'),
+        content: Text(
+          'Remove "${stop.place?.name ?? 'this stop'}" from the trip?\n\n'
+          'This will also remove any check-ins, drinks, and ratings for this stop.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Remove', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      final api = ref.read(apiClientProvider);
+      await api.delete(
+        '${ApiPaths.trips}${widget.tripId}/stops/${stop.id}/',
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${stop.place?.name ?? "Stop"} removed'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        // Go back to trip detail and refresh
+        ref.invalidate(tripDetailProvider(widget.tripId));
+        context.go('/trips/${widget.tripId}');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  void _navigateToStop(int newIndex) {
+    context.go('/trips/${widget.tripId}/stop/$newIndex');
+  }
+}
+
+class _StopView extends StatelessWidget {
+  final Trip trip;
+  final TripStop stop;
+  final Place place;
+  final int stopIndex;
+  final int totalStops;
+  final String tripId;
+  final String? visitId;
+  final bool checkedIn;
+  final bool checkingIn;
+  final Map<String, dynamic>? existingVisitData;
+  final bool showMap;
+  final bool isFavorited;
+  final VoidCallback onToggleMap;
+  final VoidCallback onCheckIn;
+  final VoidCallback onToggleFavorite;
+  final ValueChanged<int> onNavigate;
+  final VoidCallback onRemoveStop;
+  final VoidCallback onEditStop;
+  final VoidCallback onCompleteTrip;
+
+  const _StopView({
+    required this.trip,
+    required this.stop,
+    required this.place,
+    required this.stopIndex,
+    required this.totalStops,
+    required this.tripId,
+    required this.visitId,
+    required this.checkedIn,
+    required this.checkingIn,
+    this.existingVisitData,
+    required this.showMap,
+    required this.isFavorited,
+    required this.onToggleMap,
+    required this.onCheckIn,
+    required this.onToggleFavorite,
+    required this.onNavigate,
+    required this.onRemoveStop,
+    required this.onEditStop,
+    required this.onCompleteTrip,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Scaffold(
+      body: CustomScrollView(
+        slivers: [
+          // ── Hero header with place image ──
+          SliverAppBar(
+            expandedHeight: 240,
+            pinned: true,
+            backgroundColor: colorScheme.primary,
+            foregroundColor: Colors.white,
+            actions: [
+              IconButton(
+                icon: Icon(
+                  isFavorited ? Icons.favorite : Icons.favorite_border,
+                  color: isFavorited ? Colors.red : Colors.white,
+                ),
+                tooltip: isFavorited ? 'Remove from Favorites' : 'Add to Favorites',
+                onPressed: onToggleFavorite,
+              ),
+              if (checkedIn)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  margin: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.green,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.white, size: 14),
+                      SizedBox(width: 4),
+                      Text('Checked In',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+              IconButton(
+                icon: const Icon(Icons.edit),
+                tooltip: 'Edit Stop',
+                onPressed: onEditStop,
+              ),
+            ],
+            flexibleSpace: FlexibleSpaceBar(
+              background: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (place.imageUrl.isNotEmpty)
+                    Image.network(place.imageUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) =>
+                            _gradientBg(colorScheme))
+                  else
+                    _gradientBg(colorScheme),
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        stops: const [0.0, 0.5, 1.0],
+                        colors: [
+                          Colors.black.withValues(alpha: 0.3),
+                          Colors.transparent,
+                          Colors.black.withValues(alpha: 0.8),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // Stop info (bottom)
+                  Positioned(
+                    left: 20,
+                    right: 20,
+                    bottom: 16,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Badges row
+                        Row(
+                          children: [
+                            _HeaderChip(
+                              'Stop ${stopIndex + 1} of $totalStops',
+                              filled: true,
+                              color: Colors.white,
+                              textColor: colorScheme.primary,
+                            ),
+                            const SizedBox(width: 8),
+                            _HeaderChip(place.placeType.toUpperCase()),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        // Place name
+                        Text(place.name,
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold)),
+                        if (place.location.isNotEmpty)
+                          Text(place.location,
+                              style: const TextStyle(
+                                  color: Colors.white70, fontSize: 14)),
+                        const SizedBox(height: 10),
+                        // Stop details row
+                        _StopDetailsRow(
+                          stop: stop,
+                          nextStop: stopIndex < totalStops - 1
+                              ? trip.tripStops![stopIndex + 1]
+                              : null,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // ── Content ──
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── Check In button (only for in-progress trips, not yet checked in) ──
+                  if (trip.status == 'in_progress' && !checkedIn) ...[
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: checkingIn ? null : onCheckIn,
+                        icon: checkingIn
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white))
+                            : const Icon(Icons.check_circle),
+                        label: Text(
+                            checkingIn ? 'Checking in...' : 'Check In'),
+                        style: FilledButton.styleFrom(
+                          padding:
+                              const EdgeInsets.symmetric(vertical: 16),
+                          textStyle: const TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // ── Map Section (always shown by default, toggle to hide) ──
+                  if (place.latitude != null && place.longitude != null) ...[
+                    Row(
+                      children: [
+                        Icon(Icons.map, size: 18, color: colorScheme.primary),
+                        const SizedBox(width: 6),
+                        Text('Location',
+                            style: Theme.of(context).textTheme.titleSmall),
+                        const Spacer(),
+                        TextButton(
+                          onPressed: onToggleMap,
+                          child: Text(showMap ? 'Hide Map' : 'Show Map'),
+                        ),
+                      ],
+                    ),
+                    if (showMap) ...[
+                      _StopMapWidget(place: place),
+                      const SizedBox(height: 16),
+                    ],
+                  ],
+
+                  // ── Place Details (condensed) ──
+                  if (place.description.isNotEmpty) ...[
+                    Text(place.description,
+                        style: const TextStyle(fontSize: 13)),
+                    const SizedBox(height: 8),
+                  ],
+                  if (place.address.isNotEmpty || place.city.isNotEmpty)
+                    _CompactDetailRow(
+                      icon: Icons.location_on,
+                      text: [
+                        place.address,
+                        place.city,
+                        place.state,
+                        place.zipCode,
+                      ].where((s) => s.isNotEmpty).join(', '),
+                      onTap: place.latitude != null && place.longitude != null
+                          ? () => launchUrl(Uri.parse(
+                              'https://www.google.com/maps/search/?api=1&query=${place.latitude},${place.longitude}'))
+                          : null,
+                    ),
+                  if (place.phone.isNotEmpty)
+                    _CompactDetailRow(
+                      icon: Icons.phone,
+                      text: place.phone,
+                      onTap: () => launchUrl(Uri.parse('tel:${place.phone}')),
+                    ),
+                  if (place.website.isNotEmpty)
+                    _CompactDetailRow(
+                      icon: Icons.language,
+                      text: place.website.replaceAll('https://', '').replaceAll('http://', '').replaceAll(RegExp(r'/$'), ''),
+                      onTap: () => launchUrl(Uri.parse(place.website)),
+                    ),
+
+                  // ── Drink Menu (always available for planning) ──
+                  const SizedBox(height: 24),
+                  _DrinkMenuSection(place: place),
+
+                  // ── My Drinks (only after check-in during live trip) ──
+                  if (checkedIn && visitId != null) ...[
+                    const SizedBox(height: 24),
+                    _DrinksSection(
+                      tripId: tripId,
+                      visitId: visitId!,
+                      place: place,
+                      placeType: place.placeType,
+                      existingWines: (existingVisitData?['wines_tasted'] as List<dynamic>?) ?? [],
+                    ),
+                  ],
+
+                  // ── Rate Experience (only after check-in during live trip) ──
+                  if (checkedIn && visitId != null) ...[
+                    const SizedBox(height: 24),
+                    _RateExperienceSection(
+                      tripId: tripId,
+                      visitId: visitId!,
+                      existingRatings: existingVisitData,
+                    ),
+                  ],
+
+                  // ── Stop Notes (only after check-in during live trip) ──
+                  if (checkedIn && visitId != null) ...[
+                    const SizedBox(height: 24),
+                    _StopNotesSection(
+                      tripId: tripId,
+                      visitId: visitId!,
+                      existingNotes: (existingVisitData?['notes'] as String?) ?? '',
+                    ),
+                  ],
+
+                  const SizedBox(height: 100), // room for nav bar
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+
+      // ── Bottom Prev/Next Navigation ──
+      bottomNavigationBar: Container(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          boxShadow: [
+            BoxShadow(
+                blurRadius: 8,
+                color: Colors.black.withValues(alpha: 0.1),
+                offset: const Offset(0, -2)),
+          ],
+        ),
+        child: Row(
+          children: [
+            // Remove stop button
+            IconButton(
+              onPressed: onRemoveStop,
+              icon: const Icon(Icons.delete_outline),
+              tooltip: 'Remove Stop',
+              color: Colors.red,
+            ),
+            const SizedBox(width: 4),
+            if (stopIndex > 0)
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => onNavigate(stopIndex - 1),
+                  icon: const Icon(Icons.arrow_back),
+                  label: const Text('Prev'),
+                ),
+              )
+            else
+              const Expanded(child: SizedBox()),
+            const SizedBox(width: 8),
+            if (stopIndex < totalStops - 1)
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: () => onNavigate(stopIndex + 1),
+                  icon: const Icon(Icons.arrow_forward),
+                  label: const Text('Next'),
+                ),
+              )
+            else
+              Expanded(
+                child: trip.status == 'in_progress' && checkedIn
+                    ? FilledButton.icon(
+                        onPressed: onCompleteTrip,
+                        icon: const Icon(Icons.celebration, size: 18),
+                        label: const Text('Complete Trip'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.green[700],
+                        ),
+                      )
+                    : OutlinedButton.icon(
+                        onPressed: () => context.go('/trips/$tripId'),
+                        icon: const Icon(Icons.flag),
+                        label: const Text('Back to Trip'),
+                      ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _gradientBg(ColorScheme colorScheme) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [colorScheme.primary, const Color(0xFF5DADE2)],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Detail Tile ─────────────────────────────────────────────────
+
+class _CompactDetailRow extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final VoidCallback? onTap;
+  const _CompactDetailRow({
+    required this.icon,
+    required this.text,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            Icon(icon, size: 16, color: cs.primary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(text,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: onTap != null ? cs.primary : null,
+                    decoration: onTap != null ? TextDecoration.underline : null,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DetailTile extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final VoidCallback? onTap;
+  const _DetailTile(this.icon, this.text, {this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(text,
+                  style: TextStyle(
+                    color: onTap != null
+                        ? Theme.of(context).colorScheme.primary
+                        : null,
+                    decoration:
+                        onTap != null ? TextDecoration.underline : null,
+                  )),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Drinks Section ──────────────────────────────────────────────
+
+class _DrinksSection extends ConsumerStatefulWidget {
+  final String tripId;
+  final String visitId;
+  final Place place;
+  final List<dynamic> existingWines;
+  final String placeType;
+  const _DrinksSection({
+    required this.tripId,
+    required this.visitId,
+    required this.place,
+    required this.existingWines,
+    required this.placeType,
+  });
+
+  @override
+  ConsumerState<_DrinksSection> createState() => _DrinksSectionState();
+}
+
+class _DrinksSectionState extends ConsumerState<_DrinksSection> {
+  late final List<Map<String, dynamic>> _addedDrinks;
+
+  @override
+  void initState() {
+    super.initState();
+    _addedDrinks = widget.existingWines.map((w) {
+      final wine = w as Map<String, dynamic>;
+      return <String, dynamic>{
+        'id': wine['id'] ?? '',
+        'wine_name': wine['display_name'] ?? wine['wine_name'] ?? '',
+        'wine_type': wine['wine_type'] ?? '',
+        'serving_type': wine['serving_type'] ?? '',
+        'rating': wine['rating'],
+        'tasting_notes': wine['tasting_notes'] ?? '',
+        'is_favorite': wine['is_favorite'] ?? false,
+        'purchased': wine['purchased'] ?? false,
+        'purchased_price': wine['purchased_price'],
+        'purchased_quantity': wine['purchased_quantity'],
+      };
+    }).toList();
+  }
+
+  Future<void> _deleteDrink(int index) async {
+    final drink = _addedDrinks[index];
+    final drinkId = drink['id'] as String?;
+    if (drinkId == null || drinkId.isEmpty) {
+      setState(() => _addedDrinks.removeAt(index));
+      return;
+    }
+    try {
+      final api = ref.read(apiClientProvider);
+      await api.delete('${ApiPaths.visits}${widget.visitId}/wines/$drinkId/');
+      if (mounted) {
+        setState(() => _addedDrinks.removeAt(index));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Drink removed'), backgroundColor: Colors.orange, duration: Duration(seconds: 2)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  Future<void> _editDrink(int index) async {
+    final drink = Map<String, dynamic>.from(_addedDrinks[index]);
+    final result = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => ProviderScope(
+        parent: ProviderScope.containerOf(context),
+        child: _DrinkFormSheet(
+          initial: drink,
+          menuItems: widget.place.menuItems ?? [],
+          placeType: widget.placeType,
+          title: 'Edit Drink',
+        ),
+      ),
+    );
+    if (result == null || !mounted) return;
+
+    final drinkId = drink['id'] as String? ?? '';
+    if (drinkId.isNotEmpty) {
+      try {
+        final api = ref.read(apiClientProvider);
+        await api.patch('${ApiPaths.visits}${widget.visitId}/wines/$drinkId/', data: result);
+        setState(() => _addedDrinks[index] = {...result, 'id': drinkId});
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Drink updated'), backgroundColor: Colors.green, duration: Duration(seconds: 2)),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        }
+      }
+    }
+  }
+
+  Future<void> _addDrink() async {
+    final result = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => ProviderScope(
+        parent: ProviderScope.containerOf(context),
+        child: _DrinkFormSheet(
+          menuItems: widget.place.menuItems ?? [],
+          placeType: widget.placeType,
+          title: 'Add Drink',
+        ),
+      ),
+    );
+    if (result == null || !mounted) return;
+
+    try {
+      final api = ref.read(apiClientProvider);
+      final resp = await api.post(
+        '${ApiPaths.trips}${widget.tripId}/live/wine/',
+        data: {...result, 'visit_id': widget.visitId},
+      );
+      final respData = resp.data['data'] as Map<String, dynamic>?;
+      setState(() {
+        _addedDrinks.add({...result, 'id': respData?['id'] ?? ''});
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Drink added!'), backgroundColor: Colors.green, duration: Duration(seconds: 2)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  Future<void> _addFromMenu(Map<String, dynamic> menuItem) async {
+    // Pre-fill the drink form with menu item data
+    final prefill = <String, dynamic>{
+      'wine_name': menuItem['name'] ?? '',
+      'wine_type': menuItem['varietal'] ?? '',
+      'tasting_notes': menuItem['description'] ?? '',
+      'menu_item': menuItem['id'],
+    };
+    final result = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => ProviderScope(
+        parent: ProviderScope.containerOf(context),
+        child: _DrinkFormSheet(
+          initial: prefill,
+          menuItems: widget.place.menuItems ?? [],
+          placeType: widget.placeType,
+          title: 'Add ${menuItem['name']}',
+        ),
+      ),
+    );
+    if (result == null || !mounted) return;
+
+    try {
+      final api = ref.read(apiClientProvider);
+      final resp = await api.post(
+        '${ApiPaths.trips}${widget.tripId}/live/wine/',
+        data: {
+          ...result,
+          'visit_id': widget.visitId,
+          'menu_item': menuItem['id'],
+        },
+      );
+      final respData = resp.data['data'] as Map<String, dynamic>?;
+      setState(() {
+        _addedDrinks.add({...result, 'id': respData?['id'] ?? ''});
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${menuItem['name']} added!'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Flexible(
+              child: Text('My Drinks (${_addedDrinks.length})',
+                  style: Theme.of(context).textTheme.titleMedium),
+            ),
+            IconButton(
+              onPressed: _addDrink,
+              icon: const Icon(Icons.add_circle_outline),
+              tooltip: 'Add Drink',
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ...List.generate(_addedDrinks.length, (i) {
+          return _DrinkCard(
+            drink: _addedDrinks[i],
+            onEdit: () => _editDrink(i),
+            onDelete: () => _deleteDrink(i),
+          );
+        }),
+        if (_addedDrinks.isEmpty)
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Center(
+                child: Column(
+                  children: [
+                    Icon(Icons.local_drink, size: 40, color: Colors.grey[400]),
+                    const SizedBox(height: 8),
+                    const Text('No drinks logged yet'),
+                    const Text('Tap "Add Drink" to get started',
+                        style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// ── Drink Form Bottom Sheet (shared for Add & Edit) ─────────────
+
+class _DrinkFormSheet extends ConsumerStatefulWidget {
+  final Map<String, dynamic>? initial;
+  final List<MenuItem> menuItems;
+  final String placeType;
+  final String title;
+
+  const _DrinkFormSheet({
+    this.initial,
+    required this.menuItems,
+    required this.placeType,
+    required this.title,
+  });
+
+  @override
+  ConsumerState<_DrinkFormSheet> createState() => _DrinkFormSheetState();
+}
+
+class _DrinkFormSheetState extends ConsumerState<_DrinkFormSheet> {
+  /// Convert a lowercase_underscore value back to Title Case label.
+  /// e.g. "half_pint" → "Half Pint", "tasting" → "Tasting"
+  String _toLabel(String value) {
+    if (value.isEmpty) return 'Tasting';
+    return value
+        .replaceAll('_', ' ')
+        .split(' ')
+        .map((w) => w.isNotEmpty ? '${w[0].toUpperCase()}${w.substring(1)}' : '')
+        .join(' ');
+  }
+
+  late final TextEditingController _nameCtl;
+  late final TextEditingController _notesCtl;
+  late final TextEditingController _priceCtl;
+  late String _type;
+  late String _serving;
+  late int? _rating;
+  late bool _isFavorite;
+  late bool _purchased;
+  late int? _purchasedQty;
+
+  @override
+  void initState() {
+    super.initState();
+    final d = widget.initial ?? {};
+    _nameCtl = TextEditingController(text: d['wine_name'] as String? ?? '');
+    _notesCtl = TextEditingController(text: d['tasting_notes'] as String? ?? '');
+    _priceCtl = TextEditingController(
+      text: d['purchased_price'] != null ? '${d['purchased_price']}' : '',
+    );
+    _type = (d['wine_type'] as String?) ?? 'Red';
+    if (_type.isEmpty) _type = 'Red';
+    _serving = _toLabel((d['serving_type'] as String?) ?? 'tasting');
+    _rating = d['rating'] as int?;
+    _isFavorite = d['is_favorite'] as bool? ?? false;
+    _purchased = d['purchased'] as bool? ?? false;
+    _purchasedQty = d['purchased_quantity'] as int?;
+  }
+
+  @override
+  void dispose() {
+    _nameCtl.dispose();
+    _notesCtl.dispose();
+    _priceCtl.dispose();
+    super.dispose();
+  }
+
+  void _done() {
+    if (_nameCtl.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Drink name is required')),
+      );
+      return;
+    }
+    Navigator.of(context).pop(<String, dynamic>{
+      'wine_name': _nameCtl.text,
+      'wine_type': _type,
+      'serving_type': _serving.toLowerCase().replaceAll(' ', '_'),
+      'tasting_notes': _notesCtl.text,
+      'rating': _rating,
+      'is_favorite': _isFavorite,
+      'purchased': _purchased,
+      'purchased_quantity': _purchased ? (_purchasedQty ?? 1) : null,
+      'purchased_price': _purchased ? double.tryParse(_priceCtl.text) : null,
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final codes = DrinkLookupCodes.forPlaceType(widget.placeType);
+    final typeList = ref.watch(lookupProvider(codes.typeCode));
+    final servingList = ref.watch(lookupProvider(codes.servingCode));
+
+    final typeOptions = typeList.when(
+      data: (items) => items.map((l) => l.label).toList(),
+      loading: () => <String>['Loading...'],
+      error: (_, __) => <String>['Other'],
+    );
+    final servingOptions = servingList.when(
+      data: (items) => items.map((l) => l.label).toList(),
+      loading: () => <String>['Loading...'],
+      error: (_, __) => <String>['Glass'],
+    );
+
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 20, right: 20, top: 16,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Handle bar
+            Center(
+              child: Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[400],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(widget.title, style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 16),
+
+            // Quick pick from menu
+            if (widget.menuItems.isNotEmpty) ...[
+              Text('From Menu', style: Theme.of(context).textTheme.labelMedium),
+              const SizedBox(height: 4),
+              SizedBox(
+                height: 36,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: widget.menuItems.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 6),
+                  itemBuilder: (_, i) {
+                    final item = widget.menuItems[i];
+                    return ActionChip(
+                      label: Text(item.name, style: const TextStyle(fontSize: 12)),
+                      onPressed: () {
+                        _nameCtl.text = item.name;
+                        if (item.varietal.isNotEmpty) {
+                          setState(() => _type = item.varietal);
+                        }
+                      },
+                    );
+                  },
+                ),
+              ),
+              const Divider(height: 20),
+            ],
+
+            // Name
+            TextField(
+              controller: _nameCtl,
+              decoration: const InputDecoration(labelText: 'Drink Name'),
+            ),
+            const SizedBox(height: 12),
+
+            // Type + Serving
+            Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: typeOptions.contains(_type) ? _type : typeOptions.first,
+                    decoration: const InputDecoration(labelText: 'Type'),
+                    items: typeOptions
+                        .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+                        .toList(),
+                    onChanged: (v) => setState(() => _type = v!),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: servingOptions.contains(_serving) ? _serving : servingOptions.first,
+                    decoration: const InputDecoration(labelText: 'Serving'),
+                    items: servingOptions
+                        .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+                        .toList(),
+                    onChanged: (v) => setState(() => _serving = v!),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Tasting notes
+            TextField(
+              controller: _notesCtl,
+              maxLines: 2,
+              decoration: const InputDecoration(labelText: 'Tasting Notes'),
+            ),
+            const SizedBox(height: 12),
+
+            // Rating
+            Row(
+              children: [
+                const Text('Rating: '),
+                RatingStars(
+                  rating: _rating,
+                  size: 28,
+                  onChanged: (v) => setState(() => _rating = v),
+                ),
+                if (_rating != null) ...[
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () => setState(() => _rating = null),
+                    child: const Text('Clear', style: TextStyle(fontSize: 12)),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 8),
+
+            // Favorite toggle
+            SwitchListTile(
+              title: const Text('Favorite'),
+              secondary: Icon(
+                _isFavorite ? Icons.favorite : Icons.favorite_border,
+                color: _isFavorite ? Colors.red : null,
+              ),
+              value: _isFavorite,
+              onChanged: (v) => setState(() => _isFavorite = v),
+              contentPadding: EdgeInsets.zero,
+            ),
+
+            // Purchased toggle + details
+            SwitchListTile(
+              title: const Text('Bought a bottle?'),
+              secondary: const Icon(Icons.shopping_bag),
+              value: _purchased,
+              onChanged: (v) => setState(() => _purchased = v),
+              contentPadding: EdgeInsets.zero,
+            ),
+            if (_purchased) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _priceCtl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Price',
+                        prefixText: '\$',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: DropdownButtonFormField<int>(
+                      value: _purchasedQty ?? 1,
+                      decoration: const InputDecoration(labelText: 'Quantity'),
+                      items: List.generate(12, (i) => i + 1)
+                          .map((n) => DropdownMenuItem(value: n, child: Text('$n')))
+                          .toList(),
+                      onChanged: (v) => setState(() => _purchasedQty = v),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+            ],
+
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _done,
+                child: Text(widget.initial != null ? 'Update Drink' : 'Add Drink'),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+// ── Rate Experience Section ─────────────────────────────────────
+
+class _RateExperienceSection extends ConsumerStatefulWidget {
+  final String tripId;
+  final String visitId;
+  final Map<String, dynamic>? existingRatings;
+  const _RateExperienceSection({
+    required this.tripId,
+    required this.visitId,
+    this.existingRatings,
+  });
+
+  @override
+  ConsumerState<_RateExperienceSection> createState() =>
+      _RateExperienceSectionState();
+}
+
+class _RateExperienceSectionState
+    extends ConsumerState<_RateExperienceSection> {
+  late int? _overall;
+  late int? _staff;
+  late int? _ambience;
+  late int? _food;
+  late bool _saved;
+  bool _saving = false;
+  bool _dirty = false; // true when user changed a rating
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFromExisting();
+  }
+
+  @override
+  void didUpdateWidget(covariant _RateExperienceSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // If parent passes new existing data (e.g. after re-fetch), reload
+    // but only if user hasn't made unsaved changes
+    if (!_dirty && widget.existingRatings != oldWidget.existingRatings) {
+      _loadFromExisting();
+    }
+  }
+
+  void _loadFromExisting() {
+    final r = widget.existingRatings;
+    _overall = r?['rating_overall'] as int?;
+    _staff = r?['rating_staff'] as int?;
+    _ambience = r?['rating_ambience'] as int?;
+    _food = r?['rating_food'] as int?;
+    _saved = (_overall != null || _staff != null || _ambience != null || _food != null);
+    _dirty = false;
+  }
+
+  void _setRating(void Function() update) {
+    setState(() {
+      update();
+      _dirty = true;
+      _saved = false; // user changed something — needs to re-save
+    });
+  }
+
+  Future<void> _resetRatings() async {
+    setState(() {
+      _overall = null;
+      _staff = null;
+      _ambience = null;
+      _food = null;
+      _dirty = true;
+      _saved = false;
+    });
+    // Save the reset to the server
+    try {
+      final api = ref.read(apiClientProvider);
+      await api.post(
+        '${ApiPaths.trips}${widget.tripId}/live/rate/${widget.visitId}/',
+        data: {
+          'rating_overall': null,
+          'rating_staff': null,
+          'rating_ambience': null,
+          'rating_food': null,
+        },
+      );
+      if (mounted) {
+        setState(() => _dirty = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Ratings cleared'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 2)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    try {
+      final api = ref.read(apiClientProvider);
+      await api.post(
+        '${ApiPaths.trips}${widget.tripId}/live/rate/${widget.visitId}/',
+        data: {
+          'rating_overall': _overall,
+          'rating_staff': _staff,
+          'rating_ambience': _ambience,
+          'rating_food': _food,
+        },
+      );
+      if (mounted) {
+        setState(() {
+          _saved = true;
+          _saving = false;
+          _dirty = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Rating saved!'),
+            duration: Duration(seconds: 2),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('[RateExperience] FAILED: $e');
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error saving: $e')));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Rate Experience',
+            style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                _RatingRow('Overall', _overall,
+                    (v) => _setRating(() => _overall = v)),
+                _RatingRow(
+                    'Staff', _staff, (v) => _setRating(() => _staff = v)),
+                _RatingRow('Ambience', _ambience,
+                    (v) => _setRating(() => _ambience = v)),
+                _RatingRow('Food & Drinks', _food,
+                    (v) => _setRating(() => _food = v)),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _saved && !_dirty
+                          ? Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.check_circle,
+                                    color: Colors.green, size: 20),
+                                const SizedBox(width: 8),
+                                Text('Rating saved',
+                                    style: TextStyle(color: Colors.green[700])),
+                              ],
+                            )
+                          : FilledButton(
+                              onPressed: _saving ? null : _save,
+                              child: _saving
+                                  ? const SizedBox(
+                                      height: 18,
+                                      width: 18,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2, color: Colors.white))
+                                  : const Text('Save Rating'),
+                            ),
+                    ),
+                    if (_overall != null || _staff != null || _ambience != null || _food != null) ...[
+                      const SizedBox(width: 8),
+                      TextButton(
+                        onPressed: () => _resetRatings(),
+                        child: const Text('Reset',
+                            style: TextStyle(color: Colors.red)),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _RatingRow extends StatelessWidget {
+  final String label;
+  final int? rating;
+  final ValueChanged<int> onChanged;
+  const _RatingRow(this.label, this.rating, this.onChanged);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(label, style: const TextStyle(fontSize: 14)),
+          ),
+          RatingStars(rating: rating, size: 28, onChanged: onChanged),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Drink Menu Section (always visible, for planning) ───────────
+
+class _DrinkMenuSection extends ConsumerStatefulWidget {
+  final Place place;
+  const _DrinkMenuSection({required this.place});
+
+  @override
+  ConsumerState<_DrinkMenuSection> createState() => _DrinkMenuSectionState();
+}
+
+class _DrinkMenuSectionState extends ConsumerState<_DrinkMenuSection> {
+  List<Map<String, dynamic>>? _menuItems;
+  bool _fetching = false;
+  bool _expanded = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadExistingMenu();
+  }
+
+  Future<void> _loadExistingMenu() async {
+    // Check if menu items already exist in DB for this place
+    try {
+      final api = ref.read(apiClientProvider);
+      final resp = await api.get(
+        '${ApiPaths.places}${widget.place.id}/menu/',
+        queryParameters: {'page_size': '100'},
+      );
+      final data = resp.data['data'] as List<dynamic>? ?? [];
+      if (data.isNotEmpty && mounted) {
+        setState(() {
+          _menuItems = data.map((e) => e as Map<String, dynamic>).toList();
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _fetchFromWebsite() async {
+    setState(() => _fetching = true);
+    try {
+      final api = ref.read(apiClientProvider);
+      final resp = await api.dio.post(
+        '${ApiPaths.places}${widget.place.id}/fetch-menu/',
+        data: {'force': false},
+        options: Options(receiveTimeout: const Duration(minutes: 3)),
+      );
+      final data = resp.data['data'] as Map<String, dynamic>;
+      final items = (data['menu_items'] as List<dynamic>)
+          .map((e) => e as Map<String, dynamic>)
+          .toList();
+      setState(() {
+        _menuItems = items;
+        _fetching = false;
+        _expanded = true;
+      });
+      if (items.isEmpty && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No menu items found on website')),
+        );
+      }
+    } catch (e) {
+      setState(() => _fetching = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error fetching menu: $e')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.auto_awesome, size: 16, color: Colors.amber),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                _menuItems != null
+                    ? 'Drink Menu (${_menuItems!.length})'
+                    : 'Drink Menu',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            if (_menuItems != null && _menuItems!.isNotEmpty)
+              TextButton(
+                onPressed: () => setState(() => _expanded = !_expanded),
+                child: Text(_expanded ? 'Hide' : 'Show',
+                    style: const TextStyle(fontSize: 12)),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+
+        // Fetch button (show if no menu items and place has a website)
+        if ((_menuItems == null || _menuItems!.isEmpty) &&
+            widget.place.website.isNotEmpty)
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _fetching ? null : _fetchFromWebsite,
+              icon: _fetching
+                  ? const SizedBox(
+                      height: 16, width: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.auto_awesome, size: 18),
+              label: Text(_fetching
+                  ? 'Scanning website for drinks...'
+                  : 'Fetch Drink Menu from Website'),
+            ),
+          )
+        else if ((_menuItems == null || _menuItems!.isEmpty) &&
+            widget.place.website.isEmpty)
+          const Text('No menu available',
+              style: TextStyle(color: Colors.grey, fontSize: 13))
+        else if (_fetching)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 8),
+                  Text('Refreshing menu...', style: TextStyle(fontSize: 12)),
+                ],
+              ),
+            ),
+          ),
+
+        // Menu items carousel
+        if (_expanded && _menuItems != null && _menuItems!.isNotEmpty) ...[
+          SizedBox(
+            height: 140,
+            child: ScrollConfiguration(
+              behavior: const MaterialScrollBehavior().copyWith(
+                dragDevices: {
+                  PointerDeviceKind.touch,
+                  PointerDeviceKind.mouse,
+                  PointerDeviceKind.trackpad,
+                },
+              ),
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _menuItems!.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (_, i) {
+                  final item = _menuItems![i];
+                  return _MenuItemCard(item: item, onSelect: () {});
+                },
+              ),
+            ),
+          ),
+          // Refresh button
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: _fetching ? null : _fetchFromWebsite,
+              icon: const Icon(Icons.refresh, size: 14),
+              label: const Text('Refresh Menu', style: TextStyle(fontSize: 12)),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _DrinkCard extends StatefulWidget {
+  final Map<String, dynamic> drink;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+  const _DrinkCard({
+    required this.drink,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  @override
+  State<_DrinkCard> createState() => _DrinkCardState();
+}
+
+class _DrinkCardState extends State<_DrinkCard> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final d = widget.drink;
+    final name = d['wine_name'] as String? ?? '';
+    final type = d['wine_type'] as String? ?? '';
+    final serving = d['serving_type'] as String? ?? '';
+    final rating = d['rating'] as int?;
+    final notes = d['tasting_notes'] as String? ?? '';
+    final isFavorite = d['is_favorite'] as bool? ?? false;
+    final purchased = d['purchased'] as bool? ?? false;
+    final price = d['purchased_price'];
+    final qty = d['purchased_quantity'];
+    final labelStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: Colors.grey[600],
+        );
+
+    // Try to get image from photo field or menu_item image
+    final photo = d['photo'] as String? ?? '';
+    final menuItemImage = d['menu_item_image'] as String? ?? '';
+    final drinkImage = photo.isNotEmpty ? photo : menuItemImage;
+    final hasImage = drinkImage.isNotEmpty;
+
+    return Card(
+      child: InkWell(
+        onTap: () => setState(() => _expanded = !_expanded),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Collapsed header ──
+              Row(
+                children: [
+                  hasImage
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            kIsWeb && (drinkImage.contains('vinoshipper') ||
+                                    drinkImage.contains('s3.amazonaws'))
+                                ? '${EnvConfig.apiBaseUrl}/api/v1/image-proxy/?url=${Uri.encodeComponent(drinkImage)}'
+                                : drinkImage,
+                            width: 36,
+                            height: 36,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => CircleAvatar(
+                              backgroundColor:
+                                  Theme.of(context).colorScheme.primaryContainer,
+                              radius: 18,
+                              child: const Icon(Icons.local_drink, size: 18),
+                            ),
+                          ),
+                        )
+                      : CircleAvatar(
+                          backgroundColor:
+                              Theme.of(context).colorScheme.primaryContainer,
+                          radius: 18,
+                          child: const Icon(Icons.local_drink, size: 18),
+                        ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(name,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w600)),
+                            ),
+                            if (isFavorite)
+                              const Icon(Icons.favorite,
+                                  color: Colors.red, size: 16),
+                            if (purchased)
+                              const Padding(
+                                padding: EdgeInsets.only(left: 4),
+                                child: Icon(Icons.shopping_bag,
+                                    color: Colors.green, size: 16),
+                              ),
+                          ],
+                        ),
+                        Text(
+                          [type, serving, if (rating != null) '$rating/5']
+                              .where((s) => s.isNotEmpty)
+                              .join(' · '),
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    _expanded ? Icons.expand_less : Icons.expand_more,
+                    color: Colors.grey,
+                  ),
+                ],
+              ),
+
+              // ── Expanded detail view ──
+              if (_expanded) ...[
+                const Divider(height: 16),
+
+                // Type & Serving
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('TYPE', style: labelStyle),
+                          const SizedBox(height: 2),
+                          Text(type.isNotEmpty ? type : '-'),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('SERVING', style: labelStyle),
+                          const SizedBox(height: 2),
+                          Text(serving.isNotEmpty ? serving : '-'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Rating
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('RATING', style: labelStyle),
+                    const SizedBox(height: 4),
+                    rating != null
+                        ? RatingStars(rating: rating, size: 20)
+                        : const Text('Not rated',
+                            style: TextStyle(color: Colors.grey)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Tasting notes
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('TASTING NOTES', style: labelStyle),
+                    const SizedBox(height: 4),
+                    Text(notes.isNotEmpty ? notes : 'No notes',
+                        style: TextStyle(
+                            color:
+                                notes.isEmpty ? Colors.grey : null)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Favorite
+                Row(
+                  children: [
+                    Icon(
+                      isFavorite ? Icons.favorite : Icons.favorite_border,
+                      size: 18,
+                      color: isFavorite ? Colors.red : Colors.grey,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(isFavorite ? 'Favorited' : 'Not a favorite',
+                        style: TextStyle(
+                            color: isFavorite ? Colors.red : Colors.grey)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+
+                // Purchased
+                Row(
+                  children: [
+                    Icon(
+                      purchased ? Icons.shopping_bag : Icons.shopping_bag_outlined,
+                      size: 18,
+                      color: purchased ? Colors.green : Colors.grey,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      purchased
+                          ? [
+                              'Purchased',
+                              if (qty != null) '($qty)',
+                              if (price != null) '— \$$price',
+                            ].join(' ')
+                          : 'Not purchased',
+                      style: TextStyle(
+                          color: purchased ? Colors.green : Colors.grey),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 12),
+                // Action buttons
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton.icon(
+                      onPressed: widget.onEdit,
+                      icon: const Icon(Icons.edit, size: 16),
+                      label: const Text('Edit'),
+                    ),
+                    const SizedBox(width: 8),
+                    TextButton.icon(
+                      onPressed: widget.onDelete,
+                      icon: const Icon(Icons.delete_outline,
+                          color: Colors.red, size: 16),
+                      label: const Text('Remove',
+                          style: TextStyle(color: Colors.red)),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Stop Notes Section ──────────────────────────────────────────
+
+class _StopNotesSection extends ConsumerStatefulWidget {
+  final String tripId;
+  final String visitId;
+  final String existingNotes;
+  const _StopNotesSection({
+    required this.tripId,
+    required this.visitId,
+    required this.existingNotes,
+  });
+
+  @override
+  ConsumerState<_StopNotesSection> createState() => _StopNotesSectionState();
+}
+
+class _StopNotesSectionState extends ConsumerState<_StopNotesSection> {
+  late final TextEditingController _notesCtl;
+  bool _saved = false;
+  bool _saving = false;
+  bool _dirty = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _notesCtl = TextEditingController(text: widget.existingNotes);
+    _saved = widget.existingNotes.isNotEmpty;
+    _notesCtl.addListener(() {
+      if (!_dirty && _notesCtl.text != widget.existingNotes) {
+        setState(() {
+          _dirty = true;
+          _saved = false;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _notesCtl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    try {
+      final api = ref.read(apiClientProvider);
+      await api.post(
+        '${ApiPaths.trips}${widget.tripId}/live/rate/${widget.visitId}/',
+        data: {'notes': _notesCtl.text},
+      );
+      if (mounted) {
+        setState(() {
+          _saved = true;
+          _saving = false;
+          _dirty = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Notes saved!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Stop Notes', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                TextField(
+                  controller: _notesCtl,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    hintText: 'Share your thoughts about this place...',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: _saved && !_dirty
+                      ? Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.check_circle,
+                                color: Colors.green, size: 20),
+                            const SizedBox(width: 8),
+                            Text('Notes saved',
+                                style: TextStyle(color: Colors.green[700])),
+                          ],
+                        )
+                      : FilledButton(
+                          onPressed: _saving ? null : _save,
+                          child: _saving
+                              ? const SizedBox(
+                                  height: 18,
+                                  width: 18,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: Colors.white))
+                              : const Text('Save Notes'),
+                        ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Stop Map Widget ─────────────────────────────────────────────
+
+// ── Header Helper Widgets ────────────────────────────────────────
+
+class _CheckedInBadge extends StatelessWidget {
+  const _CheckedInBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.green,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [BoxShadow(blurRadius: 6, color: Colors.black38)],
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.check_circle, color: Colors.white, size: 16),
+          SizedBox(width: 4),
+          Text('Checked In',
+              style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeaderChip extends StatelessWidget {
+  final String label;
+  final bool filled;
+  final Color? color;
+  final Color? textColor;
+  const _HeaderChip(this.label,
+      {this.filled = false, this.color, this.textColor});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: filled ? (color ?? Colors.white) : Colors.black45,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(label,
+          style: TextStyle(
+              color: filled ? (textColor ?? Colors.black) : Colors.white,
+              fontSize: filled ? 12 : 10,
+              fontWeight: FontWeight.bold)),
+    );
+  }
+}
+
+class _StopDetailsRow extends StatelessWidget {
+  final TripStop stop;
+  final TripStop? nextStop;
+  const _StopDetailsRow({required this.stop, this.nextStop});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Row 1: Arrival Date, Time, Duration
+        Wrap(
+          spacing: 12,
+          runSpacing: 4,
+          children: [
+            if (stop.arrivalTime != null)
+              _DetailPill(Icons.calendar_today, _formatDate(stop.arrivalTime!)),
+            if (stop.arrivalTime != null)
+              _DetailPill(Icons.schedule, _formatTime(stop.arrivalTime!)),
+            if (stop.durationMinutes != null)
+              _DetailPill(Icons.timer, '${stop.durationMinutes} min'),
+          ],
+        ),
+        // Row 2: Drive Time and Distance
+        if (nextStop != null &&
+            (nextStop!.travelMinutes != null || nextStop!.travelMiles != null))
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Wrap(
+              spacing: 12,
+              children: [
+                if (nextStop!.travelMinutes != null)
+                  _DetailPill(Icons.directions_car,
+                      '${nextStop!.travelMinutes} min to next'),
+                if (nextStop!.travelMiles != null)
+                  _DetailPill(Icons.straighten,
+                      '${nextStop!.travelMiles!.toStringAsFixed(1)} mi'),
+              ],
+            ),
+          ),
+        if (nextStop == null && stop.order > 0)
+          const Padding(
+            padding: EdgeInsets.only(top: 6),
+            child: _DetailPill(Icons.flag, 'Last stop'),
+          ),
+      ],
+    );
+  }
+
+  String _formatDate(String isoTime) {
+    try {
+      final dt = DateTime.parse(isoTime);
+      return '${dt.month}/${dt.day}/${dt.year}';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  String _formatTime(String isoTime) {
+    try {
+      final dt = DateTime.parse(isoTime);
+      final hour = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+      final amPm = dt.hour >= 12 ? 'PM' : 'AM';
+      return '$hour:${dt.minute.toString().padLeft(2, '0')} $amPm';
+    } catch (_) {
+      return isoTime;
+    }
+  }
+}
+
+class _DetailPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  const _DetailPill(this.icon, this.label);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: Colors.white70),
+          const SizedBox(width: 4),
+          Text(label,
+              style: const TextStyle(color: Colors.white, fontSize: 11)),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Edit Stop Sheet ─────────────────────────────────────────────
+
+class _EditStopSheet extends ConsumerStatefulWidget {
+  final String tripId;
+  final TripStop stop;
+  final TripStop? nextStop;
+  const _EditStopSheet({
+    required this.tripId,
+    required this.stop,
+    this.nextStop,
+  });
+
+  @override
+  ConsumerState<_EditStopSheet> createState() => _EditStopSheetState();
+}
+
+class _EditStopSheetState extends ConsumerState<_EditStopSheet> {
+  late final TextEditingController _durationCtl;
+  late final TextEditingController _driveCtl;
+  late final TextEditingController _milesCtl;
+  late final TextEditingController _descCtl;
+  late final TextEditingController _notesCtl;
+  DateTime? _arrivalDate;
+  TimeOfDay? _arrivalTime;
+  bool _saving = false;
+  bool _calculating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final s = widget.stop;
+    // Parse existing arrival time
+    if (s.arrivalTime != null && s.arrivalTime!.isNotEmpty) {
+      try {
+        final dt = DateTime.parse(s.arrivalTime!);
+        _arrivalDate = DateTime(dt.year, dt.month, dt.day);
+        _arrivalTime = TimeOfDay(hour: dt.hour, minute: dt.minute);
+      } catch (_) {}
+    }
+    _durationCtl = TextEditingController(
+        text: s.durationMinutes != null ? '${s.durationMinutes}' : '60');
+    _driveCtl = TextEditingController(
+        text: s.travelMinutes != null ? '${s.travelMinutes}' : '');
+    _milesCtl = TextEditingController(
+        text: s.travelMiles != null ? '${s.travelMiles}' : '');
+    _descCtl = TextEditingController(text: s.description);
+    _notesCtl = TextEditingController(text: s.notes);
+  }
+
+  @override
+  void dispose() {
+    _durationCtl.dispose();
+    _driveCtl.dispose();
+    _milesCtl.dispose();
+    _descCtl.dispose();
+    _notesCtl.dispose();
+    super.dispose();
+  }
+
+  String? _buildArrivalIso() {
+    if (_arrivalDate == null) return null;
+    final d = _arrivalDate!;
+    final t = _arrivalTime ?? const TimeOfDay(hour: 12, minute: 0);
+    return DateTime(d.year, d.month, d.day, t.hour, t.minute).toIso8601String();
+  }
+
+  String _formatDate(DateTime d) => DateFormat('MM/dd/yyyy').format(d);
+  String _formatTime(TimeOfDay t, BuildContext ctx) => t.format(ctx);
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    try {
+      final api = ref.read(apiClientProvider);
+      final arrivalIso = _buildArrivalIso();
+      await api.patch(
+        '${ApiPaths.trips}${widget.tripId}/stops/${widget.stop.id}/',
+        data: {
+          'duration_minutes': int.tryParse(_durationCtl.text),
+          'travel_minutes': int.tryParse(_driveCtl.text),
+          'travel_miles': double.tryParse(_milesCtl.text),
+          'description': _descCtl.text,
+          'notes': _notesCtl.text,
+          if (arrivalIso != null) 'arrival_time': arrivalIso,
+        },
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Stop updated'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2)),
+        );
+        Navigator.of(context).pop(true);
+      }
+    } catch (e) {
+      setState(() => _saving = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  Future<void> _calculateDistance() async {
+    final nextPlace = widget.nextStop?.place;
+    if (nextPlace == null ||
+        widget.stop.place?.latitude == null ||
+        nextPlace.latitude == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Need coordinates for both stops')),
+      );
+      return;
+    }
+
+    setState(() => _calculating = true);
+    try {
+      final origin =
+          '${widget.stop.place!.latitude},${widget.stop.place!.longitude}';
+      final destination = '${nextPlace.latitude},${nextPlace.longitude}';
+
+      final api = ref.read(apiClientProvider);
+      final resp = await api.get(
+        '/api/v1/distance-matrix/',
+        queryParameters: {
+          'origins': origin,
+          'destinations': destination,
+        },
+      );
+      final respData = resp.data['data'] as Map<String, dynamic>;
+      final driveMin = respData['drive_minutes'] as int;
+      final miles = (respData['miles'] as num).toDouble();
+
+      setState(() {
+        _driveCtl.text = '$driveMin';
+        _milesCtl.text = miles.toStringAsFixed(1);
+        _calculating = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                '$driveMin min drive, ${miles.toStringAsFixed(1)} miles to ${nextPlace.name}'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() => _calculating = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasNext = widget.nextStop != null;
+
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 20, right: 20, top: 16,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                    color: Colors.grey[400],
+                    borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text('Edit Stop', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 4),
+            Text(widget.stop.place?.name ?? '',
+                style: TextStyle(color: Colors.grey[600])),
+            const SizedBox(height: 16),
+
+            // Arrival Date & Time
+            Row(
+              children: [
+                Expanded(
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.calendar_today),
+                    title: const Text('Arrival Date', style: TextStyle(fontSize: 13)),
+                    subtitle: Text(
+                      _arrivalDate != null
+                          ? _formatDate(_arrivalDate!)
+                          : 'Not set',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: _arrivalDate != null ? null : Colors.grey,
+                      ),
+                    ),
+                    onTap: () async {
+                      final d = await showDatePicker(
+                        context: context,
+                        initialDate: _arrivalDate ?? DateTime.now(),
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2030),
+                      );
+                      if (d != null) setState(() => _arrivalDate = d);
+                    },
+                  ),
+                ),
+                Expanded(
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.access_time),
+                    title: const Text('Arrival Time', style: TextStyle(fontSize: 13)),
+                    subtitle: Text(
+                      _arrivalTime != null
+                          ? _formatTime(_arrivalTime!, context)
+                          : 'Not set',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: _arrivalTime != null ? null : Colors.grey,
+                      ),
+                    ),
+                    onTap: () async {
+                      final t = await showTimePicker(
+                        context: context,
+                        initialTime: _arrivalTime ?? const TimeOfDay(hour: 12, minute: 0),
+                      );
+                      if (t != null) setState(() => _arrivalTime = t);
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Duration
+            TextField(
+              controller: _durationCtl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Duration (minutes)',
+                prefixIcon: Icon(Icons.timer),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Drive time & distance
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _driveCtl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Drive Time (min)',
+                      prefixIcon: Icon(Icons.directions_car),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _milesCtl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Distance (miles)',
+                      prefixIcon: Icon(Icons.straighten),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            // Calculate distance button
+            if (hasNext)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.tonalIcon(
+                    onPressed: _calculating ? null : _calculateDistance,
+                    icon: _calculating
+                        ? const SizedBox(
+                            height: 16, width: 16,
+                            child:
+                                CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.route, size: 18),
+                    label: Text(_calculating
+                        ? 'Calculating...'
+                        : 'Calculate Drive to ${widget.nextStop!.place?.name ?? "Next Stop"}'),
+                  ),
+                ),
+              ),
+            const SizedBox(height: 12),
+
+            // Description
+            TextField(
+              controller: _descCtl,
+              decoration: const InputDecoration(
+                labelText: 'Description',
+                prefixIcon: Icon(Icons.description),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Notes
+            TextField(
+              controller: _notesCtl,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                labelText: 'Notes',
+                prefixIcon: Icon(Icons.notes),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _saving ? null : _save,
+                child: _saving
+                    ? const SizedBox(
+                        height: 18, width: 18,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
+                    : const Text('Save Changes'),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StopMapWidget extends StatelessWidget {
+  final Place place;
+  const _StopMapWidget({required this.place});
+
+  @override
+  Widget build(BuildContext context) {
+    final lat = place.latitude!;
+    final lng = place.longitude!;
+    final position = LatLng(lat, lng);
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        height: 200,
+        child: GoogleMap(
+          initialCameraPosition: CameraPosition(
+            target: position,
+            zoom: 15,
+          ),
+          markers: {
+            Marker(
+              markerId: MarkerId(place.id),
+              position: position,
+              infoWindow: InfoWindow(
+                title: place.name,
+                snippet: place.location,
+              ),
+            ),
+          },
+          myLocationButtonEnabled: false,
+          zoomControlsEnabled: false,
+          mapToolbarEnabled: false,
+          scrollGesturesEnabled: false,
+          zoomGesturesEnabled: false,
+          rotateGesturesEnabled: false,
+          tiltGesturesEnabled: false,
+        ),
+      ),
+    );
+  }
+}
+
+// ── Menu Item Card (from website scrape) ────────────────────────
+
+class _MenuItemCard extends StatelessWidget {
+  final Map<String, dynamic> item;
+  final VoidCallback onSelect;
+  const _MenuItemCard({required this.item, required this.onSelect});
+
+  /// On web, third-party image URLs fail due to CORS.
+  /// Only show images from our own domain or known CORS-friendly hosts.
+  /// On web, proxy external images through our backend to avoid CORS.
+  String? _getImageUrl(String url) {
+    if (url.isEmpty) return null;
+    if (!kIsWeb) return url;
+    // Proxy through our backend to bypass CORS
+    final encoded = Uri.encodeComponent(url);
+    return '${EnvConfig.apiBaseUrl}/api/v1/image-proxy/?url=$encoded';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final name = item['name'] as String? ?? '';
+    final varietal = item['varietal'] as String? ?? '';
+    final vintage = item['vintage'];
+    final price = item['price'];
+    final rawImageUrl = item['image_url'] as String? ?? '';
+    final cs = Theme.of(context).colorScheme;
+    final imageUrl = _getImageUrl(rawImageUrl);
+
+    return GestureDetector(
+      onTap: onSelect,
+      child: Container(
+        width: 120,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey[300]!),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Image
+            SizedBox(
+              height: 70,
+              width: double.infinity,
+              child: imageUrl != null
+                  ? Image.network(imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => _placeholder(cs))
+                  : _placeholder(cs),
+            ),
+            // Details
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(name,
+                          style: const TextStyle(
+                              fontSize: 10, fontWeight: FontWeight.w600),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis),
+                    ),
+                    if (varietal.isNotEmpty)
+                      Text(
+                        [varietal, if (vintage != null) '$vintage'].join(' '),
+                        style: TextStyle(fontSize: 9, color: Colors.grey[600]),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    if (price != null)
+                      Text('\$$price',
+                          style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: cs.primary)),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _placeholder(ColorScheme cs) {
+    return Container(
+      color: cs.primaryContainer.withValues(alpha: 0.3),
+      child: Center(
+        child: Icon(Icons.local_drink, size: 24, color: cs.primary.withValues(alpha: 0.4)),
+      ),
+    );
+  }
+}

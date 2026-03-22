@@ -34,7 +34,7 @@ COMMON_WINE_PATHS = [
 
 def _make_client():
     return httpx.Client(
-        timeout=12,
+        timeout=120,
         follow_redirects=True,
         headers={
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",

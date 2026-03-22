@@ -46,13 +46,6 @@ class VisitLog(BaseModel):
 class VisitWine(BaseModel):
     """Wines tasted during a visit."""
 
-    class ServingType(models.TextChoices):
-        TASTING = "tasting", "Tasting"
-        GLASS = "glass", "Glass"
-        FLIGHT = "flight", "Flight"
-        BOTTLE = "bottle", "Bottle"
-        SPLIT = "split", "Split"
-
     visit = models.ForeignKey(VisitLog, on_delete=models.CASCADE, related_name="wines_tasted")
     menu_item = models.ForeignKey(
         "wineries.MenuItem", on_delete=models.CASCADE, related_name="visit_records",
@@ -61,12 +54,11 @@ class VisitWine(BaseModel):
 
     # Ad-hoc wine entry (when wine isn't in the database)
     wine_name = models.CharField(max_length=255, blank=True)
-    wine_type = models.CharField(max_length=100, blank=True)  # e.g. Red, White, Rosé, Sparkling
+    wine_type = models.CharField(max_length=100, blank=True)  # From WINE_TYPE or BEER_TYPE lookup
     wine_vintage = models.PositiveIntegerField(null=True, blank=True)
 
-    serving_type = models.CharField(
-        max_length=20, choices=ServingType.choices, default=ServingType.TASTING,
-    )
+    # Serving size — values from WINE_SERVING or BEER_SERVING lookup
+    serving_type = models.CharField(max_length=50, default="tasting", blank=True)
     quantity = models.PositiveSmallIntegerField(default=1)
     is_favorite = models.BooleanField(default=False)
     tasting_notes = models.TextField(blank=True)
