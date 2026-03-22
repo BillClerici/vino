@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/models/trip.dart';
+import 'sippy_history.dart';
 
 class TripStopDrawer extends StatelessWidget {
   final Trip trip;
@@ -175,6 +176,16 @@ class TripStopDrawer extends StatelessWidget {
                   onShowRoute!();
                 },
               ),
+            ListTile(
+              dense: true,
+              leading: Icon(Icons.history, color: colorScheme.primary, size: 20),
+              title: const Text('Sippy Conversations',
+                  style: TextStyle(fontSize: 14)),
+              onTap: () {
+                Navigator.of(context).pop();
+                openSippyHistory(context, tripId: tripId, chatType: 'ask');
+              },
+            ),
             if ((trip.tripMembers?.length ?? 0) >= 2)
               ListTile(
                 dense: true,

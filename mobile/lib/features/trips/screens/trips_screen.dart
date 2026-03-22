@@ -6,6 +6,8 @@ import '../../../core/widgets/empty_state.dart';
 import '../../help/help_launcher.dart';
 import '../../../core/widgets/search_bar.dart';
 import '../providers/trips_provider.dart';
+import '../widgets/sippy_history.dart';
+import '../widgets/sippy_planner_chat.dart';
 
 class TripsScreen extends ConsumerStatefulWidget {
   const TripsScreen({super.key});
@@ -157,9 +159,26 @@ class _TripsScreenState extends ConsumerState<TripsScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => context.push('/trips/create'),
-        child: const Icon(Icons.add),
+      floatingActionButton: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          GestureDetector(
+            onLongPress: () => openSippyHistory(context, chatType: 'plan'),
+            child: FloatingActionButton.extended(
+              heroTag: 'plan_with_sippy',
+              onPressed: () => openSippyPlanner(context),
+              tooltip: 'Plan with Sippy (long-press for history)',
+              icon: const Icon(Icons.auto_awesome, size: 18),
+              label: const Text('Sippy', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ),
+          const SizedBox(width: 12),
+          FloatingActionButton(
+            heroTag: 'create_trip',
+            onPressed: () => context.push('/trips/create'),
+            child: const Icon(Icons.add),
+          ),
+        ],
       ),
     );
   }

@@ -176,3 +176,36 @@ class TripStop(BaseModel):
 
     def __str__(self):
         return f"Stop #{self.order}: {self.place.name}"
+
+
+class SippyConversation(BaseModel):
+    """Persisted Sippy AI chat conversation."""
+
+    class ChatType(models.TextChoices):
+        ASK = "ask", "Ask Sippy"
+        PLAN = "plan", "Plan with Sippy"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="sippy_conversations",
+    )
+    trip = models.ForeignKey(
+        Trip,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="sippy_conversations",
+    )
+    chat_type = models.CharField(max_length=10, choices=ChatType.choices)
+    title = models.CharField(max_length=255, blank=True)
+    session_id = models.CharField(max_length=255, blank=True, db_index=True)
+    messages = models.JSONField(default=list)
+    phase = models.CharField(max_length=20, blank=True, default="")
+    proposed_trip = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        db_table = "trips_sippyconversation"
+        ordering = ["-updated_at"]
+
+    def __str__(self):
+        return f"{self.get_chat_type_display()} — {self.title or 'Untitled'}"

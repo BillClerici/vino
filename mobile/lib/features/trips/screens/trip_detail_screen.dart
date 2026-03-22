@@ -16,6 +16,7 @@ import '../../../core/services/google_places_service.dart';
 import '../../help/help_launcher.dart';
 import '../providers/trips_provider.dart';
 import '../widgets/sippy_chat.dart';
+import '../widgets/sippy_history.dart';
 import '../widgets/trip_stop_drawer.dart';
 import 'trip_recap_screen.dart';
 
@@ -87,13 +88,17 @@ class _TripDetailViewState extends ConsumerState<_TripDetailView> {
         onEditTrip: _isOrganizer ? () => _showEditTripSheet(context, ref) : null,
         onDeleteTrip: _isOrganizer ? () => _confirmDeleteTrip(context, ref) : null,
         onShowRoute: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => _TripRouteMapScreen(trip: trip)),
+          MaterialPageRoute(builder: (_) => TripRouteMapScreen(trip: trip)),
         ),
       ),
-      floatingActionButton: FloatingActionButton.small(
-        onPressed: () => openSippyChat(context, tripId),
-        tooltip: 'Ask Sippy',
-        child: const Text('S', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+      floatingActionButton: GestureDetector(
+        onLongPress: () => openSippyHistory(context, tripId: tripId, chatType: 'ask'),
+        child: FloatingActionButton.extended(
+          onPressed: () => openSippyChat(context, tripId),
+          tooltip: 'Ask Sippy (long-press for history)',
+          icon: const Icon(Icons.auto_awesome, size: 18),
+          label: const Text('Sippy', style: TextStyle(fontWeight: FontWeight.bold)),
+        ),
       ),
       body: CustomScrollView(
         slivers: [
@@ -245,7 +250,7 @@ class _TripDetailViewState extends ConsumerState<_TripDetailView> {
                                   child: OutlinedButton.icon(
                                     onPressed: () => Navigator.of(context).push(
                                       MaterialPageRoute(
-                                        builder: (_) => _TripRouteMapScreen(trip: trip),
+                                        builder: (_) => TripRouteMapScreen(trip: trip),
                                       ),
                                     ),
                                     icon: const Icon(Icons.route, size: 18),
@@ -2134,15 +2139,15 @@ class _EditMemberSheetState extends ConsumerState<_EditMemberSheet> {
 // TRIP ROUTE MAP SCREEN
 // ═══════════════════════════════════════════════════════════════════
 
-class _TripRouteMapScreen extends ConsumerStatefulWidget {
+class TripRouteMapScreen extends ConsumerStatefulWidget {
   final Trip trip;
-  const _TripRouteMapScreen({required this.trip});
+  const TripRouteMapScreen({required this.trip});
 
   @override
-  ConsumerState<_TripRouteMapScreen> createState() => _TripRouteMapScreenState();
+  ConsumerState<TripRouteMapScreen> createState() => TripRouteMapScreenState();
 }
 
-class _TripRouteMapScreenState extends ConsumerState<_TripRouteMapScreen> {
+class TripRouteMapScreenState extends ConsumerState<TripRouteMapScreen> {
   GoogleMapController? _mapController;
   final Set<Marker> _markers = {};
   final Set<Polyline> _polylines = {};

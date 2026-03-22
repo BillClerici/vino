@@ -772,11 +772,234 @@ Keep responses conversational, warm, and concise (2-4 sentences unless more deta
             messages.append(HumanMessage(content=user_message))
 
             response = llm.invoke(messages)
-            return Response({"reply": response.content})
+            reply = response.content
+
+            # Auto-persist conversation
+            from apps.trips.models import SippyConversation
+            conversation_id = request.data.get("conversation_id", "")
+            conversation = None
+            if conversation_id:
+                conversation = SippyConversation.objects.filter(
+                    pk=conversation_id, user=request.user, is_active=True
+                ).first()
+
+            if not conversation:
+                conversation = SippyConversation.objects.create(
+                    user=request.user,
+                    trip=trip,
+                    chat_type=SippyConversation.ChatType.ASK,
+                    title=user_message[:60],
+                    messages=[],
+                )
+
+            msgs = conversation.messages or []
+            msgs.append({"role": "user", "content": user_message})
+            msgs.append({"role": "assistant", "content": reply})
+            conversation.messages = msgs
+            conversation.save(update_fields=["messages", "updated_at"])
+
+            return Response({
+                "reply": reply,
+                "conversation_id": str(conversation.id),
+            })
 
         except Exception:
             logger.exception("Sippy chat failed")
             return Response(
                 {"detail": "Sippy is taking a sip break. Try again!"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    # ── Sippy Trip Planner (LangGraph) ────────────────────────────
+
+    @action(detail=False, methods=["post"])
+    def plan(self, request):
+        """Conversational trip planner powered by LangGraph."""
+        import time
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        from apps.trips.models import SippyConversation
+
+        user_message = request.data.get("message", "").strip()
+        action_type = request.data.get("action")  # approve | reject | None
+        session_id = request.data.get("session_id", "")
+        conversation_id = request.data.get("conversation_id", "")
+
+        if not user_message and not action_type:
+            return Response(
+                {"detail": "Message or action is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Generate or reuse session ID
+        if not session_id:
+            session_id = f"plan:{request.user.id}:{int(time.time())}"
+
+        # Load or create conversation record
+        conversation = None
+        if conversation_id:
+            conversation = SippyConversation.objects.filter(
+                pk=conversation_id, user=request.user, is_active=True
+            ).first()
+
+        try:
+            from apps.api.agents.graph import get_compiled_graph
+            from langchain_core.messages import AIMessage as AI, HumanMessage as HM
+
+            graph = get_compiled_graph("trip_planner")
+            config = {"configurable": {"thread_id": session_id}}
+
+            # Replay conversation history for context (if provided)
+            history_msgs = []
+            for h in request.data.get("history", [])[-10:]:
+                role = h.get("role", "")
+                content = h.get("content", "")
+                if role == "user":
+                    history_msgs.append(HM(content=content))
+                elif role == "assistant":
+                    history_msgs.append(AI(content=content))
+
+            # Handle approve directly — skip LangGraph, go straight to commit
+            if action_type == "approve":
+                display_user_msg = "Looks good! Create it."
+
+                # Get proposed trip from conversation record
+                proposed = conversation.proposed_trip if conversation else None
+                if not proposed:
+                    return Response(
+                        {"detail": "No trip preview to approve. Please plan a trip first."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                from apps.api.agents.nodes import planner_commit
+                commit_state = {
+                    "proposed_trip": proposed,
+                    "user_id": str(request.user.id),
+                }
+                commit_result = planner_commit(commit_state)
+
+                reply = ""
+                for msg in commit_result.get("messages", []):
+                    if isinstance(msg, AI):
+                        reply = msg.content
+                        break
+
+                phase = commit_result.get("phase", "approved")
+                trip_id = commit_result.get("created_trip_id")
+
+                # Update conversation
+                if conversation:
+                    msgs = conversation.messages or []
+                    msgs.append({"role": "user", "content": display_user_msg})
+                    if reply:
+                        msgs.append({"role": "assistant", "content": reply})
+                    conversation.messages = msgs
+                    conversation.phase = phase
+                    if trip_id:
+                        conversation.trip_id = trip_id
+                    conversation.save(update_fields=[
+                        "messages", "phase", "trip_id", "updated_at",
+                    ])
+
+                return Response({
+                    "reply": reply,
+                    "phase": phase,
+                    "session_id": session_id,
+                    "proposed_trip": proposed,
+                    "trip_id": trip_id,
+                    "conversation_id": str(conversation.id) if conversation else None,
+                })
+
+            # Handle reject
+            if action_type == "reject":
+                display_user_msg = "Cancel this plan."
+                if conversation:
+                    msgs = conversation.messages or []
+                    msgs.append({"role": "user", "content": display_user_msg})
+                    msgs.append({"role": "assistant", "content": "No problem! Let me know when you want to plan another trip."})
+                    conversation.messages = msgs
+                    conversation.phase = "rejected"
+                    conversation.save(update_fields=["messages", "phase", "updated_at"])
+
+                return Response({
+                    "reply": "No problem! Let me know when you want to plan another trip.",
+                    "phase": "rejected",
+                    "session_id": session_id,
+                    "conversation_id": str(conversation.id) if conversation else None,
+                })
+
+            # Normal conversation — invoke LangGraph
+            display_user_msg = user_message
+            input_state = {
+                "messages": history_msgs + [HM(content=user_message)],
+                "user_id": str(request.user.id),
+            }
+
+            result = graph.invoke(input_state, config)
+
+            # Extract last AI message
+            reply = ""
+            for msg in reversed(result.get("messages", [])):
+                if isinstance(msg, AI):
+                    reply = msg.content
+                    break
+
+            phase = result.get("phase", "gathering")
+            proposed = result.get("proposed_trip")
+            trip_id = result.get("created_trip_id")
+
+            # Auto-persist conversation
+            if not conversation:
+                title = user_message[:60] if user_message else "Trip Plan"
+                conversation = SippyConversation.objects.create(
+                    user=request.user,
+                    chat_type=SippyConversation.ChatType.PLAN,
+                    title=title,
+                    session_id=session_id,
+                    messages=[],
+                )
+
+            msgs = conversation.messages or []
+            if display_user_msg:
+                msgs.append({"role": "user", "content": display_user_msg})
+            if reply:
+                msgs.append({"role": "assistant", "content": reply})
+            conversation.messages = msgs
+            conversation.phase = phase
+            if proposed:
+                conversation.proposed_trip = proposed
+            if trip_id:
+                conversation.trip_id = trip_id
+            conversation.save(update_fields=[
+                "messages", "phase", "proposed_trip", "trip_id",
+                "session_id", "updated_at",
+            ])
+
+            return Response({
+                "reply": reply,
+                "phase": phase,
+                "session_id": session_id,
+                "proposed_trip": proposed,
+                "trip_id": trip_id,
+                "conversation_id": str(conversation.id),
+            })
+
+        except Exception:
+            logger.exception("Sippy trip planner failed")
+
+            # Generate a fresh session_id so retry doesn't hit the corrupt checkpoint
+            new_session = f"plan:{request.user.id}:{int(time.time())}"
+            if conversation:
+                conversation.session_id = new_session
+                conversation.save(update_fields=["session_id", "updated_at"])
+
+            return Response(
+                {
+                    "detail": "Sippy had trouble planning. Try again!",
+                    "session_id": new_session,
+                    "conversation_id": str(conversation.id) if conversation else None,
+                },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )

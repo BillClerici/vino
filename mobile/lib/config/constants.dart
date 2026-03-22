@@ -40,6 +40,15 @@ class ApiPaths {
 
   /// Ask Sippy (trip-aware AI chat): POST /api/v1/trips/{tripId}/chat/
   static String tripChat(String tripId) => '/api/v1/trips/$tripId/chat/';
+
+  /// Sippy trip planner (LangGraph): POST /api/v1/trips/plan/
+  static const tripPlan = '/api/v1/trips/plan/';
+
+  /// Sippy conversations
+  static const conversations = '/api/v1/conversations/';
+  static String conversationDetail(String id) => '/api/v1/conversations/$id/';
+  static String conversationRetry(String id) =>
+      '/api/v1/conversations/$id/retry/';
 }
 
 class StorageKeys {

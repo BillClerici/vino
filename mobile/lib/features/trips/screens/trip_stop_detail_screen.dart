@@ -21,7 +21,9 @@ import '../../../core/widgets/rating_stars.dart';
 import '../../help/help_launcher.dart';
 import '../providers/trips_provider.dart';
 import '../widgets/sippy_chat.dart';
+import '../widgets/sippy_history.dart';
 import '../widgets/trip_stop_drawer.dart';
+import 'trip_detail_screen.dart' show TripRouteMapScreen;
 
 class TripStopDetailScreen extends ConsumerStatefulWidget {
   final String tripId;
@@ -476,11 +478,18 @@ class _StopViewState extends State<_StopView> {
         tripId: tripId,
         onEditStop: onEditStop,
         onDeleteStop: onRemoveStop,
+        onShowRoute: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => TripRouteMapScreen(trip: trip)),
+        ),
       ),
-      floatingActionButton: FloatingActionButton.small(
-        onPressed: () => openSippyChat(context, tripId),
-        tooltip: 'Ask Sippy',
-        child: const Text('S', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+      floatingActionButton: GestureDetector(
+        onLongPress: () => openSippyHistory(context, tripId: tripId, chatType: 'ask'),
+        child: FloatingActionButton.extended(
+          onPressed: () => openSippyChat(context, tripId),
+          tooltip: 'Ask Sippy (long-press for history)',
+          icon: const Icon(Icons.auto_awesome, size: 18),
+          label: const Text('Sippy', style: TextStyle(fontWeight: FontWeight.bold)),
+        ),
       ),
       body: CustomScrollView(
         slivers: [
