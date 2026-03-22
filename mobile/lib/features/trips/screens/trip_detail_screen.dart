@@ -15,6 +15,8 @@ import '../../../core/models/trip.dart';
 import '../../../core/services/google_places_service.dart';
 import '../../help/help_launcher.dart';
 import '../providers/trips_provider.dart';
+import '../widgets/trip_stop_drawer.dart';
+import 'trip_recap_screen.dart';
 
 final _carouselScrollBehavior = const MaterialScrollBehavior().copyWith(
   dragDevices: {
@@ -46,10 +48,20 @@ class TripDetailScreen extends ConsumerWidget {
   }
 }
 
-class _TripDetailView extends ConsumerWidget {
+class _TripDetailView extends ConsumerStatefulWidget {
   final Trip trip;
   final String tripId;
   const _TripDetailView({required this.trip, required this.tripId});
+
+  @override
+  ConsumerState<_TripDetailView> createState() => _TripDetailViewState();
+}
+
+class _TripDetailViewState extends ConsumerState<_TripDetailView> {
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
+
+  Trip get trip => widget.trip;
+  String get tripId => widget.tripId;
 
   String get _coverImage {
     for (final stop in trip.tripStops ?? []) {
@@ -59,16 +71,24 @@ class _TripDetailView extends ConsumerWidget {
   }
 
   bool get _isOrganizer {
-    // Check if current user is the trip creator (organizer)
-    // For now, allow editing for all members since we don't have user ID in context
     return true;
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
+      key: _scaffoldKey,
+      endDrawer: TripStopDrawer(
+        trip: trip,
+        tripId: tripId,
+        onEditTrip: _isOrganizer ? () => _showEditTripSheet(context, ref) : null,
+        onDeleteTrip: _isOrganizer ? () => _confirmDeleteTrip(context, ref) : null,
+        onShowRoute: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => _TripRouteMapScreen(trip: trip)),
+        ),
+      ),
       body: CustomScrollView(
         slivers: [
           // ── Hero Header ──
@@ -78,19 +98,11 @@ class _TripDetailView extends ConsumerWidget {
             backgroundColor: colorScheme.primary,
             foregroundColor: Colors.white,
             actions: [
-              if (_isOrganizer) ...[
-                IconButton(
-                  icon: const Icon(Icons.edit),
-                  tooltip: 'Edit Trip',
-                  onPressed: () => _showEditTripSheet(context, ref),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline),
-                  tooltip: 'Delete Trip',
-                  onPressed: () => _confirmDeleteTrip(context, ref),
-                ),
-                helpButton(context, routePrefix: '/trips'),
-              ],
+              IconButton(
+                icon: const Icon(Icons.menu_open),
+                tooltip: 'Trip Menu',
+                onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
+              ),
             ],
             flexibleSpace: FlexibleSpaceBar(
               background: Stack(
@@ -330,6 +342,50 @@ class _TripDetailView extends ConsumerWidget {
                         ),
                       )),
 
+                // ── Group Palate Match (for trips with 2+ members) ──
+                if ((trip.tripMembers?.length ?? 0) >= 2 &&
+                    trip.status != 'cancelled')
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () => _showPalateMatch(context, ref),
+                        icon: const Icon(Icons.psychology),
+                        label: const Text('Group Palate Match'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          side: BorderSide(color: colorScheme.secondary),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                // ── Trip Recap button (for completed trips) ──
+                if (trip.status == 'completed')
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => ProviderScope(
+                              parent: ProviderScope.containerOf(context),
+                              child: _TripRecapRoute(tripId: tripId),
+                            ),
+                          ),
+                        ),
+                        icon: const Icon(Icons.auto_stories),
+                        label: const Text('View Trip Recap'),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          backgroundColor: const Color(0xFF8E44AD),
+                        ),
+                      ),
+                    ),
+                  ),
+
                 const SizedBox(height: 100),
               ],
             ),
@@ -385,6 +441,20 @@ class _TripDetailView extends ConsumerWidget {
         );
       }
     }
+  }
+
+  void _showPalateMatch(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => ProviderScope(
+        parent: ProviderScope.containerOf(context),
+        child: _PalateMatchSheet(tripId: tripId),
+      ),
+    );
   }
 
   Future<void> _showEditTripSheet(BuildContext context, WidgetRef ref) async {
@@ -2458,5 +2528,231 @@ class _StopCard extends StatelessWidget {
     } catch (_) {
       return isoTime;
     }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// GROUP PALATE MATCH SHEET
+// ═══════════════════════════════════════════════════════════════════
+
+class _PalateMatchSheet extends ConsumerStatefulWidget {
+  final String tripId;
+  const _PalateMatchSheet({required this.tripId});
+
+  @override
+  ConsumerState<_PalateMatchSheet> createState() => _PalateMatchSheetState();
+}
+
+class _PalateMatchSheetState extends ConsumerState<_PalateMatchSheet> {
+  bool _loading = true;
+  String? _error;
+  Map<String, dynamic>? _data;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchMatch();
+  }
+
+  Future<void> _fetchMatch() async {
+    try {
+      final api = ref.read(apiClientProvider);
+      final resp = await api.post(ApiPaths.palateMatch(widget.tripId));
+      final data = resp.data['data'] as Map<String, dynamic>? ?? resp.data as Map<String, dynamic>;
+      if (mounted) setState(() { _data = data; _loading = false; });
+    } catch (e) {
+      if (mounted) setState(() { _error = '$e'; _loading = false; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.85,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (_, scrollCtl) {
+        if (_loading) {
+          return const Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Analyzing group palates...'),
+              ],
+            ),
+          );
+        }
+        if (_error != null) {
+          return Center(child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Text('Error: $_error'),
+          ));
+        }
+
+        final recs = _data!['recommendations'] as Map<String, dynamic>? ?? {};
+        final members = _data!['member_profiles'] as List? ?? [];
+
+        return ListView(
+          controller: scrollCtl,
+          padding: const EdgeInsets.all(20),
+          children: [
+            // Handle
+            Center(
+              child: Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[400],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(Icons.psychology, color: Theme.of(context).colorScheme.secondary),
+                const SizedBox(width: 8),
+                Text('Group Palate Match', style: Theme.of(context).textTheme.titleLarge),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Group summary
+            if (recs['group_summary'] != null) ...[
+              Card(
+                color: Theme.of(context).colorScheme.secondaryContainer,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(recs['group_summary'] as String,
+                      style: Theme.of(context).textTheme.bodyLarge),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // Common ground
+            if (recs['common_ground'] != null) ...[
+              Text('Common Ground', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 8),
+              ...(recs['common_ground'] as List).map((item) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.check_circle, size: 16, color: Colors.green),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text('$item')),
+                      ],
+                    ),
+                  )),
+              const SizedBox(height: 16),
+            ],
+
+            // Adventurous picks
+            if (recs['adventurous_picks'] != null) ...[
+              Text('Adventurous Picks', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 8),
+              ...(recs['adventurous_picks'] as List).map((item) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.explore, size: 16, color: Colors.orange),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text('$item')),
+                      ],
+                    ),
+                  )),
+              const SizedBox(height: 16),
+            ],
+
+            // Suggested varietals
+            if (recs['suggested_varietals'] != null) ...[
+              Text('Seek These Out', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: (recs['suggested_varietals'] as List).map((v) => Chip(
+                      label: Text('$v', style: const TextStyle(fontSize: 12)),
+                      avatar: const Icon(Icons.wine_bar, size: 14),
+                    )).toList(),
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // Tips
+            if (recs['tips'] != null) ...[
+              Text('Tips for This Trip', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 8),
+              ...(recs['tips'] as List).map((tip) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.lightbulb_outline, size: 16, color: Colors.amber),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text('$tip')),
+                      ],
+                    ),
+                  )),
+              const SizedBox(height: 16),
+            ],
+
+            // Member profiles summary
+            if (members.isNotEmpty) ...[
+              Text('Member Profiles', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 8),
+              ...members.map((m) {
+                final mp = m as Map<String, dynamic>;
+                final tops = (mp['top_varietals'] as List?) ?? [];
+                return Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(mp['name'] as String? ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        Text(
+                          '${mp['visit_count'] ?? 0} visits · Avg ${mp['avg_rating'] ?? '-'}/5',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        if (tops.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Wrap(
+                            spacing: 4,
+                            children: tops.take(3).map((v) => Chip(
+                                  label: Text('${v['varietal']}', style: const TextStyle(fontSize: 10)),
+                                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  visualDensity: VisualDensity.compact,
+                                )).toList(),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            ],
+
+            const SizedBox(height: 32),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Simple wrapper so we can push the recap screen via MaterialPageRoute
+/// (avoids needing go_router context for nested navigation).
+class _TripRecapRoute extends ConsumerWidget {
+  final String tripId;
+  const _TripRecapRoute({required this.tripId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return TripRecapScreen(tripId: tripId);
   }
 }

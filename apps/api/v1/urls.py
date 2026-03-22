@@ -7,7 +7,7 @@ from rest_framework.routers import DefaultRouter
 from .auth.views import dev_login, mobile_google_auth, mobile_microsoft_auth
 from .dashboard.views import DashboardView
 from .lookups.views import LookupValueViewSet
-from .palate.views import PalateProfileView
+from .palate.views import PalateAnalyzeView, PalateChatView, PalateProfileView
 from .places.views import MenuItemViewSet, PlaceViewSet
 from .subscriptions.views import (
     CreateMobileCheckoutView,
@@ -16,6 +16,7 @@ from .subscriptions.views import (
 )
 from .trips.views import TripViewSet
 from .users.views import UserProfileViewSet
+from .scan_label import ScanLabelView
 from .visits.views import VisitLogViewSet
 
 router = DefaultRouter()
@@ -136,6 +137,7 @@ def config_view(request):
         "features": {
             "live_trip": True,
             "ai_palate": True,
+            "label_scanner": True,
             "push_notifications": False,
         },
         "maintenance_mode": False,
@@ -158,6 +160,8 @@ urlpatterns = [
 
     # Palate
     path("palate/", PalateProfileView.as_view(), name="palate_profile"),
+    path("palate/analyze/", PalateAnalyzeView.as_view(), name="palate_analyze"),
+    path("palate/chat/", PalateChatView.as_view(), name="palate_chat"),
 
     # Subscriptions
     path("subscription/status/", SubscriptionStatusView.as_view(), name="subscription_status"),
@@ -179,6 +183,9 @@ urlpatterns = [
         MenuItemViewSet.as_view({"get": "retrieve", "put": "update", "delete": "destroy"}),
         name="place_menu_detail",
     ),
+
+    # Wine label scanner (Gemini Vision)
+    path("scan-label/", ScanLabelView.as_view(), name="scan_label"),
 
     # Config / feature flags
     path("config/", config_view, name="app_config"),

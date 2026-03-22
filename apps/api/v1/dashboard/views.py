@@ -17,6 +17,10 @@ class DashboardView(APIView):
 
     def get(self, request):
         user = request.user
+
+        # Auto-activate trips whose scheduled date/time has arrived
+        Trip.auto_activate_user_trips(user)
+
         my_visits = VisitLog.objects.filter(user=user, is_active=True)
 
         # Stats

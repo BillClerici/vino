@@ -17,6 +17,26 @@ class ApiPaths {
   /// Upload drink photo: POST /api/v1/visits/{visitId}/wines/{wineId}/photo/
   static String winePhoto(String visitId, String wineId) =>
       '/api/v1/visits/$visitId/wines/$wineId/photo/';
+
+  /// Scan wine/beer label with AI vision: POST /api/v1/scan-label/
+  static const scanLabel = '/api/v1/scan-label/';
+
+  /// AI palate analysis: POST /api/v1/palate/analyze/
+  static const palateAnalyze = '/api/v1/palate/analyze/';
+
+  /// AI sommelier chat: POST /api/v1/palate/chat/
+  static const palateChat = '/api/v1/palate/chat/';
+
+  /// Trip recap: GET /api/v1/trips/{tripId}/recap/
+  static String tripRecap(String tripId) => '/api/v1/trips/$tripId/recap/';
+
+  /// Group palate match: POST /api/v1/trips/{tripId}/palate-match/
+  static String palateMatch(String tripId) =>
+      '/api/v1/trips/$tripId/palate-match/';
+
+  /// Live trip activity feed: GET /api/v1/trips/{tripId}/activity/
+  static String tripActivity(String tripId) =>
+      '/api/v1/trips/$tripId/activity/';
 }
 
 class StorageKeys {

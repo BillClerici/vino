@@ -1,12 +1,13 @@
 from datetime import date
 
-from django.db.models import Count, Q
+from django.db.models import Avg, Count, Q, Sum
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
+from apps.palate.models import PalateProfile
 from apps.trips.models import Trip, TripMember, TripStop
 from apps.visits.models import VisitLog, VisitWine
 from ..permissions import HasActiveSubscription, IsTripMemberOrReadOnly
@@ -32,6 +33,9 @@ class TripViewSet(ModelViewSet):
     ordering = ["-scheduled_date"]
 
     def get_queryset(self):
+        # Auto-activate trips whose scheduled date/time has arrived
+        Trip.auto_activate_user_trips(self.request.user)
+
         qs = Trip.objects.filter(
             members=self.request.user, is_active=True
         ).select_related("created_by").annotate(
@@ -69,6 +73,8 @@ class TripViewSet(ModelViewSet):
 
     def get_object(self):
         obj = super().get_object()
+        # Auto-activate if scheduled date/time has arrived
+        obj.auto_activate_if_ready()
         # Attach filtered related sets for detail serializer
         obj.active_stops = obj.trip_stops.filter(is_active=True).order_by("order")
         obj.active_members = obj.trip_members.filter(is_active=True)
@@ -300,3 +306,338 @@ class TripViewSet(ModelViewSet):
         serializer.is_valid(raise_exception=True)
         wine = serializer.save(visit=visit)
         return Response(VisitWineSerializer(wine).data, status=status.HTTP_201_CREATED)
+
+    # ── Trip Recap ────────────────────────────────────────────────
+
+    @action(detail=True, methods=["get"])
+    def recap(self, request, pk=None):
+        """Generate a recap summary for a completed trip."""
+        trip = self.get_object()
+
+        stops = trip.trip_stops.filter(is_active=True).select_related("place").order_by("order")
+
+        # Gather all visits by trip members during trip date range
+        member_user_ids = trip.trip_members.filter(
+            is_active=True, user__isnull=False
+        ).values_list("user_id", flat=True)
+
+        visit_filter = Q(user_id__in=member_user_ids, is_active=True)
+        place_ids = stops.values_list("place_id", flat=True)
+        visit_filter &= Q(place_id__in=place_ids)
+
+        visits = VisitLog.objects.filter(visit_filter).select_related("place", "user")
+
+        # Build per-stop recap
+        stop_recaps = []
+        total_wines = 0
+        all_photos = []
+        for stop in stops:
+            place = stop.place
+            stop_visits = [v for v in visits if v.place_id == place.id]
+
+            # Wines tasted at this stop
+            visit_ids = [v.id for v in stop_visits]
+            wines = VisitWine.objects.filter(
+                visit_id__in=visit_ids, is_active=True
+            ).select_related("menu_item")
+            wines_list = []
+            for w in wines:
+                total_wines += 1
+                name = w.display_name or w.wine_name or "Unknown"
+                wine_data = {
+                    "name": name,
+                    "type": w.wine_type or "",
+                    "rating": w.rating,
+                    "is_favorite": w.is_favorite,
+                    "tasting_notes": w.tasting_notes or "",
+                }
+                if w.photo:
+                    wine_data["photo"] = w.photo
+                    all_photos.append(w.photo)
+                wines_list.append(wine_data)
+
+            # Aggregate ratings for this stop
+            avg_ratings = {}
+            if stop_visits:
+                ratings_qs = VisitLog.objects.filter(id__in=visit_ids).aggregate(
+                    avg_overall=Avg("rating_overall"),
+                    avg_staff=Avg("rating_staff"),
+                    avg_ambience=Avg("rating_ambience"),
+                    avg_food=Avg("rating_food"),
+                )
+                avg_ratings = {k: round(v, 1) if v else None for k, v in ratings_qs.items()}
+
+            stop_recaps.append({
+                "order": stop.order,
+                "place": {
+                    "id": str(place.id),
+                    "name": place.name,
+                    "place_type": place.place_type,
+                    "city": place.city or "",
+                    "state": place.state or "",
+                    "latitude": place.latitude,
+                    "longitude": place.longitude,
+                    "image_url": place.image_url or "",
+                },
+                "checked_in": len(stop_visits) > 0,
+                "visit_count": len(stop_visits),
+                "wines_tasted": wines_list,
+                "avg_ratings": avg_ratings,
+                "duration_minutes": stop.duration_minutes,
+                "travel_minutes": stop.travel_minutes,
+                "travel_miles": stop.travel_miles,
+            })
+
+        # Total travel stats
+        total_travel_minutes = sum(s.travel_minutes or 0 for s in stops)
+        total_travel_miles = sum(float(s.travel_miles or 0) for s in stops)
+
+        # Members
+        members = trip.trip_members.filter(is_active=True).select_related("user")
+        member_list = []
+        for m in members:
+            member_list.append({
+                "display_name": m.display_name,
+                "role": m.role,
+                "rsvp_status": m.rsvp_status,
+            })
+
+        return Response({
+            "trip": {
+                "id": str(trip.id),
+                "name": trip.name,
+                "description": trip.description or "",
+                "status": trip.status,
+                "scheduled_date": trip.scheduled_date.isoformat() if trip.scheduled_date else None,
+                "end_date": trip.end_date.isoformat() if trip.end_date else None,
+            },
+            "stats": {
+                "total_stops": len(stop_recaps),
+                "stops_visited": sum(1 for s in stop_recaps if s["checked_in"]),
+                "total_wines": total_wines,
+                "total_travel_minutes": total_travel_minutes,
+                "total_travel_miles": round(total_travel_miles, 1),
+                "total_members": len(member_list),
+                "total_photos": len(all_photos),
+            },
+            "stops": stop_recaps,
+            "members": member_list,
+            "photos": all_photos[:20],  # First 20 photos
+        })
+
+    # ── Group Palate Matchmaker ───────────────────────────────────
+
+    @action(detail=True, methods=["post"], url_path="palate-match")
+    def palate_match(self, request, pk=None):
+        """Aggregate member palates and recommend places for the group."""
+        import json
+        import logging
+
+        logger = logging.getLogger(__name__)
+        trip = self.get_object()
+
+        # Get members with user accounts
+        member_users = trip.trip_members.filter(
+            is_active=True, user__isnull=False
+        ).select_related("user")
+
+        if member_users.count() < 1:
+            return Response(
+                {"detail": "No members with accounts found."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Build per-member palate summary
+        member_profiles = []
+        for m in member_users:
+            user = m.user
+            profile = PalateProfile.objects.filter(user=user).first()
+
+            # Get top varietals for this user
+            wines = VisitWine.objects.filter(
+                visit__user=user, is_active=True
+            )
+            from django.db.models import F
+            top_varietals = list(
+                wines.filter(wine_type__gt="")
+                .values(varietal=F("wine_type"))
+                .annotate(count=Count("id"), avg_rating=Avg("rating"))
+                .order_by("-count")[:5]
+            )
+            menu_varietals = list(
+                wines.filter(menu_item__isnull=False)
+                .values(varietal=F("menu_item__varietal"))
+                .annotate(count=Count("id"), avg_rating=Avg("rating"))
+                .order_by("-count")[:5]
+            )
+
+            # Merge
+            varietal_map = {}
+            for v in top_varietals + menu_varietals:
+                key = v.get("varietal", "")
+                if not key:
+                    continue
+                if key in varietal_map:
+                    varietal_map[key]["count"] += v["count"]
+                else:
+                    varietal_map[key] = v
+
+            visit_stats = VisitLog.objects.filter(
+                user=user, is_active=True
+            ).aggregate(
+                total=Count("id"),
+                avg_overall=Avg("rating_overall"),
+            )
+
+            member_profiles.append({
+                "name": m.display_name,
+                "preferences": profile.preferences if profile else {},
+                "top_varietals": sorted(
+                    varietal_map.values(), key=lambda x: -x["count"]
+                )[:5],
+                "visit_count": visit_stats["total"],
+                "avg_rating": round(visit_stats["avg_overall"], 1)
+                if visit_stats["avg_overall"]
+                else None,
+            })
+
+        # Build prompt for Claude
+        prompt = """You are an expert sommelier helping plan a group wine trip.
+Analyze each member's palate profile below and provide:
+
+1. **group_summary** — 2-3 sentences describing the group's collective taste
+2. **common_ground** — List of 3-5 wines/styles everyone would enjoy
+3. **adventurous_picks** — 2-3 wines/styles that would challenge the group in a fun way
+4. **place_types** — Which place types (winery, brewery, restaurant) best suit this group
+5. **suggested_varietals** — Top 5 varietals to seek out, ordered by group fit
+6. **tips** — 2-3 specific tips for making this trip great for everyone
+
+Return ONLY valid JSON with these keys. Write in a warm, conversational tone.
+
+GROUP MEMBERS:
+"""
+        for mp in member_profiles:
+            prompt += f"\n### {mp['name']}\n"
+            if mp["preferences"]:
+                prompt += f"Profile: {json.dumps(mp['preferences'])}\n"
+            if mp["top_varietals"]:
+                tops = ", ".join(
+                    f"{v['varietal']} ({v['count']}x)"
+                    for v in mp["top_varietals"]
+                )
+                prompt += f"Top varietals: {tops}\n"
+            prompt += f"Visits: {mp['visit_count']}, Avg rating: {mp['avg_rating']}\n"
+
+        try:
+            from apps.api.ai_utils import get_claude
+            from langchain_core.messages import HumanMessage
+
+            llm = get_claude()
+            response = llm.invoke([HumanMessage(content=prompt)])
+            raw = response.content.strip()
+
+            # Strip markdown fences
+            if raw.startswith("```"):
+                raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
+                if raw.endswith("```"):
+                    raw = raw[:-3]
+                raw = raw.strip()
+
+            recommendations = json.loads(raw)
+
+            return Response({
+                "member_profiles": member_profiles,
+                "recommendations": recommendations,
+            })
+
+        except json.JSONDecodeError:
+            logger.exception("Claude returned invalid JSON for palate match")
+            return Response(
+                {"detail": "Could not generate recommendations. Try again."},
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            )
+        except Exception:
+            logger.exception("Palate match failed")
+            return Response(
+                {"detail": "Analysis failed. Please try again."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    # ── Live Trip Activity Feed ───────────────────────────────────
+
+    @action(detail=True, methods=["get"])
+    def activity(self, request, pk=None):
+        """Return recent activity events for a live trip."""
+        trip = self.get_object()
+
+        # Get all members
+        member_users = trip.trip_members.filter(
+            is_active=True, user__isnull=False
+        ).select_related("user")
+        member_ids = list(member_users.values_list("user_id", flat=True))
+        user_map = {m.user_id: m.display_name for m in member_users}
+
+        # Get stop places
+        stops = trip.trip_stops.filter(is_active=True).select_related("place")
+        place_ids = [s.place_id for s in stops]
+
+        # Get visits at trip places by trip members
+        visits = (
+            VisitLog.objects.filter(
+                user_id__in=member_ids,
+                place_id__in=place_ids,
+                is_active=True,
+            )
+            .select_related("place")
+            .order_by("-visited_at")[:50]
+        )
+
+        # Get wines for those visits
+        visit_ids = [v.id for v in visits]
+        wines = (
+            VisitWine.objects.filter(visit_id__in=visit_ids, is_active=True)
+            .select_related("visit")
+            .order_by("-created_at")[:50]
+        )
+
+        # Build activity events
+        events = []
+
+        for v in visits:
+            events.append({
+                "type": "checkin",
+                "user_name": user_map.get(v.user_id, "Someone"),
+                "place_name": v.place.name if v.place else "Unknown",
+                "timestamp": v.visited_at.isoformat(),
+                "rating": v.rating_overall,
+                "notes": v.notes or "",
+            })
+
+        for w in wines:
+            events.append({
+                "type": "wine",
+                "user_name": user_map.get(w.visit.user_id, "Someone"),
+                "wine_name": w.display_name or w.wine_name or "a wine",
+                "wine_type": w.wine_type or "",
+                "timestamp": w.created_at.isoformat(),
+                "rating": w.rating,
+                "is_favorite": w.is_favorite,
+                "photo": w.photo or "",
+            })
+
+            if w.rating:
+                events.append({
+                    "type": "rating",
+                    "user_name": user_map.get(w.visit.user_id, "Someone"),
+                    "wine_name": w.display_name or w.wine_name or "a wine",
+                    "rating": w.rating,
+                    "timestamp": w.created_at.isoformat(),
+                })
+
+        # Sort by timestamp descending
+        events.sort(key=lambda e: e["timestamp"], reverse=True)
+
+        return Response({
+            "events": events[:30],
+            "total_events": len(events),
+        })

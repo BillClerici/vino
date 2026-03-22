@@ -20,6 +20,7 @@ import '../../../core/providers/lookup_provider.dart';
 import '../../../core/widgets/rating_stars.dart';
 import '../../help/help_launcher.dart';
 import '../providers/trips_provider.dart';
+import '../widgets/trip_stop_drawer.dart';
 
 class TripStopDetailScreen extends ConsumerStatefulWidget {
   final String tripId;
@@ -384,7 +385,7 @@ class _TripStopDetailScreenState extends ConsumerState<TripStopDetailScreen> {
   }
 }
 
-class _StopView extends StatelessWidget {
+class _StopView extends StatefulWidget {
   final Trip trip;
   final TripStop stop;
   final Place place;
@@ -432,10 +433,49 @@ class _StopView extends StatelessWidget {
   });
 
   @override
+  State<_StopView> createState() => _StopViewState();
+}
+
+class _StopViewState extends State<_StopView> {
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
+
+  // Convenience accessors
+  Trip get trip => widget.trip;
+  TripStop get stop => widget.stop;
+  Place get place => widget.place;
+  int get stopIndex => widget.stopIndex;
+  int get totalStops => widget.totalStops;
+  String get tripId => widget.tripId;
+  String? get visitId => widget.visitId;
+  bool get checkedIn => widget.checkedIn;
+  bool get checkingIn => widget.checkingIn;
+  Map<String, dynamic>? get existingVisitData => widget.existingVisitData;
+  bool get showMap => widget.showMap;
+  bool get isFavorited => widget.isFavorited;
+  VoidCallback get onToggleMap => widget.onToggleMap;
+  VoidCallback get onCheckIn => widget.onCheckIn;
+  VoidCallback get onToggleFavorite => widget.onToggleFavorite;
+  ValueChanged<int> get onNavigate => widget.onNavigate;
+  VoidCallback get onRemoveStop => widget.onRemoveStop;
+  VoidCallback get onEditStop => widget.onEditStop;
+  VoidCallback get onCompleteTrip => widget.onCompleteTrip;
+  VoidCallback get onUncheckIn => widget.onUncheckIn;
+  GlobalKey<_DrinksSectionState> get drinksSectionKey => widget.drinksSectionKey;
+
+  @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
+      key: _scaffoldKey,
+      endDrawer: TripStopDrawer(
+        trip: trip,
+        currentStopIndex: stopIndex,
+        onNavigate: onNavigate,
+        tripId: tripId,
+        onEditStop: onEditStop,
+        onDeleteStop: onRemoveStop,
+      ),
       body: CustomScrollView(
         slivers: [
           // ── Hero header with place image ──
@@ -504,17 +544,12 @@ class _StopView extends StatelessWidget {
                     ),
                   ),
                 ),
+              // Trip navigation drawer toggle
               IconButton(
-                icon: const Icon(Icons.edit),
-                tooltip: 'Edit Stop',
-                onPressed: onEditStop,
+                icon: const Icon(Icons.menu_open),
+                tooltip: 'Trip Stops',
+                onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
               ),
-              IconButton(
-                icon: const Icon(Icons.delete_outline),
-                tooltip: 'Delete Stop',
-                onPressed: onRemoveStop,
-              ),
-              helpButton(context, routePrefix: '/trips'),
             ],
             flexibleSpace: FlexibleSpaceBar(
               background: Stack(
@@ -719,6 +754,13 @@ class _StopView extends StatelessWidget {
                       existingNotes: (existingVisitData?['notes'] as String?) ?? '',
                     ),
                   ],
+
+                  // ── Activity Feed (shows what trip members are doing) ──
+                  if (checkedIn)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 24),
+                      child: _ActivityFeedSection(tripId: tripId),
+                    ),
 
                   const SizedBox(height: 60), // room for nav bar
                 ],
@@ -1189,6 +1231,170 @@ class _DrinksSectionState extends ConsumerState<_DrinksSection> {
   }
 }
 
+// ── Activity Feed Section ────────────────────────────────────────
+
+class _ActivityFeedSection extends ConsumerStatefulWidget {
+  final String tripId;
+  const _ActivityFeedSection({required this.tripId});
+
+  @override
+  ConsumerState<_ActivityFeedSection> createState() => _ActivityFeedSectionState();
+}
+
+class _ActivityFeedSectionState extends ConsumerState<_ActivityFeedSection> {
+  List<Map<String, dynamic>> _events = [];
+  bool _loading = true;
+  bool _expanded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchActivity();
+  }
+
+  Future<void> _fetchActivity() async {
+    try {
+      final api = ref.read(apiClientProvider);
+      final resp = await api.get(ApiPaths.tripActivity(widget.tripId));
+      final data = resp.data['data'] as Map<String, dynamic>? ?? resp.data as Map<String, dynamic>;
+      final events = (data['events'] as List?)
+              ?.map((e) => e as Map<String, dynamic>)
+              .toList() ??
+          [];
+      if (mounted) setState(() { _events = events; _loading = false; });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  String _eventText(Map<String, dynamic> event) {
+    final user = event['user_name'] as String? ?? 'Someone';
+    final type = event['type'] as String? ?? '';
+    switch (type) {
+      case 'checkin':
+        final place = event['place_name'] as String? ?? 'a place';
+        final rating = event['rating'];
+        return rating != null
+            ? '$user checked in at $place ($rating/5)'
+            : '$user checked in at $place';
+      case 'wine':
+        final wine = event['wine_name'] as String? ?? 'a wine';
+        final fav = event['is_favorite'] == true ? ' [fav]' : '';
+        final rating = event['rating'];
+        return rating != null
+            ? '$user tasted $wine$fav ($rating/5)'
+            : '$user tasted $wine$fav';
+      case 'rating':
+        final wine = event['wine_name'] as String? ?? 'a wine';
+        return '$user rated $wine ${event['rating']}/5';
+      default:
+        return '$user did something';
+    }
+  }
+
+  IconData _eventIcon(String type) {
+    switch (type) {
+      case 'checkin':
+        return Icons.location_on;
+      case 'wine':
+        return Icons.wine_bar;
+      case 'rating':
+        return Icons.star;
+      default:
+        return Icons.notifications;
+    }
+  }
+
+  Color _eventColor(String type) {
+    switch (type) {
+      case 'checkin':
+        return Colors.green;
+      case 'wine':
+        return Colors.purple;
+      case 'rating':
+        return Colors.amber;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _timeAgo(String timestamp) {
+    try {
+      final dt = DateTime.parse(timestamp);
+      final diff = DateTime.now().difference(dt);
+      if (diff.inMinutes < 1) return 'just now';
+      if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+      if (diff.inHours < 24) return '${diff.inHours}h ago';
+      return '${diff.inDays}d ago';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Column(
+        children: [
+          SizedBox(height: 8),
+          Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))),
+        ],
+      );
+    }
+
+    if (_events.isEmpty) return const SizedBox.shrink();
+
+    final displayEvents = _expanded ? _events : _events.take(5).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Flexible(
+              child: Text('Trip Activity', style: Theme.of(context).textTheme.titleMedium),
+            ),
+            IconButton(
+              onPressed: _fetchActivity,
+              icon: const Icon(Icons.refresh, size: 18),
+              tooltip: 'Refresh',
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ...displayEvents.map((event) {
+          final type = event['type'] as String? ?? '';
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 3),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(_eventIcon(type), size: 16, color: _eventColor(type)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _eventText(event),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+                Text(
+                  _timeAgo(event['timestamp'] as String? ?? ''),
+                  style: TextStyle(fontSize: 10, color: Colors.grey[500]),
+                ),
+              ],
+            ),
+          );
+        }),
+        if (_events.length > 5)
+          TextButton(
+            onPressed: () => setState(() => _expanded = !_expanded),
+            child: Text(_expanded ? 'Show less' : 'Show all (${_events.length})'),
+          ),
+      ],
+    );
+  }
+}
+
 // ── Drink Form Bottom Sheet (shared for Add & Edit) ─────────────
 
 class _DrinkFormSheet extends ConsumerStatefulWidget {
@@ -1232,6 +1438,7 @@ class _DrinkFormSheetState extends ConsumerState<_DrinkFormSheet> {
   late int? _purchasedQty;
   XFile? _pickedPhoto;
   String? _existingPhotoUrl;
+  bool _scanning = false;
 
   @override
   void initState() {
@@ -1277,6 +1484,78 @@ class _DrinkFormSheetState extends ConsumerState<_DrinkFormSheet> {
         _pickedPhoto = photo;
         _existingPhotoUrl = null;
       });
+    }
+  }
+
+  Future<void> _scanLabel() async {
+    final picker = ImagePicker();
+    final photo = await picker.pickImage(
+      source: ImageSource.camera,
+      maxWidth: 1200,
+      maxHeight: 1200,
+      imageQuality: 85,
+    );
+    if (photo == null || !mounted) return;
+
+    setState(() {
+      _scanning = true;
+      _pickedPhoto = photo;
+      _existingPhotoUrl = null;
+    });
+
+    try {
+      final api = ref.read(apiClientProvider);
+      final MultipartFile file;
+      if (kIsWeb) {
+        final bytes = await photo.readAsBytes();
+        file = MultipartFile.fromBytes(bytes, filename: 'label.jpg');
+      } else {
+        file = await MultipartFile.fromFile(photo.path, filename: 'label.jpg');
+      }
+      final formData = FormData.fromMap({'file': file});
+      final resp = await api.dio.post(
+        ApiPaths.scanLabel,
+        data: formData,
+        options: Options(contentType: 'multipart/form-data'),
+      );
+      final data = resp.data is Map
+          ? resp.data as Map<String, dynamic>
+          : <String, dynamic>{};
+      final nested = data['data'] as Map<String, dynamic>? ?? data;
+
+      if (mounted) {
+        final name = nested['name'] as String? ?? '';
+        final varietal = nested['varietal'] as String? ?? '';
+        final vintage = nested['vintage'] as String? ?? '';
+        final description = nested['description'] as String? ?? '';
+
+        setState(() {
+          if (name.isNotEmpty) _nameCtl.text = name;
+          if (varietal.isNotEmpty) _type = varietal;
+          if (description.isNotEmpty) _notesCtl.text = description;
+          _scanning = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(name.isNotEmpty
+                ? 'Found: $name${vintage.isNotEmpty ? " ($vintage)" : ""}'
+                : 'Could not read label clearly. Try again.'),
+            backgroundColor: name.isNotEmpty ? Colors.green : Colors.orange,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _scanning = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Scan failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -1440,6 +1719,28 @@ class _DrinkFormSheetState extends ConsumerState<_DrinkFormSheet> {
             ),
             const SizedBox(height: 12),
             Text(widget.title, style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 16),
+
+            // Scan Label button
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _scanning ? null : _scanLabel,
+                icon: _scanning
+                    ? const SizedBox(
+                        width: 16, height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.document_scanner),
+                label: Text(_scanning ? 'Scanning label...' : 'Scan Label with AI'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  side: BorderSide(
+                    color: Theme.of(context).colorScheme.secondary,
+                  ),
+                ),
+              ),
+            ),
             const SizedBox(height: 16),
 
             // Quick pick from menu

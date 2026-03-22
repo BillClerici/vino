@@ -1,5 +1,8 @@
+from datetime import datetime
+
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 from apps.core.models import BaseModel
 
@@ -36,6 +39,60 @@ class Trip(BaseModel):
     class Meta:
         db_table = "trips_trip"
         ordering = ["-scheduled_date"]
+
+    def should_auto_activate(self) -> bool:
+        """Check if this trip should be auto-transitioned to in_progress.
+
+        A trip auto-activates when:
+        - Status is draft, planning, or confirmed
+        - Has a scheduled_date that is today or earlier
+        - If meeting_time is set, it must have passed
+        """
+        if self.status not in (self.Status.DRAFT, self.Status.PLANNING, self.Status.CONFIRMED):
+            return False
+        if not self.scheduled_date:
+            return False
+
+        now = timezone.localtime()
+        today = now.date()
+
+        if self.scheduled_date > today:
+            return False
+
+        # If scheduled_date is in the past (before today), definitely activate
+        if self.scheduled_date < today:
+            return True
+
+        # scheduled_date is today — check meeting_time if set
+        if self.meeting_time:
+            return now.time() >= self.meeting_time
+
+        # No meeting time set, but it's the scheduled date — activate
+        return True
+
+    def auto_activate_if_ready(self) -> bool:
+        """Transition to in_progress if conditions are met. Returns True if activated."""
+        if self.should_auto_activate():
+            self.status = self.Status.IN_PROGRESS
+            self.save(update_fields=["status", "updated_at"])
+            return True
+        return False
+
+    @classmethod
+    def auto_activate_user_trips(cls, user) -> int:
+        """Check and activate all pending trips for a user. Returns count activated."""
+        pending_trips = cls.objects.filter(
+            members=user,
+            is_active=True,
+            status__in=[cls.Status.DRAFT, cls.Status.PLANNING, cls.Status.CONFIRMED],
+            scheduled_date__isnull=False,
+            scheduled_date__lte=timezone.localtime().date(),
+        )
+        count = 0
+        for trip in pending_trips:
+            if trip.auto_activate_if_ready():
+                count += 1
+        return count
 
     def __str__(self):
         return f"{self.name} ({self.get_status_display()})"
