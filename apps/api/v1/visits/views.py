@@ -3,7 +3,7 @@ import uuid
 from pathlib import Path
 
 from django.conf import settings
-from django.db.models import Count
+from django.db.models import Count, Max
 from PIL import Image
 from rest_framework import status
 from rest_framework.decorators import action
@@ -96,6 +96,65 @@ class VisitLogViewSet(ModelViewSet):
     def perform_destroy(self, instance):
         instance.is_active = False
         instance.save(update_fields=["is_active", "updated_at"])
+
+    @action(detail=False, methods=["get"], url_path="history-map")
+    def history_map(self, request):
+        """All visited places with visit count, last visit date, and last visit ID."""
+        places = (
+            VisitLog.objects.filter(user=request.user, is_active=True)
+            .values(
+                "place__id", "place__name", "place__place_type",
+                "place__city", "place__state",
+                "place__latitude", "place__longitude",
+                "place__image_url",
+                "place__address", "place__website", "place__phone",
+            )
+            .annotate(
+                visit_count=Count("id"),
+                last_visited=Max("visited_at"),
+            )
+            .filter(
+                place__latitude__isnull=False,
+                place__longitude__isnull=False,
+            )
+            .order_by("-last_visited")
+        )
+
+        results = []
+        for p in places:
+            # Get the last visit ID separately (can't MAX a UUID)
+            last_visit = (
+                VisitLog.objects.filter(
+                    user=request.user,
+                    place_id=p["place__id"],
+                    is_active=True,
+                )
+                .order_by("-visited_at")
+                .values_list("id", flat=True)
+                .first()
+            )
+
+            results.append({
+                "place_id": str(p["place__id"]),
+                "name": p["place__name"],
+                "place_type": p["place__place_type"],
+                "city": p["place__city"] or "",
+                "state": p["place__state"] or "",
+                "latitude": float(p["place__latitude"]),
+                "longitude": float(p["place__longitude"]),
+                "image_url": p["place__image_url"] or "",
+                "address": p["place__address"] or "",
+                "website": p["place__website"] or "",
+                "phone": p["place__phone"] or "",
+                "visit_count": p["visit_count"],
+                "last_visited": p["last_visited"].isoformat() if p["last_visited"] else None,
+                "last_visit_id": str(last_visit) if last_visit else None,
+            })
+
+        return Response({
+            "places": results,
+            "total_places": len(results),
+        })
 
     @action(detail=True, methods=["get", "post"], url_path="wines")
     def wines(self, request, pk=None):

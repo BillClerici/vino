@@ -17,6 +17,7 @@ import 'features/trips/screens/trip_create_screen.dart';
 import 'features/trips/screens/trip_detail_screen.dart';
 import 'features/profile/screens/badges_screen.dart';
 import 'features/profile/screens/cellar_screen.dart';
+import 'features/profile/screens/history_screen.dart';
 import 'features/trips/screens/trip_recap_screen.dart';
 import 'features/trips/screens/wishlist_screen.dart';
 import 'features/trips/screens/trip_stop_detail_screen.dart';
@@ -159,6 +160,10 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: 'badges',
                 builder: (_, __) => const BadgesScreen(),
+              ),
+              GoRoute(
+                path: 'history',
+                builder: (_, __) => const HistoryScreen(),
               ),
               GoRoute(
                 path: 'subscription',

@@ -46,6 +46,12 @@ class AppDrawer extends ConsumerWidget {
               onTap: (ctx) => ctx.go('/profile'),
             ),
             _DrawerItem(
+              icon: Icons.map,
+              label: 'Journey Map',
+              subtitle: 'Places you\'ve visited',
+              onTap: (ctx) => ctx.push('/profile/history'),
+            ),
+            _DrawerItem(
               icon: Icons.bookmark,
               label: 'My Wishlist',
               subtitle: 'Wines to try later',
