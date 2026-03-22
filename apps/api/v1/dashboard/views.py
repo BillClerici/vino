@@ -1,4 +1,4 @@
-from django.db.models import Avg, Count
+from django.db.models import Avg, Count, Q
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -44,7 +44,7 @@ class DashboardView(APIView):
             .prefetch_related("trip_stops__place")
             .annotate(
                 member_count=Count("trip_members", distinct=True),
-                stop_count=Count("trip_stops", distinct=True),
+                stop_count=Count("trip_stops", filter=Q(trip_stops__is_active=True), distinct=True),
             )
             .order_by("-created_at")[:10]
         )

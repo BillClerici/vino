@@ -1,6 +1,6 @@
 from datetime import date
 
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import action
@@ -36,7 +36,7 @@ class TripViewSet(ModelViewSet):
             members=self.request.user, is_active=True
         ).select_related("created_by").annotate(
             member_count=Count("trip_members", distinct=True),
-            stop_count=Count("trip_stops", distinct=True),
+            stop_count=Count("trip_stops", filter=Q(trip_stops__is_active=True), distinct=True),
         ).distinct()
 
         # Add active_stops and active_members for detail view

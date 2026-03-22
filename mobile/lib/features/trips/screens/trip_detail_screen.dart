@@ -77,12 +77,18 @@ class _TripDetailView extends ConsumerWidget {
             backgroundColor: colorScheme.primary,
             foregroundColor: Colors.white,
             actions: [
-              if (_isOrganizer)
+              if (_isOrganizer) ...[
                 IconButton(
                   icon: const Icon(Icons.edit),
                   tooltip: 'Edit Trip',
                   onPressed: () => _showEditTripSheet(context, ref),
                 ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline),
+                  tooltip: 'Delete Trip',
+                  onPressed: () => _confirmDeleteTrip(context, ref),
+                ),
+              ],
             ],
             flexibleSpace: FlexibleSpaceBar(
               background: Stack(
@@ -332,6 +338,52 @@ class _TripDetailView extends ConsumerWidget {
   }
 
   // ── Edit Trip ─────────────────────────────────────────────────
+
+  Future<void> _confirmDeleteTrip(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Trip?'),
+        content: Text(
+          'Are you sure you want to delete "${trip.name}"? This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      final api = ref.read(apiClientProvider);
+      await api.delete('${ApiPaths.trips}$tripId/');
+      ref.invalidate(tripsProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Trip deleted'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+        context.go('/trips');
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
 
   Future<void> _showEditTripSheet(BuildContext context, WidgetRef ref) async {
     final result = await showModalBottomSheet<bool>(
@@ -898,11 +950,12 @@ class _AddStopScreenState extends ConsumerState<_AddStopScreen> {
   Set<Marker> _markers = {};
   GoogleMapController? _mapController;
   Timer? _mapIdleTimer;
+  bool _initialSearchDone = false;
 
   @override
   void initState() {
     super.initState();
-    _search();
+    _search(fitMap: false);
   }
 
   @override
@@ -912,7 +965,7 @@ class _AddStopScreenState extends ConsumerState<_AddStopScreen> {
     super.dispose();
   }
 
-  Future<void> _search() async {
+  Future<void> _search({bool fitMap = true}) async {
     setState(() => _loading = true);
     try {
       final query = _searchCtl.text.isNotEmpty
@@ -924,9 +977,10 @@ class _AddStopScreenState extends ConsumerState<_AddStopScreen> {
         _loading = false;
         _buildMarkers();
       });
-      if (_markers.isNotEmpty && _mapController != null) {
+      if (fitMap && _markers.isNotEmpty && _mapController != null) {
         Future.delayed(const Duration(milliseconds: 200), _fitBounds);
       }
+      _initialSearchDone = true;
     } catch (_) {
       setState(() => _loading = false);
     }
@@ -968,6 +1022,8 @@ class _AddStopScreenState extends ConsumerState<_AddStopScreen> {
   }
 
   void _onCameraIdle() {
+    // Don't trigger nearby search until the initial search has completed
+    if (!_initialSearchDone) return;
     _mapIdleTimer?.cancel();
     _mapIdleTimer = Timer(const Duration(milliseconds: 800), () {
       if (_searchCtl.text.isEmpty) {
@@ -1219,10 +1275,6 @@ class _AddStopScreenState extends ConsumerState<_AddStopScreen> {
                   zoomControlsEnabled: true,
                   onMapCreated: (c) {
                     _mapController = c;
-                    if (_markers.isNotEmpty) {
-                      Future.delayed(
-                          const Duration(milliseconds: 400), _fitBounds);
-                    }
                   },
                   onCameraIdle: _onCameraIdle,
                   onTap: (_) {

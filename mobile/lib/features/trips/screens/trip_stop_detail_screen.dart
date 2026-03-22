@@ -348,6 +348,9 @@ class _TripStopDetailScreenState extends ConsumerState<TripStopDetailScreen> {
         '${ApiPaths.trips}${widget.tripId}/stops/${stop.id}/',
       );
       if (mounted) {
+        // Hide the map first to prevent Google Maps iframe from
+        // intercepting the navigation on web
+        setState(() => _showMap = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('${stop.place?.name ?? "Stop"} removed'),
@@ -355,9 +358,17 @@ class _TripStopDetailScreenState extends ConsumerState<TripStopDetailScreen> {
             duration: const Duration(seconds: 2),
           ),
         );
-        // Go back to trip detail and refresh
         ref.invalidate(tripDetailProvider(widget.tripId));
-        context.go('/trips/${widget.tripId}');
+        // Defer navigation to next frame so the map widget is fully disposed
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/trips/${widget.tripId}');
+            }
+          }
+        });
       }
     } catch (e) {
       if (mounted) {
@@ -496,6 +507,11 @@ class _StopView extends StatelessWidget {
                 icon: const Icon(Icons.edit),
                 tooltip: 'Edit Stop',
                 onPressed: onEditStop,
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline),
+                tooltip: 'Delete Stop',
+                onPressed: onRemoveStop,
               ),
             ],
             flexibleSpace: FlexibleSpaceBar(
@@ -641,8 +657,10 @@ class _StopView extends StatelessWidget {
                         place.zipCode,
                       ].where((s) => s.isNotEmpty).join(', '),
                       onTap: place.latitude != null && place.longitude != null
-                          ? () => launchUrl(Uri.parse(
-                              'https://www.google.com/maps/search/?api=1&query=${place.latitude},${place.longitude}'))
+                          ? () => launchUrl(
+                              Uri.parse('https://www.google.com/maps/search/?api=1&query=${place.latitude},${place.longitude}'),
+                              mode: LaunchMode.externalApplication,
+                            )
                           : null,
                     ),
                   if (place.phone.isNotEmpty)
@@ -700,7 +718,7 @@ class _StopView extends StatelessWidget {
                     ),
                   ],
 
-                  const SizedBox(height: 100), // room for nav bar
+                  const SizedBox(height: 60), // room for nav bar
                 ],
               ),
             ),
@@ -710,7 +728,7 @@ class _StopView extends StatelessWidget {
 
       // ── Bottom Prev/Next Navigation ──
       bottomNavigationBar: Container(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
         decoration: BoxDecoration(
           color: Theme.of(context).scaffoldBackgroundColor,
           boxShadow: [
@@ -722,14 +740,6 @@ class _StopView extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // Remove stop button
-            IconButton(
-              onPressed: onRemoveStop,
-              icon: const Icon(Icons.delete_outline),
-              tooltip: 'Remove Stop',
-              color: Colors.red,
-            ),
-            const SizedBox(width: 4),
             if (stopIndex > 0)
               Expanded(
                 child: OutlinedButton.icon(
