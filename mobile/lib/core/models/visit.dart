@@ -57,6 +57,7 @@ class VisitWine {
   final bool isFavorite;
   final String tastingNotes;
   final int? rating;
+  final String ratingComments;
   final String photo;
   final bool purchased;
   final String displayName;
@@ -73,6 +74,7 @@ class VisitWine {
     this.isFavorite = false,
     this.tastingNotes = '',
     this.rating,
+    this.ratingComments = '',
     this.photo = '',
     this.purchased = false,
     this.displayName = '',
@@ -91,6 +93,7 @@ class VisitWine {
       isFavorite: json['is_favorite'] as bool? ?? false,
       tastingNotes: json['tasting_notes'] as String? ?? '',
       rating: json['rating'] as int?,
+      ratingComments: json['rating_comments'] as String? ?? '',
       photo: json['photo'] as String? ?? '',
       purchased: json['purchased'] as bool? ?? false,
       displayName: json['display_name'] as String? ?? '',

@@ -831,6 +831,7 @@ class _DrinksSectionState extends ConsumerState<_DrinksSection> {
         'serving_type': wine['serving_type'] ?? '',
         'rating': wine['rating'],
         'tasting_notes': wine['tasting_notes'] ?? '',
+        'rating_comments': wine['rating_comments'] ?? '',
         'is_favorite': wine['is_favorite'] ?? false,
         'purchased': wine['purchased'] ?? false,
         'purchased_price': wine['purchased_price'],
@@ -1079,6 +1080,7 @@ class _DrinkFormSheetState extends ConsumerState<_DrinkFormSheet> {
 
   late final TextEditingController _nameCtl;
   late final TextEditingController _notesCtl;
+  late final TextEditingController _ratingCommentsCtl;
   late final TextEditingController _priceCtl;
   late String _type;
   late String _serving;
@@ -1093,11 +1095,13 @@ class _DrinkFormSheetState extends ConsumerState<_DrinkFormSheet> {
     final d = widget.initial ?? {};
     _nameCtl = TextEditingController(text: d['wine_name'] as String? ?? '');
     _notesCtl = TextEditingController(text: d['tasting_notes'] as String? ?? '');
+    _ratingCommentsCtl = TextEditingController(text: d['rating_comments'] as String? ?? '');
     _priceCtl = TextEditingController(
       text: d['purchased_price'] != null ? '${d['purchased_price']}' : '',
     );
-    _type = (d['wine_type'] as String?) ?? 'Red';
-    if (_type.isEmpty) _type = 'Red';
+    final defaultType = widget.placeType == 'brewery' ? 'Lager' : 'Red';
+    _type = (d['wine_type'] as String?) ?? defaultType;
+    if (_type.isEmpty) _type = defaultType;
     _serving = _toLabel((d['serving_type'] as String?) ?? 'tasting');
     _rating = d['rating'] as int?;
     _isFavorite = d['is_favorite'] as bool? ?? false;
@@ -1109,6 +1113,7 @@ class _DrinkFormSheetState extends ConsumerState<_DrinkFormSheet> {
   void dispose() {
     _nameCtl.dispose();
     _notesCtl.dispose();
+    _ratingCommentsCtl.dispose();
     _priceCtl.dispose();
     super.dispose();
   }
@@ -1126,6 +1131,7 @@ class _DrinkFormSheetState extends ConsumerState<_DrinkFormSheet> {
       'serving_type': _serving.toLowerCase().replaceAll(' ', '_'),
       'tasting_notes': _notesCtl.text,
       'rating': _rating,
+      'rating_comments': _ratingCommentsCtl.text,
       'is_favorite': _isFavorite,
       'purchased': _purchased,
       'purchased_quantity': _purchased ? (_purchasedQty ?? 1) : null,
@@ -1244,6 +1250,17 @@ class _DrinkFormSheetState extends ConsumerState<_DrinkFormSheet> {
             ),
             const SizedBox(height: 12),
 
+            // Rating comments
+            TextField(
+              controller: _ratingCommentsCtl,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                labelText: 'Rating Comments',
+                hintText: 'What did you like or dislike?',
+              ),
+            ),
+            const SizedBox(height: 12),
+
             // Rating
             Row(
               children: [
@@ -1278,7 +1295,7 @@ class _DrinkFormSheetState extends ConsumerState<_DrinkFormSheet> {
 
             // Purchased toggle + details
             SwitchListTile(
-              title: const Text('Bought a bottle?'),
+              title: Text(widget.placeType == 'brewery' ? 'Bought to go?' : 'Bought a bottle?'),
               secondary: const Icon(Icons.shopping_bag),
               value: _purchased,
               onChanged: (v) => setState(() => _purchased = v),
@@ -1754,6 +1771,7 @@ class _DrinkCardState extends State<_DrinkCard> {
     final serving = d['serving_type'] as String? ?? '';
     final rating = d['rating'] as int?;
     final notes = d['tasting_notes'] as String? ?? '';
+    final ratingComments = d['rating_comments'] as String? ?? '';
     final isFavorite = d['is_favorite'] as bool? ?? false;
     final purchased = d['purchased'] as bool? ?? false;
     final price = d['purchased_price'];
@@ -1810,24 +1828,9 @@ class _DrinkCardState extends State<_DrinkCard> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(name,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.w600)),
-                            ),
-                            if (isFavorite)
-                              const Icon(Icons.favorite,
-                                  color: Colors.red, size: 16),
-                            if (purchased)
-                              const Padding(
-                                padding: EdgeInsets.only(left: 4),
-                                child: Icon(Icons.shopping_bag,
-                                    color: Colors.green, size: 16),
-                              ),
-                          ],
-                        ),
+                        Text(name,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w600)),
                         Text(
                           [type, serving, if (rating != null) '$rating/5']
                               .where((s) => s.isNotEmpty)
@@ -1837,6 +1840,16 @@ class _DrinkCardState extends State<_DrinkCard> {
                       ],
                     ),
                   ),
+                  if (isFavorite)
+                    const Icon(Icons.favorite,
+                        color: Colors.red, size: 16),
+                  if (purchased)
+                    const Padding(
+                      padding: EdgeInsets.only(left: 4),
+                      child: Icon(Icons.shopping_bag,
+                          color: Colors.green, size: 16),
+                    ),
+                  const SizedBox(width: 8),
                   Icon(
                     _expanded ? Icons.expand_less : Icons.expand_more,
                     color: Colors.grey,
@@ -1875,20 +1888,6 @@ class _DrinkCardState extends State<_DrinkCard> {
                 ),
                 const SizedBox(height: 12),
 
-                // Rating
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('RATING', style: labelStyle),
-                    const SizedBox(height: 4),
-                    rating != null
-                        ? RatingStars(rating: rating, size: 20)
-                        : const Text('Not rated',
-                            style: TextStyle(color: Colors.grey)),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
                 // Tasting notes
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1903,9 +1902,32 @@ class _DrinkCardState extends State<_DrinkCard> {
                 ),
                 const SizedBox(height: 12),
 
-                // Favorite
+                // Rating comments
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('RATING COMMENTS', style: labelStyle),
+                    const SizedBox(height: 4),
+                    Text(
+                        ratingComments.isNotEmpty
+                            ? ratingComments
+                            : 'No comments',
+                        style: TextStyle(
+                            color: ratingComments.isEmpty
+                                ? Colors.grey
+                                : null)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Rating & Favorite
                 Row(
                   children: [
+                    rating != null
+                        ? RatingStars(rating: rating, size: 20)
+                        : const Text('Not rated',
+                            style: TextStyle(color: Colors.grey)),
+                    const Spacer(),
                     Icon(
                       isFavorite ? Icons.favorite : Icons.favorite_border,
                       size: 18,

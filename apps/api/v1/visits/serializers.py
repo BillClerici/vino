@@ -14,9 +14,9 @@ class VisitWineSerializer(serializers.ModelSerializer):
         fields = [
             "id", "menu_item", "menu_item_name", "wine_name", "wine_type",
             "wine_vintage", "serving_type", "quantity", "is_favorite",
-            "tasting_notes", "rating", "photo", "purchased",
-            "purchased_quantity", "purchased_price", "purchased_notes",
-            "display_name", "created_at",
+            "tasting_notes", "rating", "rating_comments", "photo",
+            "purchased", "purchased_quantity", "purchased_price",
+            "purchased_notes", "display_name", "created_at",
         ]
         read_only_fields = ["id", "display_name", "created_at"]
 
@@ -32,8 +32,8 @@ class VisitWineWriteSerializer(serializers.ModelSerializer):
         fields = [
             "menu_item", "wine_name", "wine_type", "wine_vintage",
             "serving_type", "quantity", "is_favorite", "tasting_notes",
-            "rating", "photo", "purchased", "purchased_quantity",
-            "purchased_price", "purchased_notes",
+            "rating", "rating_comments", "photo", "purchased",
+            "purchased_quantity", "purchased_price", "purchased_notes",
         ]
 
 

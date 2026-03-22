@@ -66,6 +66,7 @@ class VisitWine(BaseModel):
         validators=[MinValueValidator(1), MaxValueValidator(5)],
         null=True, blank=True,
     )
+    rating_comments = models.TextField(blank=True)
 
     # Photo
     photo = models.TextField(blank=True, help_text="Photo URL or base64 data URI")
