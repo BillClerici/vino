@@ -40,6 +40,7 @@ class _TripStopDetailScreenState extends ConsumerState<TripStopDetailScreen> {
   bool _checkedExisting = false;
   bool _showMap = true;
   Map<String, dynamic>? _existingVisitData;
+  final _drinksSectionKey = GlobalKey<_DrinksSectionState>();
 
   @override
   void initState() {
@@ -163,6 +164,7 @@ class _TripStopDetailScreenState extends ConsumerState<TripStopDetailScreen> {
           onRemoveStop: () => _removeStop(stop),
           onEditStop: () => _editStop(stop),
           onCompleteTrip: _completeTrip,
+          drinksSectionKey: _drinksSectionKey,
         );
       },
     );
@@ -359,6 +361,7 @@ class _StopView extends StatelessWidget {
   final VoidCallback onRemoveStop;
   final VoidCallback onEditStop;
   final VoidCallback onCompleteTrip;
+  final GlobalKey<_DrinksSectionState> drinksSectionKey;
 
   const _StopView({
     required this.trip,
@@ -380,6 +383,7 @@ class _StopView extends StatelessWidget {
     required this.onRemoveStop,
     required this.onEditStop,
     required this.onCompleteTrip,
+    required this.drinksSectionKey,
   });
 
   @override
@@ -593,12 +597,18 @@ class _StopView extends StatelessWidget {
 
                   // ── Drink Menu (always available for planning) ──
                   const SizedBox(height: 24),
-                  _DrinkMenuSection(place: place),
+                  _DrinkMenuSection(
+                    place: place,
+                    onSelectItem: (checkedIn && visitId != null)
+                        ? (item) => drinksSectionKey.currentState?.addFromMenu(item)
+                        : null,
+                  ),
 
                   // ── My Drinks (only after check-in during live trip) ──
                   if (checkedIn && visitId != null) ...[
                     const SizedBox(height: 24),
                     _DrinksSection(
+                      key: drinksSectionKey,
                       tripId: tripId,
                       visitId: visitId!,
                       place: place,
@@ -794,6 +804,7 @@ class _DrinksSection extends ConsumerStatefulWidget {
   final List<dynamic> existingWines;
   final String placeType;
   const _DrinksSection({
+    super.key,
     required this.tripId,
     required this.visitId,
     required this.place,
@@ -930,7 +941,7 @@ class _DrinksSectionState extends ConsumerState<_DrinksSection> {
     }
   }
 
-  Future<void> _addFromMenu(Map<String, dynamic> menuItem) async {
+  Future<void> addFromMenu(Map<String, dynamic> menuItem) async {
     // Pre-fill the drink form with menu item data
     final prefill = <String, dynamic>{
       'wine_name': menuItem['name'] ?? '',
@@ -1548,7 +1559,8 @@ class _RatingRow extends StatelessWidget {
 
 class _DrinkMenuSection extends ConsumerStatefulWidget {
   final Place place;
-  const _DrinkMenuSection({required this.place});
+  final ValueChanged<Map<String, dynamic>>? onSelectItem;
+  const _DrinkMenuSection({required this.place, this.onSelectItem});
 
   @override
   ConsumerState<_DrinkMenuSection> createState() => _DrinkMenuSectionState();
@@ -1695,7 +1707,9 @@ class _DrinkMenuSectionState extends ConsumerState<_DrinkMenuSection> {
                 separatorBuilder: (_, __) => const SizedBox(width: 8),
                 itemBuilder: (_, i) {
                   final item = _menuItems![i];
-                  return _MenuItemCard(item: item, onSelect: () {});
+                  return _MenuItemCard(item: item, onSelect: () {
+                    widget.onSelectItem?.call(item);
+                  });
                 },
               ),
             ),
