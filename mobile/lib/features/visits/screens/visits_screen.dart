@@ -135,10 +135,6 @@ class _VisitsScreenState extends ConsumerState<VisitsScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => context.push('/visits/checkin'),
-        child: const Icon(Icons.add),
-      ),
     );
   }
 }

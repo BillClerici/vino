@@ -146,6 +146,7 @@ class _PlaceMapTabState extends ConsumerState<_PlaceMapTab>
   bool _loading = false;
   Set<Marker> _markers = {};
   Timer? _mapIdleTimer;
+  bool _initialSearchDone = false;
 
   @override
   bool get wantKeepAlive => true;
@@ -153,7 +154,7 @@ class _PlaceMapTabState extends ConsumerState<_PlaceMapTab>
   @override
   void initState() {
     super.initState();
-    _search();
+    _search(fitMap: false);
   }
 
   @override
@@ -163,7 +164,7 @@ class _PlaceMapTabState extends ConsumerState<_PlaceMapTab>
     super.dispose();
   }
 
-  Future<void> _search() async {
+  Future<void> _search({bool fitMap = true}) async {
     setState(() => _loading = true);
     try {
       final query = _searchCtl.text.isNotEmpty
@@ -175,9 +176,10 @@ class _PlaceMapTabState extends ConsumerState<_PlaceMapTab>
         _loading = false;
         _buildMarkers();
       });
-      if (_markers.isNotEmpty && _mapController != null) {
+      if (fitMap && _markers.isNotEmpty && _mapController != null) {
         Future.delayed(const Duration(milliseconds: 200), _fitBounds);
       }
+      _initialSearchDone = true;
     } catch (_) {
       setState(() => _loading = false);
     }
@@ -217,6 +219,7 @@ class _PlaceMapTabState extends ConsumerState<_PlaceMapTab>
   }
 
   void _onCameraIdle() {
+    if (!_initialSearchDone) return;
     _mapIdleTimer?.cancel();
     _mapIdleTimer = Timer(const Duration(milliseconds: 800), () {
       if (_searchCtl.text.isEmpty) _searchNearby();
@@ -421,10 +424,6 @@ class _PlaceMapTabState extends ConsumerState<_PlaceMapTab>
                 zoomControlsEnabled: true,
                 onMapCreated: (c) {
                   _mapController = c;
-                  if (_markers.isNotEmpty) {
-                    Future.delayed(
-                        const Duration(milliseconds: 400), _fitBounds);
-                  }
                 },
                 onCameraIdle: _onCameraIdle,
                 onTap: (_) {
