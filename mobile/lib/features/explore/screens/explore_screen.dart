@@ -8,6 +8,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../../config/constants.dart';
 import '../../../config/env.dart';
 import '../../../core/api/api_client.dart';
+import '../../../core/widgets/app_drawer.dart';
 import '../../../core/models/place.dart';
 import '../../../core/services/google_places_service.dart';
 import '../../../core/services/trip_service.dart';
@@ -43,6 +44,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      drawer: const AppDrawer(),
       appBar: AppBar(
         title: const Text('Explore'),
         actions: [helpButton(context, routePrefix: '/explore')],

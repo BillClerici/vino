@@ -1,3 +1,5 @@
+import 'dart:ui' show PointerDeviceKind;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -61,22 +63,34 @@ class _HelpIndexScreenState extends ConsumerState<HelpIndexScreen>
       appBar: AppBar(
         title: const Text('Help & Guide'),
         bottom: _searchQuery.isEmpty
-            ? TabBar(
-                controller: _tabCtl,
-                isScrollable: true,
-                tabAlignment: TabAlignment.start,
-                tabs: _categories
-                    .map((c) => Tab(
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(c.icon, size: 16),
-                              const SizedBox(width: 6),
-                              Text(c.label),
-                            ],
-                          ),
-                        ))
-                    .toList(),
+            ? PreferredSize(
+                preferredSize: const Size.fromHeight(kTextTabBarHeight),
+                child: ScrollConfiguration(
+                  behavior: ScrollConfiguration.of(context).copyWith(
+                    dragDevices: {
+                      PointerDeviceKind.touch,
+                      PointerDeviceKind.mouse,
+                      PointerDeviceKind.trackpad,
+                    },
+                  ),
+                  child: TabBar(
+                    controller: _tabCtl,
+                    isScrollable: true,
+                    tabAlignment: TabAlignment.start,
+                    tabs: _categories
+                        .map((c) => Tab(
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(c.icon, size: 16),
+                                  const SizedBox(width: 6),
+                                  Text(c.label),
+                                ],
+                              ),
+                            ))
+                        .toList(),
+                  ),
+                ),
               )
             : null,
       ),

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/widgets/app_drawer.dart';
 import '../../help/help_launcher.dart';
 
 import '../../../core/models/place.dart';
@@ -29,6 +30,7 @@ class DashboardScreen extends ConsumerWidget {
     final dashboard = ref.watch(dashboardProvider);
 
     return Scaffold(
+      drawer: const AppDrawer(),
       appBar: AppBar(
         title: const Text('Trip Me'),
         actions: [helpButton(context, routePrefix: '/dashboard')],

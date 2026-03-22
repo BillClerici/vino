@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/models/visit.dart';
+import '../../../core/widgets/app_drawer.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/rating_stars.dart';
 import '../../../core/widgets/search_bar.dart';
@@ -42,6 +43,7 @@ class _VisitsScreenState extends ConsumerState<VisitsScreen> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
+      drawer: const AppDrawer(),
       appBar: AppBar(
         title: const Text('My Visits'),
         actions: [helpButton(context, routePrefix: '/visits')],

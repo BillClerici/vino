@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/auth/auth_provider.dart';
+import '../../../core/widgets/app_drawer.dart';
 import '../../help/help_launcher.dart';
 import '../providers/profile_provider.dart';
 
@@ -15,6 +16,7 @@ class ProfileScreen extends ConsumerWidget {
     final statsState = ref.watch(userStatsProvider);
 
     return Scaffold(
+      drawer: const AppDrawer(),
       appBar: AppBar(
         title: const Text('Profile'),
         actions: [helpButton(context, routePrefix: '/profile')],
