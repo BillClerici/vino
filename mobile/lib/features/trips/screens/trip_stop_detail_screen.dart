@@ -20,6 +20,7 @@ import '../../../core/providers/lookup_provider.dart';
 import '../../../core/widgets/rating_stars.dart';
 import '../../help/help_launcher.dart';
 import '../providers/trips_provider.dart';
+import '../widgets/sippy_chat.dart';
 import '../widgets/trip_stop_drawer.dart';
 
 class TripStopDetailScreen extends ConsumerStatefulWidget {
@@ -475,6 +476,11 @@ class _StopViewState extends State<_StopView> {
         tripId: tripId,
         onEditStop: onEditStop,
         onDeleteStop: onRemoveStop,
+      ),
+      floatingActionButton: FloatingActionButton.small(
+        onPressed: () => openSippyChat(context, tripId),
+        tooltip: 'Ask Sippy',
+        child: const Text('S', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
       ),
       body: CustomScrollView(
         slivers: [

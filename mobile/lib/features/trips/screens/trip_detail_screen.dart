@@ -15,6 +15,7 @@ import '../../../core/models/trip.dart';
 import '../../../core/services/google_places_service.dart';
 import '../../help/help_launcher.dart';
 import '../providers/trips_provider.dart';
+import '../widgets/sippy_chat.dart';
 import '../widgets/trip_stop_drawer.dart';
 import 'trip_recap_screen.dart';
 
@@ -88,6 +89,11 @@ class _TripDetailViewState extends ConsumerState<_TripDetailView> {
         onShowRoute: () => Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => _TripRouteMapScreen(trip: trip)),
         ),
+      ),
+      floatingActionButton: FloatingActionButton.small(
+        onPressed: () => openSippyChat(context, tripId),
+        tooltip: 'Ask Sippy',
+        child: const Text('S', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
       ),
       body: CustomScrollView(
         slivers: [

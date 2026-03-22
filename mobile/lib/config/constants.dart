@@ -37,6 +37,9 @@ class ApiPaths {
   /// Live trip activity feed: GET /api/v1/trips/{tripId}/activity/
   static String tripActivity(String tripId) =>
       '/api/v1/trips/$tripId/activity/';
+
+  /// Ask Sippy (trip-aware AI chat): POST /api/v1/trips/{tripId}/chat/
+  static String tripChat(String tripId) => '/api/v1/trips/$tripId/chat/';
 }
 
 class StorageKeys {

@@ -641,3 +641,142 @@ GROUP MEMBERS:
             "events": events[:30],
             "total_events": len(events),
         })
+
+    # ── Ask Sippy (Trip-aware AI Chat) ────────────────────────────
+
+    @action(detail=True, methods=["post"])
+    def chat(self, request, pk=None):
+        """Chat with Sippy, the trip-aware AI assistant."""
+        import json
+        import logging
+
+        logger = logging.getLogger(__name__)
+        trip = self.get_object()
+
+        user_message = request.data.get("message", "").strip()
+        if not user_message:
+            return Response(
+                {"detail": "Message is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Build rich trip context
+        stops = trip.trip_stops.filter(is_active=True).select_related("place").order_by("order")
+        members = trip.trip_members.filter(is_active=True).select_related("user")
+
+        context_lines = [f"## Trip: {trip.name}"]
+        context_lines.append(f"Status: {trip.status}")
+        if trip.scheduled_date:
+            context_lines.append(f"Date: {trip.scheduled_date}")
+        if trip.meeting_time:
+            context_lines.append(f"Meeting time: {trip.meeting_time}")
+        if trip.meeting_location:
+            context_lines.append(f"Meeting location: {trip.meeting_location}")
+        if trip.description:
+            context_lines.append(f"Description: {trip.description}")
+        if trip.notes:
+            context_lines.append(f"Notes: {trip.notes}")
+
+        context_lines.append(f"\n## Members ({members.count()})")
+        for m in members:
+            context_lines.append(f"- {m.display_name} ({m.role}, RSVP: {m.rsvp_status})")
+
+        context_lines.append(f"\n## Stops ({stops.count()})")
+        for stop in stops:
+            place = stop.place
+            context_lines.append(f"\n### Stop {stop.order + 1}: {place.name}")
+            context_lines.append(f"Type: {place.place_type}")
+            if place.city:
+                context_lines.append(f"Location: {place.city}, {place.state or ''}")
+            if place.address:
+                context_lines.append(f"Address: {place.address}")
+            if place.website:
+                context_lines.append(f"Website: {place.website}")
+            if place.phone:
+                context_lines.append(f"Phone: {place.phone}")
+            if place.description:
+                context_lines.append(f"About: {place.description}")
+            if stop.arrival_time:
+                context_lines.append(f"Arrival: {stop.arrival_time}")
+            if stop.duration_minutes:
+                context_lines.append(f"Duration: {stop.duration_minutes} min")
+            if stop.travel_minutes:
+                context_lines.append(f"Drive from previous: {stop.travel_minutes} min, {stop.travel_miles} mi")
+            if stop.notes:
+                context_lines.append(f"Stop notes: {stop.notes}")
+
+            # Menu items for this place
+            menu_items = place.menu_items.filter(is_active=True)[:20]
+            if menu_items:
+                context_lines.append("Menu:")
+                for item in menu_items:
+                    price = f" ${item.price}" if item.price else ""
+                    vintage = f" ({item.vintage})" if item.vintage else ""
+                    context_lines.append(f"  - {item.name} — {item.varietal}{vintage}{price}")
+
+        # User's palate profile
+        profile = PalateProfile.objects.filter(user=request.user).first()
+        if profile and profile.preferences:
+            context_lines.append("\n## Your Palate Profile")
+            context_lines.append(json.dumps(profile.preferences, indent=2))
+
+        # Recent visits at these places
+        place_ids = [s.place_id for s in stops]
+        recent_visits = VisitLog.objects.filter(
+            user=request.user, place_id__in=place_ids, is_active=True
+        ).select_related("place").order_by("-visited_at")[:10]
+        if recent_visits:
+            context_lines.append("\n## Your Past Visits at These Places")
+            for v in recent_visits:
+                context_lines.append(
+                    f"- {v.place.name} ({v.visited_at:%Y-%m-%d}): "
+                    f"overall={v.rating_overall}/5"
+                    f"{f' — {v.notes}' if v.notes else ''}"
+                )
+
+        trip_context = "\n".join(context_lines)
+
+        system_prompt = """You are Sippy, a friendly and knowledgeable AI trip assistant for a wine, beer, and food tasting app called Vino. You have full knowledge of the user's trip, including all stops, places, menus, members, and their palate profile.
+
+You can help with:
+- Recommending what to order at each stop based on their palate
+- Suggesting an order to visit stops for the best experience
+- Answering questions about the places, their menus, and varietals
+- Tips for making the most of each stop
+- Food and wine pairing suggestions
+- General wine/beer knowledge and tasting advice
+- Trip logistics (drive times, timing, etc.)
+
+Keep responses conversational, warm, and concise (2-4 sentences unless more detail is asked for). Use the trip data to personalize every answer. If they ask about something unrelated to the trip or wine/beer/food, gently redirect.
+
+""" + trip_context
+
+        try:
+            from apps.api.ai_utils import get_claude
+            from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+
+            llm = get_claude()
+            messages = [SystemMessage(content=system_prompt)]
+
+            # Include conversation history if provided
+            chat_history = request.data.get("history", [])
+            if chat_history:
+                for msg in chat_history[-10:]:
+                    role = msg.get("role", "")
+                    content = msg.get("content", "")
+                    if role == "user":
+                        messages.append(HumanMessage(content=content))
+                    elif role == "assistant":
+                        messages.append(AIMessage(content=content))
+
+            messages.append(HumanMessage(content=user_message))
+
+            response = llm.invoke(messages)
+            return Response({"reply": response.content})
+
+        except Exception:
+            logger.exception("Sippy chat failed")
+            return Response(
+                {"detail": "Sippy is taking a sip break. Try again!"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
