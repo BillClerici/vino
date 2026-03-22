@@ -7,8 +7,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+
 import '../../../config/constants.dart';
 import '../../../core/api/api_client.dart';
+import '../../dashboard/providers/dashboard_provider.dart';
+import '../providers/trips_provider.dart';
 import 'sippy_history.dart';
 
 /// Opens the Sippy Trip Planner chat as a full-screen modal.
@@ -21,10 +25,7 @@ void openSippyPlanner(BuildContext context, {String? conversationId}) {
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
-    builder: (_) => ProviderScope(
-      parent: ProviderScope.containerOf(context),
-      child: _SippyPlannerChat(conversationId: conversationId),
-    ),
+    builder: (_) => _SippyPlannerChat(conversationId: conversationId),
   );
 }
 
@@ -39,6 +40,7 @@ class _SippyPlannerChat extends ConsumerStatefulWidget {
 class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
+  final _inputFocusNode = FocusNode();
   final List<Map<String, String>> _messages = [];
   bool _sending = false;
   bool _loadingHistory = false;
@@ -58,11 +60,8 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
       _loadConversation();
     } else {
       _messages.add({
-        'role': 'assistant',
-        'content':
-            "Hey, I'm Sippy! Let's plan an amazing trip. "
-                "Tell me where, when, and what you're in the mood for — "
-                "the more detail you give me upfront, the faster we'll get rolling!",
+        'role': 'welcome',
+        'content': '',  // rendered by _WelcomeCard, content ignored
       });
     }
   }
@@ -111,6 +110,7 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
   void dispose() {
     _controller.dispose();
     _scrollController.dispose();
+    _inputFocusNode.dispose();
     super.dispose();
   }
 
@@ -199,11 +199,20 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
           }
           _sessionId = sessionId;
           _phase = phase;
-          _proposedTrip = proposedTrip ?? _proposedTrip;
+          if (phase == 'gathering' || phase == 'rejected') {
+            _proposedTrip = null;
+          } else {
+            _proposedTrip = proposedTrip ?? _proposedTrip;
+          }
           _createdTripId = tripId;
           if (convId != null) _conversationId = convId;
           _lastFailedMessage = null;
           _sending = false;
+          // Refresh trips list and dashboard if a trip was created
+          if (tripId != null) {
+            ref.invalidate(tripsProvider);
+            ref.invalidate(dashboardProvider);
+          }
         });
         _scrollToBottom();
       }
@@ -404,6 +413,16 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
                         ),
                       );
                     }
+                    if (msg['role'] == 'welcome') {
+                      return _WelcomeCard(
+                        onUseExample: (text) {
+                          _controller.text = text;
+                          setState(() {
+                            _messages.removeWhere((m) => m['role'] == 'welcome');
+                          });
+                        },
+                      );
+                    }
                     return _ChatBubble(
                       text: msg['content'] ?? '',
                       isUser: msg['role'] == 'user',
@@ -418,17 +437,30 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
                     return _TripPreviewCard(
                       trip: _proposedTrip!,
                       onApprove: () => _send(overrideText: 'Looks good! Create it.', action: 'approve'),
-                      onModify: () {
-                        // Focus the text field for modifications
-                        _controller.text = '';
-                        FocusScope.of(context).requestFocus(FocusNode());
-                      },
-                      onReject: () {
+                      onReject: () async {
+                        final confirmed = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('Start Over?'),
+                            content: const Text('This will discard the current trip plan. You can always plan a new one.'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(ctx).pop(false),
+                                child: const Text('Keep Plan'),
+                              ),
+                              TextButton(
+                                onPressed: () => Navigator.of(ctx).pop(true),
+                                child: const Text('Start Over', style: TextStyle(color: Colors.red)),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirmed != true || !mounted) return;
                         setState(() {
                           _proposedTrip = null;
                           _phase = 'gathering';
                         });
-                        _send(overrideText: 'Let\'s start over with a different plan.');
+                        _send(overrideText: 'Let\'s start over with a different plan.', action: 'reject');
                       },
                     );
                   }
@@ -469,7 +501,7 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
             ),
 
             // Quick suggestions at start
-            if (_messages.length <= 2 && _createdTripId == null)
+            if (_messages.any((m) => m['role'] == 'welcome') && _createdTripId == null)
               SizedBox(
                 height: 40,
                 child: ScrollConfiguration(
@@ -506,22 +538,26 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
               Padding(
                 padding: const EdgeInsets.all(12),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Expanded(
                       child: TextField(
                         controller: _controller,
+                        focusNode: _inputFocusNode,
+                        minLines: 1,
+                        maxLines: 4,
                         decoration: InputDecoration(
                           hintText: _phase == 'proposing'
                               ? 'Request changes or approve...'
-                              : 'Tell Sippy about your trip...',
+                              : 'Describe your ideal trip...',
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(24),
+                            borderRadius: BorderRadius.circular(16),
                           ),
                           contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 10),
+                              horizontal: 16, vertical: 12),
                         ),
-                        textInputAction: TextInputAction.send,
-                        onSubmitted: (_) => _send(),
+                        textInputAction: TextInputAction.newline,
+                        keyboardType: TextInputType.multiline,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -544,15 +580,22 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
 class _TripPreviewCard extends StatelessWidget {
   final Map<String, dynamic> trip;
   final VoidCallback onApprove;
-  final VoidCallback onModify;
   final VoidCallback onReject;
 
   const _TripPreviewCard({
     required this.trip,
     required this.onApprove,
-    required this.onModify,
     required this.onReject,
   });
+
+  bool _hasCoordinates(List stops) {
+    int count = 0;
+    for (final s in stops) {
+      final place = (s as Map<String, dynamic>)['place'] as Map<String, dynamic>? ?? {};
+      if (place['latitude'] != null && place['longitude'] != null) count++;
+    }
+    return count >= 2;
+  }
 
   IconData _placeTypeIcon(String? type) {
     switch (type) {
@@ -771,9 +814,29 @@ class _TripPreviewCard extends StatelessWidget {
             ),
           ),
 
-          // Action buttons
+          // Route map
+          if (_hasCoordinates(stops))
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: SizedBox(
+                  height: 150,
+                  child: _PreviewRouteMap(stops: stops),
+                ),
+              ),
+            ),
+
+          // Hint + action buttons
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+            child: Text(
+              'Type below to request changes, or approve:',
+              style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
             child: Row(
               children: [
                 Expanded(
@@ -786,11 +849,6 @@ class _TripPreviewCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(vertical: 10),
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                OutlinedButton(
-                  onPressed: onModify,
-                  child: const Text('Change'),
                 ),
                 const SizedBox(width: 8),
                 IconButton(
@@ -878,6 +936,255 @@ class _ChatBubble extends StatelessWidget {
           style: TextStyle(color: isUser ? Colors.white : null),
         ),
       ),
+    );
+  }
+}
+
+class _WelcomeCard extends StatelessWidget {
+  final void Function(String) onUseExample;
+  const _WelcomeCard({required this.onUseExample});
+
+  static const _examplePrompt =
+      "My wife and I would like to visit 3 wineries today starting "
+      "around noon near I-77 in northern NC. We want to visit each "
+      "stop for 60-90 minutes and keep drive time between stops to "
+      "less than 20 minutes. We like both red and white wines. "
+      "We also like live music.";
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Sippy greeting bubble
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width * 0.78,
+            ),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Text(
+              "Hey, I'm Sippy! Tell me about the trip you're dreaming up — "
+              "the more detail you give me upfront, the faster we'll get rolling!",
+            ),
+          ),
+        ),
+
+        // What I need card
+        Container(
+          margin: const EdgeInsets.only(bottom: 8, right: 32),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: colorScheme.primaryContainer.withValues(alpha: 0.4),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: colorScheme.primary.withValues(alpha: 0.2)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.checklist, size: 16, color: colorScheme.primary),
+                  const SizedBox(width: 6),
+                  Text("What I'll ask you",
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.primary)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              _CheckItem(icon: Icons.place, text: 'Where do you want to go?'),
+              _CheckItem(icon: Icons.calendar_today, text: 'What date?'),
+              _CheckItem(icon: Icons.access_time, text: 'What time to start?'),
+              _CheckItem(icon: Icons.wine_bar, text: 'What do you like to drink?'),
+              _CheckItem(icon: Icons.timer, text: 'How long at each stop?'),
+              _CheckItem(icon: Icons.route, text: 'Max drive time between stops?'),
+              _CheckItem(icon: Icons.music_note, text: 'Events or live music?'),
+              const SizedBox(height: 4),
+              Text('Include as many as you can in your first message!',
+                  style: TextStyle(fontSize: 10, color: Colors.grey[500], fontStyle: FontStyle.italic)),
+            ],
+          ),
+        ),
+
+        // Example prompt card
+        Container(
+          margin: const EdgeInsets.only(bottom: 8, right: 32),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: colorScheme.secondaryContainer.withValues(alpha: 0.4),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: colorScheme.secondary.withValues(alpha: 0.2)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.lightbulb_outline, size: 16, color: colorScheme.secondary),
+                  const SizedBox(width: 6),
+                  Text('Example prompt',
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.secondary)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(_examplePrompt,
+                  style: TextStyle(fontSize: 12, color: Colors.grey[700], fontStyle: FontStyle.italic)),
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 32,
+                child: OutlinedButton.icon(
+                  onPressed: () => onUseExample(_examplePrompt),
+                  icon: const Icon(Icons.edit, size: 14),
+                  label: const Text('Use as template', style: TextStyle(fontSize: 11)),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    side: BorderSide(color: colorScheme.secondary),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CheckItem extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  const _CheckItem({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Icon(icon, size: 13, color: Colors.grey[600]),
+          const SizedBox(width: 8),
+          Text(text, style: TextStyle(fontSize: 12, color: Colors.grey[700])),
+        ],
+      ),
+    );
+  }
+}
+
+class _PreviewRouteMap extends StatefulWidget {
+  final List stops;
+  const _PreviewRouteMap({required this.stops});
+
+  @override
+  State<_PreviewRouteMap> createState() => _PreviewRouteMapState();
+}
+
+class _PreviewRouteMapState extends State<_PreviewRouteMap> {
+  GoogleMapController? _controller;
+
+  List<LatLng> get _points {
+    final pts = <LatLng>[];
+    for (final s in widget.stops) {
+      final place = (s as Map<String, dynamic>)['place'] as Map<String, dynamic>? ?? {};
+      final lat = place['latitude'];
+      final lng = place['longitude'];
+      if (lat != null && lng != null) {
+        pts.add(LatLng((lat as num).toDouble(), (lng as num).toDouble()));
+      }
+    }
+    return pts;
+  }
+
+  Set<Marker> get _markers {
+    final markers = <Marker>{};
+    final points = _points;
+    for (var i = 0; i < points.length; i++) {
+      final stop = widget.stops[i] as Map<String, dynamic>;
+      final place = stop['place'] as Map<String, dynamic>? ?? {};
+      final name = place['name'] as String? ?? 'Stop ${i + 1}';
+      markers.add(Marker(
+        markerId: MarkerId('stop_$i'),
+        position: points[i],
+        infoWindow: InfoWindow(title: name),
+      ));
+    }
+    return markers;
+  }
+
+  Set<Polyline> get _polylines {
+    final points = _points;
+    if (points.length < 2) return {};
+    return {
+      Polyline(
+        polylineId: const PolylineId('route'),
+        points: points,
+        color: const Color(0xFF2C3E50),
+        width: 3,
+      ),
+    };
+  }
+
+  void _fitBounds() {
+    final points = _points;
+    if (points.isEmpty || _controller == null) return;
+
+    double minLat = points.first.latitude;
+    double maxLat = points.first.latitude;
+    double minLng = points.first.longitude;
+    double maxLng = points.first.longitude;
+
+    for (final p in points) {
+      if (p.latitude < minLat) minLat = p.latitude;
+      if (p.latitude > maxLat) maxLat = p.latitude;
+      if (p.longitude < minLng) minLng = p.longitude;
+      if (p.longitude > maxLng) maxLng = p.longitude;
+    }
+
+    _controller!.animateCamera(CameraUpdate.newLatLngBounds(
+      LatLngBounds(
+        southwest: LatLng(minLat, minLng),
+        northeast: LatLng(maxLat, maxLng),
+      ),
+      40, // padding
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final points = _points;
+    if (points.isEmpty) return const SizedBox.shrink();
+
+    return GoogleMap(
+      initialCameraPosition: CameraPosition(
+        target: points.first,
+        zoom: 10,
+      ),
+      onMapCreated: (controller) {
+        _controller = controller;
+        // Delay to let the map render before fitting bounds
+        Future.delayed(const Duration(milliseconds: 300), _fitBounds);
+      },
+      markers: _markers,
+      polylines: _polylines,
+      myLocationButtonEnabled: false,
+      zoomControlsEnabled: false,
+      mapToolbarEnabled: false,
+      scrollGesturesEnabled: false,
+      zoomGesturesEnabled: false,
+      rotateGesturesEnabled: false,
+      tiltGesturesEnabled: false,
     );
   }
 }

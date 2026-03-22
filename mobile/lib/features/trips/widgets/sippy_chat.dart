@@ -15,10 +15,7 @@ void openSippyChat(BuildContext context, String tripId, {String? conversationId}
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
-    builder: (_) => ProviderScope(
-      parent: ProviderScope.containerOf(context),
-      child: _SippyChat(tripId: tripId, conversationId: conversationId),
-    ),
+    builder: (_) => _SippyChat(tripId: tripId, conversationId: conversationId),
   );
 }
 

@@ -2176,6 +2176,15 @@ class _DrinkMenuSectionState extends ConsumerState<_DrinkMenuSection> {
     _loadExistingMenu();
   }
 
+  @override
+  void didUpdateWidget(_DrinkMenuSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.place.id != widget.place.id) {
+      _menuItems = null;
+      _loadExistingMenu();
+    }
+  }
+
   Future<void> _loadExistingMenu() async {
     // Check if menu items already exist in DB for this place
     try {
@@ -3238,32 +3247,55 @@ class _EditStopSheetState extends ConsumerState<_EditStopSheet> {
   }
 }
 
-class _StopMapWidget extends StatelessWidget {
+class _StopMapWidget extends StatefulWidget {
   final Place place;
   const _StopMapWidget({required this.place});
 
   @override
-  Widget build(BuildContext context) {
-    final lat = place.latitude!;
-    final lng = place.longitude!;
-    final position = LatLng(lat, lng);
+  State<_StopMapWidget> createState() => _StopMapWidgetState();
+}
 
+class _StopMapWidgetState extends State<_StopMapWidget> {
+  GoogleMapController? _mapController;
+
+  LatLng get _position => LatLng(widget.place.latitude!, widget.place.longitude!);
+
+  @override
+  void didUpdateWidget(_StopMapWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.place.id != widget.place.id) {
+      _moveToPlace();
+    }
+  }
+
+  void _moveToPlace() {
+    _mapController?.animateCamera(
+      CameraUpdate.newLatLngZoom(_position, 15),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
       child: SizedBox(
         height: 200,
         child: GoogleMap(
+          key: ValueKey(widget.place.id),
           initialCameraPosition: CameraPosition(
-            target: position,
+            target: _position,
             zoom: 15,
           ),
+          onMapCreated: (controller) {
+            _mapController = controller;
+          },
           markers: {
             Marker(
-              markerId: MarkerId(place.id),
-              position: position,
+              markerId: MarkerId(widget.place.id),
+              position: _position,
               infoWindow: InfoWindow(
-                title: place.name,
-                snippet: place.location,
+                title: widget.place.name,
+                snippet: widget.place.location,
               ),
             ),
           },

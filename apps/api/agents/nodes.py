@@ -20,26 +20,33 @@ TODAY'S DATE: {today}
 
 Your job is to help users plan amazing tasting trips through conversation. Here's how you work:
 
-## GATHERING PHASE
-You MUST gather answers to ALL of these before proposing a trip. Group them efficiently — ask 3-5 per turn so we move fast.
+## GATHERING PHASE — ONE QUESTION AT A TIME
 
-**Turn 1** — Get the basics from their opening message, then ask what's missing from:
-- Region/location (required)
-- Date (required — convert "today"/"tomorrow"/"this Saturday" to YYYY-MM-DD using today's date)
-- What they're into: wine styles, beer types, food interests
-- Group size
-- Any must-visit or must-avoid places
+The app shows users a checklist of what you need before they start chatting. Your job is to fill in the gaps from their first message.
 
-**Turn 2** — Fill in the trip logistics:
-- What time to arrive at the first stop? (default: 10:30 AM)
-- How long at each stop? (suggest: 45-60 min for tastings, 60-90 min if food too)
-- How far between stops? (suggest: under 20 min drives to keep it relaxed)
-- Number of stops (suggest: 3-4 for a day trip, 2-3 if longer stays)
-- Budget range per person for tastings
-- Want me to look for places with events, live music, or special tastings today?
-- Any dietary needs or accessibility requirements?
+Required info (with defaults if not provided):
+1. Where? — Region/location (REQUIRED, no default)
+2. When? — Date (REQUIRED — convert "today"/"tomorrow"/"this Saturday" to YYYY-MM-DD)
+3. What time to start? — (default: 10:30 AM)
+4. How many stops? — (default: 3-4)
+5. How long at each stop? — (default: 60 min)
+6. Max drive time between stops? — (default: 20 min)
+7. What do you like? — Wine/beer styles, preferences
+8. Events or live music? — (default: yes if available)
 
-If the user's first message already answers many of these, skip what's covered and only ask what's missing. Be efficient — don't repeat what they already told you. Two turns of questions max before searching.
+CRITICAL RULES FOR ASKING QUESTIONS:
+- After the user's first message, ALWAYS ask at least ONE follow-up question before searching — even if they gave lots of detail
+- Ask only ONE missing question per response — never list multiple questions
+- Keep each response to 1-2 sentences: briefly acknowledge what they said, then ask the ONE next question
+- Pick the most important unanswered question from this priority order:
+  1. What do you like? (wine styles, beer types) — if not mentioned
+  2. How long at each stop? — if not mentioned
+  3. Max drive time between stops? — if not mentioned
+  4. Events or live music? — if not mentioned
+  5. Any dietary needs or must-visit places? — if not mentioned
+- Skip questions they already answered — never repeat back what they told you
+- After asking 1-2 follow-up questions, start searching — use defaults for anything still missing
+- Do NOT search on the very first response. Always ask at least one question first.
 
 ## SEARCHING PHASE
 Once you have enough info (at minimum: region, date, preferences, start time, and stop duration), use the search_places tool to find options. Call it multiple times with different queries to get variety. Factor in their max drive time between stops when selecting places.
@@ -107,7 +114,7 @@ If the user wants changes after seeing the preview, adjust the plan and propose 
 - NEVER say you are creating or building the trip — you can only PROPOSE plans via <trip_plan> tags
 - The user must click a button in the app to approve — you cannot approve on their behalf
 - If the user says "looks good", "yes", "go ahead" etc., respond with "Great! Click the 'Looks Good!' button below the preview to create your trip!" and include the SAME <trip_plan> block again
-- If the user asks for changes after a preview, adjust and propose again with updated <trip_plan> tags
+- IMPORTANT: Whenever you suggest ANY change to the trip plan (swapping a stop, changing times, etc.), you MUST include the COMPLETE updated <trip_plan> JSON block with ALL stops. Never describe changes without including the full updated plan in <trip_plan> tags. The app can ONLY display previews from <trip_plan> tags — if you don't include them, the user will see the old plan.
 """
 
 
@@ -166,7 +173,22 @@ def planner_conversation(state: dict) -> dict:
             continue
         messages.append(msg)
 
+    # If we already have a proposed trip and the user is asking for changes,
+    # append the current plan to the system prompt so Claude can modify it
+    current_phase = state.get("phase", "gathering")
+    current_proposed = state.get("proposed_trip")
+    if current_phase == "proposing" and current_proposed:
+        plan_context = (
+            "\n\n## CURRENT TRIP PLAN (user is requesting changes)\n"
+            "You MUST include the COMPLETE updated <trip_plan> JSON block in your response "
+            "with ALL stops. Here is the current plan to modify:\n\n"
+            + json.dumps(current_proposed, indent=2)
+        )
+        # Update the system message (first in the list) to include the plan
+        messages[0] = SystemMessage(content=messages[0].content + plan_context)
+
     # Invoke LLM with tools — handle tool calls in a loop
+    tool_map = {t.name: t for t in tools}
     max_tool_rounds = 5
     for _ in range(max_tool_rounds):
         response = llm_with_tools.invoke(messages)
@@ -174,8 +196,6 @@ def planner_conversation(state: dict) -> dict:
 
         if not response.tool_calls:
             break
-
-        tool_map = {t.name: t for t in tools}
 
         for tc in response.tool_calls:
             tool_fn = tool_map.get(tc["name"])
@@ -198,16 +218,45 @@ def planner_conversation(state: dict) -> dict:
                 )
             messages.append(tool_msg)
 
-    # Ensure the final message is a text AI response (not a tool call)
+    # Ensure the final message is a text-only AI response
     final_response = messages[-1]
-    if not isinstance(final_response, AIMessage):
-        # Last message is a ToolMessage — do one more LLM call to get text
-        final_response = llm.invoke(messages)  # use llm without tools to force text
-        messages.append(final_response)
-    elif getattr(final_response, "tool_calls", None):
-        # LLM returned tool calls but we hit max rounds — get a text summary
-        final_response = llm.invoke(messages)  # use llm without tools to force text
-        messages.append(final_response)
+    needs_text_response = (
+        not isinstance(final_response, AIMessage)
+        or getattr(final_response, "tool_calls", None)
+    )
+    if needs_text_response:
+        # Call LLM WITH tools to get a proper continuation after tool results.
+        # The tool results are in the messages, so Claude needs to see them
+        # and respond with text (and possibly more tool calls).
+        continuation = llm_with_tools.invoke(messages)
+        messages.append(continuation)
+
+        # If it STILL wants to call tools, do one final round
+        if getattr(continuation, "tool_calls", None):
+            for tc in continuation.tool_calls:
+                tool_fn = tool_map.get(tc["name"])
+                if tool_fn:
+                    try:
+                        result = tool_fn.invoke(tc["args"])
+                        messages.append(ToolMessage(
+                            content=json.dumps(result, default=str),
+                            tool_call_id=tc["id"],
+                        ))
+                    except Exception as e:
+                        messages.append(ToolMessage(
+                            content=f"Tool error: {e}",
+                            tool_call_id=tc["id"],
+                        ))
+
+            # Now force a text-only response
+            final_response = llm.invoke([
+                m for m in messages
+                if not isinstance(m, ToolMessage)
+                and not (isinstance(m, AIMessage) and getattr(m, "tool_calls", None))
+            ])
+            messages.append(final_response)
+        else:
+            final_response = continuation
 
     # Extract text content (handles both string and content block list)
     content = _extract_text(final_response.content)
@@ -228,6 +277,21 @@ def planner_conversation(state: dict) -> dict:
         before = display_content.split("<trip_plan>")[0]
         after = display_content.split("</trip_plan>")[-1] if "</trip_plan>" in display_content else ""
         display_content = (before + after).strip()
+
+    # Strip any tool-related XML tags that Claude may output inline
+    # (e.g. <search_places>, <get_drive_time>, etc.)
+    import re
+    display_content = re.sub(
+        r'<(search_places|get_drive_time|tool_call|function_call)[^>]*>.*?</\1>',
+        '', display_content, flags=re.DOTALL,
+    )
+    # Also strip self-closing or unclosed tool tags with JSON content
+    display_content = re.sub(
+        r'<(search_places|get_drive_time)[^>]*>\s*\{[^}]*\}[\s\S]*?(?:</\1>|(?=\n\n))',
+        '', display_content, flags=re.DOTALL,
+    )
+    # Clean up extra whitespace left behind
+    display_content = re.sub(r'\n{3,}', '\n\n', display_content).strip()
 
     # Only persist the user's message and the final AI response (clean)
     # Do NOT persist intermediate tool_call/tool_result messages —

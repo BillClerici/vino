@@ -914,19 +914,24 @@ Keep responses conversational, warm, and concise (2-4 sentences unless more deta
 
             # Handle reject
             if action_type == "reject":
-                display_user_msg = "Cancel this plan."
+                display_user_msg = "Let's start over with a different plan."
                 if conversation:
                     msgs = conversation.messages or []
                     msgs.append({"role": "user", "content": display_user_msg})
-                    msgs.append({"role": "assistant", "content": "No problem! Let me know when you want to plan another trip."})
+                    msgs.append({"role": "assistant", "content": "No problem! Let's start fresh — tell me what you're in the mood for."})
                     conversation.messages = msgs
-                    conversation.phase = "rejected"
-                    conversation.save(update_fields=["messages", "phase", "updated_at"])
+                    conversation.phase = "gathering"
+                    conversation.proposed_trip = {}
+                    # Fresh session so we don't hit old LangGraph checkpoint
+                    conversation.session_id = f"plan:{request.user.id}:{int(time.time())}"
+                    conversation.save(update_fields=["messages", "phase", "proposed_trip", "session_id", "updated_at"])
 
+                new_session = conversation.session_id if conversation else session_id
                 return Response({
-                    "reply": "No problem! Let me know when you want to plan another trip.",
-                    "phase": "rejected",
-                    "session_id": session_id,
+                    "reply": "No problem! Let's start fresh — tell me what you're in the mood for.",
+                    "phase": "gathering",
+                    "session_id": new_session,
+                    "proposed_trip": None,
                     "conversation_id": str(conversation.id) if conversation else None,
                 })
 
