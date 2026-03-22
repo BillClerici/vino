@@ -77,6 +77,12 @@ def discover_wine_pages(base_url: str, homepage_html: str) -> list[str]:
     for link in links:
         full = urljoin(base_url, link).rstrip("/")
 
+        # Check for Untappd digital boards (brewery tap lists)
+        untappd_match = re.match(r"(https?://business\.untappd\.com/app/boards/\d+)", full)
+        if untappd_match:
+            third_party_shops.add(untappd_match.group(1))
+            continue
+
         # Check for third-party wine shop platforms (server-rendered, reliable)
         if re.search(r"vinoshipper\.com/shop/|shop\.\w+\.com|\.myshopify\.com", full, re.IGNORECASE):
             # Get the shop root, not a specific product/join page
@@ -151,6 +157,129 @@ HTML:
         return []
 
 
+def _extract_untappd_board(board_url: str) -> list[dict]:
+    """Fetch an Untappd digital board and extract beer items from embedded data."""
+    try:
+        with _make_client() as client:
+            resp = client.get(board_url)
+            resp.raise_for_status()
+    except Exception as e:
+        logger.warning("Failed to fetch Untappd board %s: %s", board_url, e)
+        return []
+
+    import html as html_mod
+    match = re.search(r'data-react-props="([^"]+)"', resp.text)
+    if not match:
+        logger.warning("No data-react-props found on Untappd board %s", board_url)
+        return []
+
+    try:
+        decoded = html_mod.unescape(match.group(1))
+        data = json.loads(decoded)
+    except (json.JSONDecodeError, ValueError) as e:
+        logger.warning("Failed to parse Untappd board data: %s", e)
+        return []
+
+    items = []
+    for menu in data.get("board", {}).get("menus", []):
+        for section in menu.get("sections", []):
+            for item in section.get("items", []):
+                name = item.get("name", "").strip()
+                if not name:
+                    continue
+                style = item.get("style", "") or item.get("original_style", "") or ""
+                short_style = item.get("short_style", "") or ""
+                abv = item.get("abv", "")
+                description = item.get("description", "") or item.get("custom_description", "") or ""
+                if abv and not description:
+                    description = f"ABV: {abv}%"
+                elif abv:
+                    description = f"{description} (ABV: {abv}%)"
+                # Map style to a beer type
+                style_lower = style.lower()
+                if "ipa" in style_lower:
+                    wine_type = "IPA"
+                elif "stout" in style_lower or "porter" in style_lower:
+                    wine_type = "Stout"
+                elif "lager" in style_lower or "pilsner" in style_lower:
+                    wine_type = "Lager"
+                elif "sour" in style_lower or "gose" in style_lower or "lambic" in style_lower:
+                    wine_type = "Sour"
+                else:
+                    wine_type = "Ale"
+                items.append({
+                    "name": name,
+                    "varietal": short_style or style.split(" - ")[0] if style else "",
+                    "vintage": None,
+                    "description": description,
+                    "wine_type": wine_type,
+                    "price": None,
+                    "image_url": item.get("label_image_hd") or item.get("label_image") or None,
+                })
+    logger.info("Extracted %d items from Untappd board %s", len(items), board_url)
+    return items
+
+
+def _save_extracted_items(place, extracted: list[dict]) -> None:
+    """Deduplicate extracted items and save as MenuItem records."""
+    from apps.wineries.models import MenuItem
+
+    if not extracted:
+        place.wine_menu_last_scraped = timezone.now()
+        place.save(update_fields=["wine_menu_last_scraped", "updated_at"])
+        return
+
+    seen = set()
+    for item in extracted:
+        name = item.get("name", "").strip()
+        if not name:
+            continue
+        key = (name.lower(), item.get("vintage"))
+        if key in seen:
+            continue
+        seen.add(key)
+
+        image_url = item.get("image_url", "") or ""
+        price = item.get("price")
+        if price is not None:
+            try:
+                price = round(float(price), 2)
+            except (ValueError, TypeError):
+                price = None
+
+        menu_item, created = MenuItem.objects.get_or_create(
+            place=place,
+            name=name,
+            vintage=item.get("vintage"),
+            defaults={
+                "varietal": item.get("varietal", "") or "",
+                "description": item.get("description", "") or "",
+                "price": price,
+                "image_url": image_url,
+                "metadata": {"scraped": True, "wine_type": item.get("wine_type", "")},
+            },
+        )
+        if not created:
+            changed = []
+            if not menu_item.varietal and item.get("varietal"):
+                menu_item.varietal = item["varietal"]
+                changed.append("varietal")
+            if not menu_item.description and item.get("description"):
+                menu_item.description = item["description"]
+                changed.append("description")
+            if price and menu_item.price != price:
+                menu_item.price = price
+                changed.append("price")
+            if image_url and menu_item.image_url != image_url:
+                menu_item.image_url = image_url
+                changed.append("image_url")
+            if changed:
+                menu_item.save(update_fields=changed + ["updated_at"])
+
+    place.wine_menu_last_scraped = timezone.now()
+    place.save(update_fields=["wine_menu_last_scraped", "updated_at"])
+
+
 def scrape_and_cache_menu_items(place) -> list:
     """
     Main entry point: scrape place website, discover menu pages,
@@ -186,9 +315,23 @@ def scrape_and_cache_menu_items(place) -> list:
 
         logger.info("Trying %d menu pages for %s: %s", len(wine_page_urls), place.name, wine_page_urls[:5])
 
-        # Separate third-party shops from same-domain pages
-        third_party = [u for u in wine_page_urls if "vinoshipper.com" in u or ".myshopify.com" in u]
-        same_domain = [u for u in wine_page_urls if u not in third_party]
+        # Separate Untappd boards, third-party shops, and same-domain pages
+        untappd_urls = [u for u in wine_page_urls if "business.untappd.com" in u]
+        third_party = [u for u in wine_page_urls if u not in untappd_urls and ("vinoshipper.com" in u or ".myshopify.com" in u)]
+        same_domain = [u for u in wine_page_urls if u not in untappd_urls and u not in third_party]
+
+        # Handle Untappd boards directly (structured data, no AI needed)
+        if untappd_urls:
+            logger.info("Found Untappd boards: %s", untappd_urls)
+            extracted = []
+            for board_url in untappd_urls[:2]:
+                extracted.extend(_extract_untappd_board(board_url))
+            if extracted:
+                # Skip HTML scraping — Untappd data is authoritative
+                logger.info("Extracted %d menu items from Untappd for %s", len(extracted), place.name)
+                # Jump straight to dedup/storage (below)
+                _save_extracted_items(place, extracted)
+                return list(MenuItem.objects.filter(place=place))
 
         all_html = ""
         pages_fetched = 0
@@ -234,64 +377,7 @@ def scrape_and_cache_menu_items(place) -> list:
         extracted = extract_wines_from_html(all_html, place.name)
         logger.info("Extracted %d menu items for %s (from %d subpages)", len(extracted), place.name, pages_fetched)
 
-        if not extracted:
-            place.wine_menu_last_scraped = timezone.now()
-            place.save(update_fields=["wine_menu_last_scraped", "updated_at"])
-            return list(MenuItem.objects.filter(place=place))
-
-        # Deduplicate by name+vintage
-        seen = set()
-        menu_items = []
-        for item in extracted:
-            name = item.get("name", "").strip()
-            if not name:
-                continue
-            key = (name.lower(), item.get("vintage"))
-            if key in seen:
-                continue
-            seen.add(key)
-
-            image_url = item.get("image_url", "") or ""
-            price = item.get("price")
-            if price is not None:
-                try:
-                    price = round(float(price), 2)
-                except (ValueError, TypeError):
-                    price = None
-
-            menu_item, created = MenuItem.objects.get_or_create(
-                place=place,
-                name=name,
-                vintage=item.get("vintage"),
-                defaults={
-                    "varietal": item.get("varietal", "") or "",
-                    "description": item.get("description", "") or "",
-                    "price": price,
-                    "image_url": image_url,
-                    "metadata": {"scraped": True, "wine_type": item.get("wine_type", "")},
-                },
-            )
-            if not created:
-                changed = []
-                if not menu_item.varietal and item.get("varietal"):
-                    menu_item.varietal = item["varietal"]
-                    changed.append("varietal")
-                if not menu_item.description and item.get("description"):
-                    menu_item.description = item["description"]
-                    changed.append("description")
-                if price and menu_item.price != price:
-                    menu_item.price = price
-                    changed.append("price")
-                if image_url and menu_item.image_url != image_url:
-                    menu_item.image_url = image_url
-                    changed.append("image_url")
-                if changed:
-                    menu_item.save(update_fields=changed + ["updated_at"])
-            menu_items.append(menu_item)
-
-        place.wine_menu_last_scraped = timezone.now()
-        place.save(update_fields=["wine_menu_last_scraped", "updated_at"])
-        # Return all menu items for this place (including previously scraped ones)
+        _save_extracted_items(place, extracted)
         return list(MenuItem.objects.filter(place=place))
 
     except Exception as e:
