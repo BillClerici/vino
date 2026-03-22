@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/widgets/empty_state.dart';
+import '../../help/help_launcher.dart';
 import '../../../core/widgets/search_bar.dart';
 import '../providers/trips_provider.dart';
 
@@ -21,7 +22,10 @@ class _TripsScreenState extends ConsumerState<TripsScreen> {
     final tripsState = ref.watch(tripsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('My Trips')),
+      appBar: AppBar(
+        title: const Text('My Trips'),
+        actions: [helpButton(context, routePrefix: '/trips')],
+      ),
       body: Column(
         children: [
           // Search + filter row

@@ -6,6 +6,7 @@ import '../../../core/models/visit.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/rating_stars.dart';
 import '../../../core/widgets/search_bar.dart';
+import '../../help/help_launcher.dart';
 import '../providers/visits_provider.dart';
 
 enum _SortOption {
@@ -41,7 +42,10 @@ class _VisitsScreenState extends ConsumerState<VisitsScreen> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('My Visits')),
+      appBar: AppBar(
+        title: const Text('My Visits'),
+        actions: [helpButton(context, routePrefix: '/visits')],
+      ),
       body: Column(
         children: [
           VinoSearchBar(

@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/services/trip_service.dart';
 import '../../../core/widgets/rating_stars.dart';
+import '../../help/help_launcher.dart';
 import '../providers/places_provider.dart';
 
 class PlaceDetailScreen extends ConsumerWidget {
@@ -15,7 +16,10 @@ class PlaceDetailScreen extends ConsumerWidget {
     final placeState = ref.watch(placeDetailProvider(placeId));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Place Details')),
+      appBar: AppBar(
+        title: const Text('Place Details'),
+        actions: [helpButton(context, routePrefix: '/explore')],
+      ),
       body: placeState.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),

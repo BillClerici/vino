@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../config/constants.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/widgets/rating_stars.dart';
+import '../../help/help_launcher.dart';
 
 class CheckinScreen extends ConsumerStatefulWidget {
   final String? placeId;
@@ -65,7 +66,10 @@ class _CheckinScreenState extends ConsumerState<CheckinScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Check In')),
+      appBar: AppBar(
+        title: const Text('Check In'),
+        actions: [helpButton(context, routePrefix: '/visits')],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [

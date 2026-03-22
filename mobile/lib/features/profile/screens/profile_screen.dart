@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/auth/auth_provider.dart';
+import '../../help/help_launcher.dart';
 import '../providers/profile_provider.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -14,7 +15,10 @@ class ProfileScreen extends ConsumerWidget {
     final statsState = ref.watch(userStatsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Profile')),
+      appBar: AppBar(
+        title: const Text('Profile'),
+        actions: [helpButton(context, routePrefix: '/profile')],
+      ),
       body: authState.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, __) => const Center(child: Text('Error loading profile')),
@@ -130,6 +134,12 @@ class ProfileScreen extends ConsumerWidget {
                 title: const Text('Subscription'),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push('/profile/subscription'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.help_outline),
+                title: const Text('Help & Guide'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/profile/help'),
               ),
               const Divider(),
               ListTile(

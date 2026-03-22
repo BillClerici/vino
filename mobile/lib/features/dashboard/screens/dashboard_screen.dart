@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../help/help_launcher.dart';
+
 import '../../../core/models/place.dart';
 import '../../../core/models/visit.dart';
 import '../../../core/widgets/empty_state.dart';
@@ -27,7 +29,10 @@ class DashboardScreen extends ConsumerWidget {
     final dashboard = ref.watch(dashboardProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Trip Me')),
+      appBar: AppBar(
+        title: const Text('Trip Me'),
+        actions: [helpButton(context, routePrefix: '/dashboard')],
+      ),
       body: dashboard.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),

@@ -14,6 +14,7 @@ import '../../../core/services/trip_service.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/place_card.dart';
 import '../../../core/widgets/search_bar.dart';
+import '../../help/help_launcher.dart';
 import '../providers/places_provider.dart';
 
 class ExploreScreen extends ConsumerStatefulWidget {
@@ -44,6 +45,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text('Explore'),
+        actions: [helpButton(context, routePrefix: '/explore')],
         bottom: TabBar(
           controller: _tabController,
           tabs: const [

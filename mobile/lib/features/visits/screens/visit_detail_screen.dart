@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/widgets/rating_stars.dart';
 import '../../../core/widgets/wine_card.dart';
+import '../../help/help_launcher.dart';
 import '../providers/visits_provider.dart';
 
 class VisitDetailScreen extends ConsumerWidget {
@@ -14,7 +15,10 @@ class VisitDetailScreen extends ConsumerWidget {
     final visitState = ref.watch(visitDetailProvider(visitId));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Visit Details')),
+      appBar: AppBar(
+        title: const Text('Visit Details'),
+        actions: [helpButton(context, routePrefix: '/visits')],
+      ),
       body: visitState.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),

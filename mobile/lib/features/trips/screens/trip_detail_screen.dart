@@ -13,6 +13,7 @@ import '../../../config/env.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/models/trip.dart';
 import '../../../core/services/google_places_service.dart';
+import '../../help/help_launcher.dart';
 import '../providers/trips_provider.dart';
 
 final _carouselScrollBehavior = const MaterialScrollBehavior().copyWith(
@@ -88,6 +89,7 @@ class _TripDetailView extends ConsumerWidget {
                   tooltip: 'Delete Trip',
                   onPressed: () => _confirmDeleteTrip(context, ref),
                 ),
+                helpButton(context, routePrefix: '/trips'),
               ],
             ],
             flexibleSpace: FlexibleSpaceBar(

@@ -17,6 +17,9 @@ import 'features/trips/screens/trip_create_screen.dart';
 import 'features/trips/screens/trip_detail_screen.dart';
 import 'features/trips/screens/trip_stop_detail_screen.dart';
 import 'features/trips/screens/trips_screen.dart';
+import 'features/help/screens/getting_started_screen.dart';
+import 'features/help/screens/help_article_screen.dart';
+import 'features/help/screens/help_index_screen.dart';
 import 'features/visits/screens/checkin_screen.dart';
 import 'features/visits/screens/visit_detail_screen.dart';
 import 'features/visits/screens/visits_screen.dart';
@@ -139,6 +142,21 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: 'subscription',
                 builder: (_, __) => const SubscriptionScreen(),
+              ),
+              GoRoute(
+                path: 'help',
+                builder: (_, __) => const HelpIndexScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'getting-started',
+                    builder: (_, __) => const GettingStartedScreen(),
+                  ),
+                  GoRoute(
+                    path: ':articleId',
+                    builder: (_, state) => HelpArticleScreen(
+                        articleId: state.pathParameters['articleId']!),
+                  ),
+                ],
               ),
             ],
           ),

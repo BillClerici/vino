@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../config/constants.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/models/trip.dart';
+import '../../help/help_launcher.dart';
 import '../providers/trips_provider.dart';
 
 class LiveTripScreen extends ConsumerStatefulWidget {
@@ -23,7 +24,10 @@ class _LiveTripScreenState extends ConsumerState<LiveTripScreen> {
     final tripState = ref.watch(tripDetailProvider(widget.tripId));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Live Trip')),
+      appBar: AppBar(
+        title: const Text('Live Trip'),
+        actions: [helpButton(context, routePrefix: '/trips')],
+      ),
       body: tripState.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),

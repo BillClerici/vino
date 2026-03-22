@@ -18,6 +18,7 @@ import '../../../core/models/place.dart';
 import '../../../core/models/trip.dart';
 import '../../../core/providers/lookup_provider.dart';
 import '../../../core/widgets/rating_stars.dart';
+import '../../help/help_launcher.dart';
 import '../providers/trips_provider.dart';
 
 class TripStopDetailScreen extends ConsumerStatefulWidget {
@@ -513,6 +514,7 @@ class _StopView extends StatelessWidget {
                 tooltip: 'Delete Stop',
                 onPressed: onRemoveStop,
               ),
+              helpButton(context, routePrefix: '/trips'),
             ],
             flexibleSpace: FlexibleSpaceBar(
               background: Stack(
