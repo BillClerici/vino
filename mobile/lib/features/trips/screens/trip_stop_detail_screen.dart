@@ -40,7 +40,7 @@ class _TripStopDetailScreenState extends ConsumerState<TripStopDetailScreen> {
   bool _checkedExisting = false;
   bool _showMap = true;
   Map<String, dynamic>? _existingVisitData;
-  final _drinksSectionKey = GlobalKey<_DrinksSectionState>();
+  var _drinksSectionKey = GlobalKey<_DrinksSectionState>();
 
   @override
   void initState() {
@@ -164,6 +164,7 @@ class _TripStopDetailScreenState extends ConsumerState<TripStopDetailScreen> {
           onRemoveStop: () => _removeStop(stop),
           onEditStop: () => _editStop(stop),
           onCompleteTrip: _completeTrip,
+          onUncheckIn: _undoCheckIn,
           drinksSectionKey: _drinksSectionKey,
         );
       },
@@ -188,6 +189,34 @@ class _TripStopDetailScreenState extends ConsumerState<TripStopDetailScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('Check-in failed: $e')));
+      }
+    }
+  }
+
+  Future<void> _undoCheckIn() async {
+    if (_visitId == null) return;
+    try {
+      final api = ref.read(apiClientProvider);
+      await api.delete('${ApiPaths.visits}$_visitId/');
+      setState(() {
+        _visitId = null;
+        _checkedIn = false;
+        _existingVisitData = null;
+      });
+      _drinksSectionKey = GlobalKey<_DrinksSectionState>();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Check-in removed. You can check in again.'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -361,6 +390,7 @@ class _StopView extends StatelessWidget {
   final VoidCallback onRemoveStop;
   final VoidCallback onEditStop;
   final VoidCallback onCompleteTrip;
+  final VoidCallback onUncheckIn;
   final GlobalKey<_DrinksSectionState> drinksSectionKey;
 
   const _StopView({
@@ -383,6 +413,7 @@ class _StopView extends StatelessWidget {
     required this.onRemoveStop,
     required this.onEditStop,
     required this.onCompleteTrip,
+    required this.onUncheckIn,
     required this.drinksSectionKey,
   });
 
@@ -409,24 +440,54 @@ class _StopView extends StatelessWidget {
                 onPressed: onToggleFavorite,
               ),
               if (checkedIn)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  margin: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.green,
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: InkWell(
                     borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.check_circle, color: Colors.white, size: 14),
-                      SizedBox(width: 4),
-                      Text('Checked In',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold)),
-                    ],
+                    onTap: () async {
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Undo Check-In?'),
+                          content: const Text(
+                            'This will remove your check-in and clear all drinks, ratings, and notes for this stop. You can check in again afterwards.',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(ctx).pop(false),
+                              child: const Text('Cancel'),
+                            ),
+                            FilledButton(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: Colors.red,
+                              ),
+                              onPressed: () => Navigator.of(ctx).pop(true),
+                              child: const Text('Undo Check-In'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirmed == true) onUncheckIn();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.green,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.check_circle, color: Colors.white, size: 14),
+                          SizedBox(width: 4),
+                          Text('Checked In',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               IconButton(
