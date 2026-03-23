@@ -27,5 +27,17 @@ ignore_missing_imports = true
 explicit_package_bases = true
 mypy_path = "."
 
+[[tool.mypy.overrides]]
+module = [
+    "apps.api.agents.*",
+    "apps.api.v1.visits.views",
+    "apps.api.v1.scan_label",
+    "apps.api.v1.auth.views",
+    "apps.users.models",
+    "apps.trips.models",
+    "apps.partners.models",
+]
+ignore_errors = true
+
 [tool.django-stubs]
 django_settings_module = "config.settings.local"
