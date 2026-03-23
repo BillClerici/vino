@@ -51,15 +51,13 @@ lint:
 	docker-compose exec web ruff check .
 	docker-compose exec web mypy .
 
-BUILD_NUMBER ?= local
-APP_VERSION := $(shell cat VERSION 2>/dev/null || echo "1.0.0")
+BUILD_NUMBER ?= 0
 
 apk:
-	@echo "Building APK v$(APP_VERSION)+$(BUILD_NUMBER)..."
+	@echo "Building APK v1.0.$(BUILD_NUMBER)..."
 	cd mobile && flutter build apk --release \
 		--dart-define=API_BASE_URL=https://vino-production.up.railway.app \
 		--dart-define=GOOGLE_CLIENT_ID=520560916664-27j152ocl7l7ksq3madpf4eb45uplpn7.apps.googleusercontent.com \
-		--dart-define=APP_VERSION=$(APP_VERSION) \
 		--dart-define=BUILD_NUMBER=$(BUILD_NUMBER)
 	@echo "APK built: mobile/build/app/outputs/flutter-apk/app-release.apk"
 

@@ -32,7 +32,7 @@ class AppDrawer extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 4),
-                  Text('v${const String.fromEnvironment("APP_VERSION", defaultValue: "1.0.0")}+${const String.fromEnvironment("BUILD_NUMBER", defaultValue: "local")}',
+                  Text('v1.0.${const String.fromEnvironment("BUILD_NUMBER", defaultValue: "0")}',
                       style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 11)),
                 ],
               ),

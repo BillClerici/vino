@@ -11,11 +11,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 # Read .env file
 environ.Env.read_env(os.path.join(BASE_DIR, '.env'), overwrite=False)
 
-# App version — read from VERSION file + BUILD_NUMBER env var
-_version_file = BASE_DIR / 'VERSION'
-APP_VERSION = _version_file.read_text().strip() if _version_file.exists() else '0.0.0'
-BUILD_NUMBER = env('BUILD_NUMBER', default='local')
-APP_VERSION_FULL = f'v{APP_VERSION}+{BUILD_NUMBER}'
+# App version — BUILD_NUMBER set by CI or Railway
+BUILD_NUMBER = env('BUILD_NUMBER', default='dev')
+APP_VERSION_FULL = f'v1.0.{BUILD_NUMBER}'
 
 SECRET_KEY = env('DJANGO_SECRET_KEY')
 DEBUG = env.bool('DEBUG', default=False)

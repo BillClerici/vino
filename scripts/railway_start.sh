@@ -5,6 +5,12 @@ echo "=== Starting Railway ==="
 echo "PORT=$PORT"
 echo "DJANGO_SETTINGS_MODULE=$DJANGO_SETTINGS_MODULE"
 
+# Auto-set BUILD_NUMBER from Railway deployment ID if not set
+if [ -z "$BUILD_NUMBER" ] || [ "$BUILD_NUMBER" = "0" ]; then
+    export BUILD_NUMBER="${RAILWAY_GIT_COMMIT_SHA:0:7}"
+fi
+echo "BUILD_NUMBER=$BUILD_NUMBER"
+
 echo "=== Running migrations ==="
 python manage.py migrate --no-input
 
