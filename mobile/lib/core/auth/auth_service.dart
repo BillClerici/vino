@@ -28,9 +28,14 @@ class AuthService {
   }
 
   Future<User> signInWithGoogle() async {
+    final clientId = const String.fromEnvironment('GOOGLE_CLIENT_ID');
+    if (clientId.isEmpty) {
+      throw Exception('GOOGLE_CLIENT_ID not set — rebuild APK with --dart-define=GOOGLE_CLIENT_ID=...');
+    }
     final googleSignIn = GoogleSignIn(
       scopes: ['email', 'profile'],
-      serverClientId: const String.fromEnvironment('GOOGLE_CLIENT_ID'),
+      serverClientId: clientId,
+      forceCodeForRefreshToken: true,
     );
 
     final account = await googleSignIn.signIn();
