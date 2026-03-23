@@ -132,8 +132,18 @@ def build_trip_graph() -> StateGraph:
 # Graph compilation with PostgreSQL checkpointing
 # ---------------------------------------------------------------------------
 
+_compiled_graphs: dict = {}
+
+
 def get_compiled_graph(graph_name: str = "palate"):
-    """Compile a graph with PostgreSQL checkpointing."""
+    """Compile a graph with PostgreSQL checkpointing.
+
+    Uses DATABASE_URL_DIRECT (bypasses PgBouncer) for the psycopg connection.
+    Caches compiled graphs to avoid leaking connections.
+    """
+    if graph_name in _compiled_graphs:
+        return _compiled_graphs[graph_name]
+
     import psycopg
 
     from django.conf import settings
@@ -147,12 +157,20 @@ def get_compiled_graph(graph_name: str = "palate"):
 
     builder = builders[graph_name]()
 
-    # Open a fresh psycopg connection and pass it directly to PostgresSaver
-    db_url = settings.DATABASE_URL
+    # Use direct connection (bypasses PgBouncer for DDL and checkpointing)
+    db_url = getattr(settings, "DATABASE_URL_DIRECT", settings.DATABASE_URL)
     if db_url.startswith("postgres://"):
         db_url = db_url.replace("postgres://", "postgresql://", 1)
-    conn = psycopg.connect(db_url, autocommit=True)
+
+    # Add SSL for non-local connections
+    connect_kwargs = {"autocommit": True}
+    if not settings.DEBUG:
+        connect_kwargs["sslmode"] = "require"
+
+    conn = psycopg.connect(db_url, **connect_kwargs)
     checkpointer = PostgresSaver(conn)
     checkpointer.setup()
 
-    return builder.compile(checkpointer=checkpointer)
+    compiled = builder.compile(checkpointer=checkpointer)
+    _compiled_graphs[graph_name] = compiled
+    return compiled

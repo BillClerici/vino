@@ -8,8 +8,30 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: vino_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
       DJANGO_SETTINGS_MODULE: config.settings.local
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/vino_test
+      DATABASE_URL_DIRECT: postgres://postgres:postgres@localhost:5432/vino_test
+      DJANGO_SECRET_KEY: ci-test-secret-key-not-for-production
+      FIELD_ENCRYPTION_KEY: dGVzdC1lbmNyeXB0aW9uLWtleS1mb3ItY2ktb25seQ==
+      ANTHROPIC_API_KEY: sk-ant-test
+      GOOGLE_API_KEY: test
+      GOOGLE_MAPS_API_KEY: test
+      REDIS_URL: redis://localhost:6379/0
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -18,5 +40,5 @@ jobs:
       - run: pip install -r requirements/dev.txt
       - run: ruff check .
       - run: mypy . --config-file pyproject.toml
+      - run: python manage.py migrate --no-input
       - run: pytest --tb=short -q
-      - run: python -c "import sentry_sdk"

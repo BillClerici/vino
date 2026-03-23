@@ -81,8 +81,10 @@ DATABASES = {
     'default': env.db('DATABASE_URL')
 }
 
-# Raw connection string for LangGraph checkpointer (psycopg3 format)
+# Raw connection strings for LangGraph checkpointer (psycopg3 format)
 DATABASE_URL = env('DATABASE_URL')
+# Direct connection (bypasses PgBouncer) — used for migrations and LangGraph
+DATABASE_URL_DIRECT = env('DATABASE_URL_DIRECT', default=DATABASE_URL)
 
 AUTH_USER_MODEL = 'users.User'
 
