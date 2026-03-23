@@ -146,6 +146,12 @@ class _NearbyTabState extends ConsumerState<_NearbyTab> {
   List<Map<String, dynamic>>? _places;
   bool _loading = true;
   String? _error;
+  int _radiusMiles = 25;
+
+  static const _radiusOptions = [25, 50, 100];
+
+  // Convert miles to meters
+  int get _radiusMeters => (_radiusMiles * 1609.34).round();
 
   @override
   void initState() {
@@ -161,7 +167,7 @@ class _NearbyTabState extends ConsumerState<_NearbyTab> {
       final resp = await api.get(ApiPaths.nearbyPlaces, queryParameters: {
         'lat': '${loc.latitude}',
         'lng': '${loc.longitude}',
-        'radius': '40000',
+        'radius': '$_radiusMeters',
       });
       final data = resp.data['data'] as Map<String, dynamic>? ?? resp.data as Map<String, dynamic>;
       final places = (data['places'] as List?)?.cast<Map<String, dynamic>>() ?? [];
@@ -171,24 +177,19 @@ class _NearbyTabState extends ConsumerState<_NearbyTab> {
     }
   }
 
-  Color _typeColor(String? type) {
-    switch (type) {
-      case 'winery': return const Color(0xFF8E44AD);
-      case 'brewery': return Colors.orange;
-      default: return Colors.blueGrey;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     if (_loading) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 12),
-            Text('Finding places near you...', style: TextStyle(color: Colors.grey)),
+            const CircularProgressIndicator(),
+            const SizedBox(height: 12),
+            Text('Finding places within $_radiusMiles miles...',
+                style: const TextStyle(color: Colors.grey)),
           ],
         ),
       );
@@ -207,35 +208,124 @@ class _NearbyTabState extends ConsumerState<_NearbyTab> {
         ),
       );
     }
-    if (_places == null || _places!.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.explore_off, size: 48, color: Colors.grey[400]),
-            const SizedBox(height: 12),
-            const Text('No wineries or breweries found nearby'),
-            const SizedBox(height: 8),
-            FilledButton(onPressed: _loadNearby, child: const Text('Retry')),
-          ],
-        ),
-      );
-    }
 
-    return RefreshIndicator(
-      onRefresh: _loadNearby,
-      child: ListView.builder(
-        padding: const EdgeInsets.all(8),
-        itemCount: _places!.length,
-        itemBuilder: (_, i) => _NearbyPlaceCard(place: _places![i]),
-      ),
+    return Column(
+      children: [
+        // Radius selector
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+          child: Row(
+            children: [
+              Icon(Icons.near_me, size: 16, color: colorScheme.primary),
+              const SizedBox(width: 6),
+              Text('Within', style: TextStyle(fontSize: 13, color: Colors.grey[700])),
+              const SizedBox(width: 8),
+              ..._radiusOptions.map((miles) => Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: ChoiceChip(
+                  label: Text('$miles mi', style: const TextStyle(fontSize: 12)),
+                  selected: _radiusMiles == miles,
+                  onSelected: (_) {
+                    setState(() => _radiusMiles = miles);
+                    _loadNearby();
+                  },
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              )),
+              const Spacer(),
+              if (_places != null)
+                Text('${_places!.length} found',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+            ],
+          ),
+        ),
+
+        // Results
+        Expanded(
+          child: _places == null || _places!.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.explore_off, size: 48, color: Colors.grey[400]),
+                      const SizedBox(height: 12),
+                      Text('No wineries or breweries within $_radiusMiles miles'),
+                      const SizedBox(height: 8),
+                      if (_radiusMiles < 100)
+                        OutlinedButton(
+                          onPressed: () {
+                            final nextIdx = _radiusOptions.indexOf(_radiusMiles) + 1;
+                            if (nextIdx < _radiusOptions.length) {
+                              setState(() => _radiusMiles = _radiusOptions[nextIdx]);
+                              _loadNearby();
+                            }
+                          },
+                          child: Text('Try ${_radiusOptions[_radiusOptions.indexOf(_radiusMiles) + 1 < _radiusOptions.length ? _radiusOptions.indexOf(_radiusMiles) + 1 : _radiusOptions.length - 1]} miles'),
+                        ),
+                    ],
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _loadNearby,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    itemCount: _places!.length,
+                    itemBuilder: (_, i) => _NearbyPlaceCard(
+                      place: _places![i],
+                      onStartTrip: () {
+                        final name = _places![i]['name'] as String? ?? '';
+                        // Create place in our DB first, then start trip
+                        _startTripFromNearby(context, _places![i]);
+                      },
+                    ),
+                  ),
+                ),
+        ),
+      ],
     );
+  }
+
+  Future<void> _startTripFromNearby(BuildContext context, Map<String, dynamic> place) async {
+    try {
+      final api = ref.read(apiClientProvider);
+      // Create or find the place in our DB
+      final createResp = await api.post(ApiPaths.places, data: {
+        'name': place['name'],
+        'place_type': place['place_type'] ?? 'winery',
+        'address': place['address'] ?? '',
+        'latitude': place['latitude'],
+        'longitude': place['longitude'],
+        'website': place['website'] ?? '',
+        'phone': place['phone'] ?? '',
+        'description': place['description'] ?? '',
+        'image_url': place['image_url'] ?? '',
+      });
+      final placeData = createResp.data['data'] as Map<String, dynamic>;
+      final placeId = placeData['id'] as String;
+
+      if (context.mounted) {
+        startTripFromPlace(
+          context: context,
+          ref: ref,
+          placeId: placeId,
+          placeName: place['name'] as String? ?? '',
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
   }
 }
 
 class _NearbyPlaceCard extends StatelessWidget {
   final Map<String, dynamic> place;
-  const _NearbyPlaceCard({required this.place});
+  final VoidCallback? onStartTrip;
+  const _NearbyPlaceCard({required this.place, this.onStartTrip});
 
   Color _typeColor(String? type) {
     switch (type) {
@@ -409,6 +499,9 @@ class _NearbyPlaceCard extends StatelessWidget {
                 const SizedBox(height: 10),
                 Row(
                   children: [
+                    if (onStartTrip != null)
+                      _ActionChip(icon: Icons.directions_car, label: 'Start Trip',
+                          onTap: onStartTrip!),
                     if (phone.isNotEmpty)
                       _ActionChip(icon: Icons.phone, label: 'Call',
                           onTap: () => launchUrl(Uri.parse('tel:$phone'))),
