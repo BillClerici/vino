@@ -6,9 +6,10 @@ enum HelpCategory {
   trips('Trips', Icons.map),
   stops('Stops & Drinks', Icons.place),
   drinks('Drinks', Icons.local_drink),
+  sippy('Sippy AI', Icons.auto_awesome),
   visits('Visits', Icons.history),
   explore('Explore', Icons.explore),
-  profile('Profile', Icons.person);
+  profile('Profile & Tools', Icons.person);
 
   final String label;
   final IconData icon;

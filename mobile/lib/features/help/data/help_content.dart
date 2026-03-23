@@ -8,30 +8,34 @@ const allHelpArticles = <HelpArticle>[
   // ══════════════════════════════════════════════════════════════
   HelpArticle(
     id: 'getting-started-overview',
-    title: 'Welcome to Vino',
+    title: 'Welcome to Trip Me',
     category: HelpCategory.gettingStarted,
     icon: Icons.waving_hand,
-    keywords: ['welcome', 'overview', 'intro', 'about', 'what'],
+    keywords: ['welcome', 'overview', 'intro', 'about', 'what', 'trip me'],
     relatedRoutePrefix: '/dashboard',
     sections: [
       HelpSection(
         body:
-            'Vino helps you plan wine and brewery trips, check in at stops along the way, '
-            'log the drinks you taste, rate your experiences, and build a history of your visits.',
+            'Trip Me helps you plan wine, brewery, and restaurant trips with AI-powered assistance. '
+            'Check in at stops, log drinks, rate experiences, get personalized recommendations, '
+            'and build a history of your tasting adventures.',
       ),
       HelpSection(
-        heading: 'What You Can Do',
+        heading: 'Key Features',
         body:
-            'Plan trips with multiple stops at wineries, breweries, and restaurants. '
-            'Check in when you arrive, browse the drink menu, log what you taste with photos and ratings, '
-            'and look back at your visit history anytime.',
+            'Plan trips manually or with Sippy AI. '
+            'Check in at stops, log drinks with photos and ratings. '
+            'Get AI-powered recommendations, food pairings, and tasting flights. '
+            'Track your wishlist, cellar, palate profile, and achievements. '
+            'View your journey on an interactive map.',
       ),
       HelpSection(
         heading: 'Navigation',
         body:
-            'Use the bottom navigation bar to move between the main sections of the app: '
-            'Home (Dashboard), Explore, Trips, Visits, and Profile.',
-        tipText: 'Tap the "?" icon in the top-right of any screen for help specific to that page.',
+            'Use the bottom navigation bar for main sections: Home, Explore, Trips, Visits, and Profile. '
+            'Use the hamburger menu (top-left) for quick access to your Profile, Wishlist, Cellar, Palate, '
+            'Achievements, Journey Map, and Help.',
+        tipText: 'Tap the "?" icon on any screen for context-specific help.',
       ),
     ],
   ),
@@ -41,35 +45,38 @@ const allHelpArticles = <HelpArticle>[
     title: 'Planning Your First Trip',
     category: HelpCategory.gettingStarted,
     icon: Icons.assistant,
-    keywords: ['first', 'trip', 'plan', 'start', 'begin', 'new'],
+    keywords: ['first', 'trip', 'plan', 'start', 'begin', 'new', 'sippy'],
     relatedRoutePrefix: '/trips',
     sections: [
       HelpSection(
-        heading: 'Step 1: Create a Trip',
+        heading: 'Option 1: Plan with Sippy AI',
         body:
-            'Go to the Trips tab and tap the "+" button. Give your trip a name, optional description, '
-            'and set a date. Tap "Create" to get started.',
+            'On the Trips screen, tap the "Sippy" button. Tell Sippy where you want to go, '
+            'when, and what you like. Sippy will ask a few quick questions, search for places, '
+            'and build a complete trip with stops, times, and drive distances. '
+            'Review the preview and tap "Looks Good!" to create it.',
+        stepIcon: Icons.auto_awesome,
+      ),
+      HelpSection(
+        heading: 'Option 2: Create Manually',
+        body:
+            'Tap the "+" button on the Trips screen. Give your trip a name and date. '
+            'Then add stops by searching for places.',
         stepIcon: Icons.add_circle,
       ),
       HelpSection(
-        heading: 'Step 2: Add Stops',
+        heading: 'Starting Your Trip',
         body:
-            'From your trip details, tap "Add Stop". Search for wineries, breweries, or restaurants '
-            'by name or location. Tap a marker on the map or a result in the list, then tap "Add to Trip".',
-        stepIcon: Icons.add_location,
-      ),
-      HelpSection(
-        heading: 'Step 3: Start Your Trip',
-        body:
-            'When you are ready, tap "Start Trip" to enter live mode. '
-            'Navigate between stops, check in when you arrive, and log your drinks and ratings.',
+            'Trips automatically activate on the scheduled date and time. '
+            'You can also start a trip manually from the trip detail screen. '
+            'Once active, navigate between stops, check in, and log your experience.',
         stepIcon: Icons.play_circle,
       ),
       HelpSection(
-        heading: 'Step 4: Complete Your Trip',
+        heading: 'Completing Your Trip',
         body:
-            'After your last stop, tap "Complete Trip" to finish. '
-            'Your visits, drinks, and ratings are saved to your history.',
+            'At your last stop, tap "Complete Trip". '
+            'For completed trips, you can view a Trip Recap with all your stops, wines, ratings, and photos.',
         stepIcon: Icons.celebration,
       ),
     ],
@@ -80,68 +87,160 @@ const allHelpArticles = <HelpArticle>[
     title: 'Getting Around the App',
     category: HelpCategory.gettingStarted,
     icon: Icons.navigation,
-    keywords: ['navigate', 'tabs', 'menu', 'bottom', 'bar', 'screens'],
+    keywords: ['navigate', 'tabs', 'menu', 'bottom', 'bar', 'drawer', 'hamburger'],
     sections: [
       HelpSection(
-        heading: 'Home',
+        heading: 'Bottom Navigation',
         body:
-            'Your dashboard with stats (trips, visits, places, average rating), '
-            'active trips, recent visits, top-rated places, and new places to discover.',
-        stepIcon: Icons.dashboard,
+            'Home — dashboard with stats, active trips, recent visits.\n'
+            'Explore — search and browse places on a map.\n'
+            'Trips — your trips list, create new or plan with Sippy.\n'
+            'Visits — your check-in history.\n'
+            'Profile — your account, stats, and settings.',
       ),
       HelpSection(
-        heading: 'Explore',
+        heading: 'Main Menu (Hamburger)',
         body:
-            'Search and browse wineries, breweries, and restaurants. '
-            'View them on a map, see details, and add them to your favorites.',
-        stepIcon: Icons.explore,
+            'Tap the hamburger icon (top-left on main screens) to access:\n'
+            'Profile, Journey Map, My Wishlist, My Cellar, My Palate, '
+            'Achievements, Help & Guide, and Log Out.',
       ),
       HelpSection(
-        heading: 'Trips',
+        heading: 'Trip Navigation Drawer',
         body:
-            'View, create, and manage your trips. '
-            'Each trip has stops you can plan, reorder, and visit in live mode.',
-        stepIcon: Icons.map,
+            'Inside a trip or stop, tap the menu icon (top-right) to open the trip drawer. '
+            'Jump to any stop, view the full route, trip recap, group palate match, '
+            'or edit/delete the trip or stop.',
+      ),
+    ],
+  ),
+
+  // ══════════════════════════════════════════════════════════════
+  // SIPPY AI
+  // ══════════════════════════════════════════════════════════════
+  HelpArticle(
+    id: 'sippy-planner',
+    title: 'Plan with Sippy',
+    category: HelpCategory.sippy,
+    icon: Icons.auto_awesome,
+    keywords: ['sippy', 'plan', 'ai', 'trip', 'planner', 'create', 'suggest'],
+    relatedRoutePrefix: '/trips',
+    sections: [
+      HelpSection(
+        body:
+            'Sippy is your AI trip planning assistant. Tap the "Sippy" button on the Trips screen '
+            'to start a planning conversation.',
       ),
       HelpSection(
-        heading: 'Visits',
+        heading: 'How It Works',
         body:
-            'Your visit history. See all the places you have checked into, '
-            'sorted by date or grouped by place. View ratings and drinks from each visit.',
-        stepIcon: Icons.history,
+            '1. Tell Sippy where, when, and what you like.\n'
+            '2. Sippy asks a few follow-up questions (one at a time).\n'
+            '3. Sippy searches for real places and builds an itinerary.\n'
+            '4. Review the trip preview with stops, times, and a route map.\n'
+            '5. Tap "Looks Good!" to create the trip, or type changes.',
       ),
       HelpSection(
-        heading: 'Profile',
+        heading: 'Tips for Better Results',
         body:
-            'View your stats, manage your palate profile, subscription, and app settings.',
-        stepIcon: Icons.person,
+            'Include as much detail as possible in your first message: location, date, '
+            'start time, how long at each stop, max drive time, and what you like to drink. '
+            'Tap "Use as template" on the example prompt to get started quickly.',
+      ),
+      HelpSection(
+        heading: 'Conversation History',
+        body:
+            'Sippy conversations are saved automatically. Long-press the Sippy button '
+            'or tap the history icon in the chat header to see past conversations.',
       ),
     ],
   ),
 
   HelpArticle(
-    id: 'getting-started-checkin',
-    title: 'Your First Check-In',
-    category: HelpCategory.gettingStarted,
-    icon: Icons.check_circle,
-    keywords: ['check', 'in', 'checkin', 'arrive', 'first', 'visit'],
+    id: 'sippy-ask',
+    title: 'Ask Sippy',
+    category: HelpCategory.sippy,
+    icon: Icons.chat,
+    keywords: ['sippy', 'ask', 'chat', 'question', 'recommend', 'help', 'trip'],
     relatedRoutePrefix: '/trips',
     sections: [
       HelpSection(
         body:
-            'When you arrive at a stop during a live trip, open the stop details and tap the "Check In" button. '
-            'This creates a visit record and unlocks the ability to log drinks, rate your experience, and add notes.',
+            'When viewing a trip or stop, tap the "Sippy" button (bottom-right) to chat with Sippy '
+            'about that specific trip.',
       ),
       HelpSection(
-        heading: 'After Checking In',
+        heading: 'What You Can Ask',
         body:
-            'Once checked in, you will see new sections appear: My Drinks, Rate Experience, and Stop Notes. '
-            'The "Checked In" badge appears in the header — you can tap it to undo your check-in if needed.',
+            'What should I order at this stop?\n'
+            'Best order to visit the stops?\n'
+            'Wine pairing suggestions for dinner.\n'
+            'How long is the drive between stops?\n'
+            'Any must-try wines on the menu?',
+      ),
+      HelpSection(
+        body:
+            'Sippy knows your trip details, all stops, menus, members, your palate profile, '
+            'and your past visits. Answers are personalized to you.',
+      ),
+    ],
+  ),
+
+  HelpArticle(
+    id: 'sippy-recommendations',
+    title: 'AI Recommendations & Pairings',
+    category: HelpCategory.sippy,
+    icon: Icons.restaurant_menu,
+    keywords: ['recommend', 'pairing', 'food', 'wine', 'flight', 'suggest', 'ai'],
+    relatedRoutePrefix: '/trips',
+    sections: [
+      HelpSection(
+        body:
+            'After checking in at a stop that has a drink menu, three AI-powered tools appear:',
+      ),
+      HelpSection(
+        heading: 'Get Recommendations',
+        body:
+            'AI picks the top 3 drinks from the menu based on your palate profile and past ratings. '
+            'Tap any recommendation to add it as a drink.',
+      ),
+      HelpSection(
+        heading: 'Get Food Pairings',
+        body:
+            'At wineries/breweries: suggests food to pair with the drinks. '
+            'At restaurants: suggests wines/beers to pair with the food. '
+            'Each pairing includes why it works and a serving tip.',
+      ),
+      HelpSection(
+        heading: 'Build Tasting Flight',
+        body:
+            'AI builds a curated 4-drink tasting flight from the menu:\n'
+            'Opener (light/approachable) → Comfort (your style) → Stretch (something new) → Finisher (bold/memorable). '
+            'Each drink gets a role badge and tasting guidance.',
       ),
       HelpSection(
         tipText:
-            'You can undo a check-in by tapping the green "Checked In" badge. '
-            'This will clear all drinks, ratings, and notes for that stop so you can start fresh.',
+            'All three features save their results — they persist when you navigate away and return.',
+      ),
+    ],
+  ),
+
+  HelpArticle(
+    id: 'sippy-label-scanner',
+    title: 'Wine Label Scanner',
+    category: HelpCategory.sippy,
+    icon: Icons.document_scanner,
+    keywords: ['scan', 'label', 'camera', 'wine', 'recognize', 'photo', 'ai'],
+    relatedRoutePrefix: '/trips',
+    sections: [
+      HelpSection(
+        body:
+            'When adding a drink, tap "Scan Label with AI" at the top of the form. '
+            'Point your camera at a wine or beer label and the AI will extract the name, '
+            'varietal, vintage, and description automatically.',
+      ),
+      HelpSection(
+        tipText: 'Works best with clear, well-lit labels. The photo is also saved as the drink photo.',
       ),
     ],
   ),
@@ -154,54 +253,25 @@ const allHelpArticles = <HelpArticle>[
     title: 'Your Dashboard',
     category: HelpCategory.dashboard,
     icon: Icons.dashboard,
-    keywords: ['dashboard', 'home', 'stats', 'badges', 'overview'],
+    keywords: ['dashboard', 'home', 'stats', 'overview', 'active'],
     relatedRoutePrefix: '/dashboard',
     sections: [
       HelpSection(
-        heading: 'Stats Badges',
+        heading: 'Stats',
         body:
-            'The colored badges at the top show your key stats: total Trips, '
-            'Visits, unique Places visited, and your Average Rating across all visits.',
+            'Colored badges show your totals: Trips, Visits, unique Places, and Average Rating.',
       ),
       HelpSection(
         heading: 'Active Trips',
         body:
-            'The carousel shows your current trips that are not yet completed or cancelled. '
-            'Tap a trip card to open it. Cards show the trip name, dates, member and stop counts, '
-            'and a cover image from the first stop.',
+            'Carousel of your current trips (not completed or cancelled). '
+            'Trips automatically activate on their scheduled date and time.',
       ),
       HelpSection(
-        heading: 'Recent Visits',
+        heading: 'Recent Visits & Discover',
         body:
-            'Your latest 5 visits, showing the place name, date, wine count, and overall rating. '
-            'Tap any visit to see its full details.',
-      ),
-      HelpSection(
-        heading: 'Top Places & Discover',
-        body:
-            'Top Places shows your highest-rated venues. '
-            'Discover suggests places you have not visited yet, based on overall ratings.',
-      ),
-    ],
-  ),
-
-  HelpArticle(
-    id: 'dashboard-discover',
-    title: 'Discovering New Places',
-    category: HelpCategory.dashboard,
-    icon: Icons.auto_awesome,
-    keywords: ['discover', 'new', 'places', 'recommendations', 'suggest'],
-    relatedRoutePrefix: '/dashboard',
-    sections: [
-      HelpSection(
-        body:
-            'The Discover section on your dashboard shows places you have not visited yet, '
-            'ranked by their average rating from all users.',
-      ),
-      HelpSection(
-        body:
-            'Tap any place card to see its full details — address, website, phone, and menu items. '
-            'From the place details, you can add it to your favorites or start a new trip.',
+            'Recent Visits shows your latest 5 check-ins. '
+            'Discover suggests places you have not visited yet.',
       ),
     ],
   ),
@@ -214,90 +284,66 @@ const allHelpArticles = <HelpArticle>[
     title: 'Managing Your Trips',
     category: HelpCategory.trips,
     icon: Icons.map,
-    keywords: ['trips', 'list', 'manage', 'filter', 'status'],
+    keywords: ['trips', 'list', 'manage', 'filter', 'status', 'create'],
     relatedRoutePrefix: '/trips',
     sections: [
       HelpSection(
         body:
-            'The Trips screen lists all your trips. Use the search bar to find trips by name. '
-            'Trips are organized by status: Draft, Planning, Confirmed, In Progress, Completed, and Cancelled.',
-      ),
-      HelpSection(
-        heading: 'Trip Statuses',
-        body:
-            'Draft — just created, not yet planned.\n'
-            'Planning — adding stops and details.\n'
-            'Confirmed — ready to go, date set.\n'
-            'In Progress — currently on the trip.\n'
-            'Completed — trip is finished.\n'
-            'Cancelled — trip was cancelled.',
+            'The Trips screen lists all your trips. Search by name and filter by status.',
       ),
       HelpSection(
         heading: 'Creating a Trip',
         body:
-            'Tap the "+" button to create a new trip. You can also start a trip directly from the Explore tab '
-            'by finding a place and choosing "Start a Trip".',
+            'Two ways to create a trip:\n'
+            '1. Tap "Sippy" to plan with AI assistance.\n'
+            '2. Tap "+" to create manually with a name and date.',
       ),
-    ],
-  ),
-
-  HelpArticle(
-    id: 'trips-create',
-    title: 'Creating a Trip',
-    category: HelpCategory.trips,
-    icon: Icons.add_circle,
-    keywords: ['create', 'new', 'trip', 'plan', 'name', 'date'],
-    relatedRoutePrefix: '/trips',
-    sections: [
       HelpSection(
+        heading: 'Auto-Activation',
         body:
-            'To create a trip, tap the "+" button on the Trips screen. Fill in a trip name '
-            'and optionally a description, scheduled date, end date, and meeting point.',
+            'Trips with a scheduled date automatically move to "In Progress" when the date '
+            'and meeting time arrive. No need to manually start them.',
       ),
       HelpSection(
-        heading: 'Adding Stops',
+        heading: 'Trip Statuses',
         body:
-            'After creating the trip, open it and tap "Add Stop" to search for places. '
-            'You can search by name, city, or browse the map. Filter by type: Wineries, Breweries, or Restaurants.',
-      ),
-      HelpSection(
-        tipText:
-            'You can drag and drop stops to reorder them. The order determines the suggested route for your trip.',
+            'Draft → Planning → Confirmed → In Progress → Completed.\n'
+            'Cancelled trips are hidden from the active list.',
       ),
     ],
   ),
 
   HelpArticle(
     id: 'trips-detail',
-    title: 'Trip Details',
+    title: 'Trip Details & Drawer',
     category: HelpCategory.trips,
     icon: Icons.info,
-    keywords: ['trip', 'detail', 'edit', 'delete', 'members', 'stops', 'info'],
+    keywords: ['trip', 'detail', 'edit', 'delete', 'drawer', 'menu', 'route', 'recap'],
     relatedRoutePrefix: '/trips',
     sections: [
       HelpSection(
         body:
-            'The trip detail screen shows your trip name, dates, status, member count, and all planned stops. '
-            'A cover image is pulled from the first stop that has one.',
+            'The trip detail screen shows your trip with a hero image, dates, stops carousel, and members.',
       ),
       HelpSection(
-        heading: 'Editing & Deleting',
+        heading: 'Trip Drawer Menu',
         body:
-            'Tap the pencil icon in the header to edit the trip name, description, dates, and meeting point. '
-            'Tap the trash icon to delete the trip (you will be asked to confirm).',
+            'Tap the menu icon (top-right) to open the slide-out drawer with:\n'
+            'Trip Details — Overview, Recap, Show Full Route, Group Palate Match.\n'
+            'Stops — jump to any stop directly.\n'
+            'Manage — Edit Trip, Delete Trip.',
       ),
       HelpSection(
-        heading: 'Managing Stops',
+        heading: 'Trip Recap',
         body:
-            'Stops are listed in order below the trip info. Tap a stop to see its details. '
-            'Drag the handle on the right to reorder stops. '
-            'Tap "Add Stop" to search and add new places.',
+            'Available for completed trips. Shows a timeline of all stops visited, '
+            'wines tasted, ratings, photos, travel stats, and members. Shareable.',
       ),
       HelpSection(
-        heading: 'Starting Live Mode',
+        heading: 'Group Palate Match',
         body:
-            'When your trip is confirmed and the date has arrived, tap "Start Trip" to enter live mode. '
-            'This changes the trip status to In Progress and lets you check in at each stop.',
+            'For trips with 2+ members. AI analyzes everyone\'s palate profiles '
+            'and recommends wines/styles the whole group will enjoy.',
       ),
     ],
   ),
@@ -307,61 +353,29 @@ const allHelpArticles = <HelpArticle>[
     title: 'Live Trip Mode',
     category: HelpCategory.trips,
     icon: Icons.play_circle,
-    keywords: ['live', 'trip', 'progress', 'active', 'start', 'go'],
+    keywords: ['live', 'trip', 'progress', 'navigate', 'stop', 'prev', 'next'],
     relatedRoutePrefix: '/trips',
     sections: [
       HelpSection(
         body:
-            'Live mode activates when you start a trip. You will see a progress bar at the top '
-            'showing how many stops you have visited.',
+            'During an active trip, navigate between stops using the Previous/Next buttons at the bottom, '
+            'or jump to any stop via the trip drawer (menu icon).',
       ),
       HelpSection(
-        heading: 'Navigating Stops',
+        heading: 'At Each Stop',
         body:
-            'Use the Previous and Next buttons at the bottom of each stop to move between them. '
-            'The stop order matches what you planned in the trip details.',
+            'Check in to unlock: drink menu, AI recommendations, food pairings, tasting flights, '
+            'drink logging, ratings, notes, and the activity feed.',
+      ),
+      HelpSection(
+        heading: 'Activity Feed',
+        body:
+            'See what other trip members are doing in real-time: check-ins, wines tasted, ratings.',
       ),
       HelpSection(
         heading: 'Completing the Trip',
         body:
-            'At your last stop, after checking in, a "Complete Trip" button appears. '
-            'Tap it to mark the trip as completed. All your visits and drinks are saved.',
-      ),
-    ],
-  ),
-
-  HelpArticle(
-    id: 'trips-stops',
-    title: 'Adding & Managing Stops',
-    category: HelpCategory.trips,
-    icon: Icons.add_location,
-    keywords: ['stop', 'add', 'remove', 'reorder', 'drag', 'search', 'map'],
-    relatedRoutePrefix: '/trips',
-    sections: [
-      HelpSection(
-        heading: 'Adding a Stop',
-        body:
-            'From the trip detail screen, tap "Add Stop". You can search by name or city, '
-            'or browse the map. Filter by place type: Wineries, Breweries, or Restaurants. '
-            'Tap a result and then "Add to Trip".',
-      ),
-      HelpSection(
-        heading: 'The Add Stop Map',
-        body:
-            'The map starts centered on Charlotte, NC. Pan the map to search a different area — '
-            'nearby places will load automatically. Tap a marker to see place details.',
-      ),
-      HelpSection(
-        heading: 'Reordering Stops',
-        body:
-            'On the trip detail screen, drag the handle icon on the right side of each stop card '
-            'to rearrange the order. The order determines your route.',
-      ),
-      HelpSection(
-        heading: 'Removing a Stop',
-        body:
-            'Open a stop and tap the trash icon in the header. Confirm the removal. '
-            'This also removes any check-ins, drinks, and ratings for that stop.',
+            'At the last stop, tap "Complete Trip" to finish. View the Trip Recap afterward.',
       ),
     ],
   ),
@@ -374,118 +388,37 @@ const allHelpArticles = <HelpArticle>[
     title: 'At a Stop',
     category: HelpCategory.stops,
     icon: Icons.place,
-    keywords: ['stop', 'detail', 'map', 'address', 'phone', 'check', 'in', 'favorite'],
+    keywords: ['stop', 'detail', 'check', 'in', 'map', 'menu', 'favorite'],
     relatedRoutePrefix: '/trips',
     sections: [
       HelpSection(
         body:
-            'The stop detail screen shows the place name, address, phone, website, and a map. '
-            'Tap the address to open it in Google Maps for directions.',
+            'Each stop shows the place photo, map, address, phone, website, and drink menu.',
       ),
       HelpSection(
         heading: 'Checking In',
         body:
-            'During a live trip, tap the "Check In" button to record your arrival. '
-            'This unlocks My Drinks, Rate Experience, and Stop Notes sections.',
+            'Tap "Check In" to record your arrival. This unlocks AI tools (recommendations, '
+            'pairings, flights), drink logging, ratings, notes, and the activity feed.',
       ),
       HelpSection(
-        heading: 'Favorites',
+        heading: 'Wishlist Notifications',
         body:
-            'Tap the heart icon in the header to add or remove a place from your favorites. '
-            'Favorites appear in the Explore tab under the Favorites section.',
+            'When you check in, the app checks if any drinks on your wishlist are on the menu. '
+            'If found, you get a notification!',
       ),
       HelpSection(
-        heading: 'Editing & Deleting',
+        heading: 'Drink Menu',
         body:
-            'Use the pencil icon to edit stop details and the trash icon to remove the stop from the trip.',
+            'Browse the drink menu (fetched from the place\'s website). '
+            'Tap the bookmark icon on any item to add it to your wishlist. '
+            'Tap an item to log it as a drink.',
       ),
-    ],
-  ),
-
-  HelpArticle(
-    id: 'stops-drinks',
-    title: 'Logging Your Drinks',
-    category: HelpCategory.stops,
-    icon: Icons.local_drink,
-    keywords: ['drink', 'wine', 'beer', 'log', 'add', 'menu', 'taste', 'tasting'],
-    relatedRoutePrefix: '/trips',
-    sections: [
       HelpSection(
+        heading: 'Undo Check-In',
         body:
-            'After checking in, the "My Drinks" section appears. You can add drinks two ways:',
-      ),
-      HelpSection(
-        heading: 'From the Drink Menu',
-        body:
-            'If the place has a drink menu loaded, tap any item in the menu carousel to pre-fill '
-            'the drink form with its name and varietal. '
-            'The menu can be fetched from the place\'s website — tap "Fetch Drink Menu from Website".',
-      ),
-      HelpSection(
-        heading: 'Manual Entry',
-        body:
-            'Tap "Add Drink" to manually enter a drink. Fill in the name, type (varietal), '
-            'serving size, tasting notes, rating comments, and star rating. '
-            'You can also take a photo, mark it as a favorite, or track if you purchased a bottle.',
-      ),
-      HelpSection(
-        heading: 'Editing & Removing',
-        body:
-            'Tap a drink card to expand it and see full details. '
-            'Use the Edit button to modify any field, or Remove to delete it.',
-      ),
-      HelpSection(
-        tipText:
-            'Tap the drink thumbnail image to view it full-screen with pinch-to-zoom.',
-      ),
-    ],
-  ),
-
-  HelpArticle(
-    id: 'stops-ratings',
-    title: 'Rating Your Experience',
-    category: HelpCategory.stops,
-    icon: Icons.star,
-    keywords: ['rate', 'rating', 'star', 'staff', 'ambience', 'food', 'overall'],
-    relatedRoutePrefix: '/trips',
-    sections: [
-      HelpSection(
-        body:
-            'After checking in, the "Rate Experience" section lets you rate four aspects '
-            'of your visit on a 1-5 star scale:',
-      ),
-      HelpSection(
-        heading: 'Rating Categories',
-        body:
-            'Overall — your general impression.\n'
-            'Staff — friendliness and knowledge.\n'
-            'Ambience — atmosphere and setting.\n'
-            'Food & Drinks — quality of what was served.',
-      ),
-      HelpSection(
-        body:
-            'Ratings are saved automatically when you tap the stars. '
-            'Your average rating across visits is shown on your dashboard.',
-      ),
-    ],
-  ),
-
-  HelpArticle(
-    id: 'stops-notes',
-    title: 'Adding Notes',
-    category: HelpCategory.stops,
-    icon: Icons.note,
-    keywords: ['note', 'notes', 'text', 'write', 'comment', 'stop'],
-    relatedRoutePrefix: '/trips',
-    sections: [
-      HelpSection(
-        body:
-            'After checking in, the "Stop Notes" section lets you write free-form notes about your visit. '
-            'These are separate from drink-level tasting notes and rating comments.',
-      ),
-      HelpSection(
-        tipText:
-            'Use stop notes for things like parking tips, special events, or recommendations for next time.',
+            'Tap the green "Checked In" badge to undo. '
+            'This clears all drinks, ratings, and notes for that stop.',
       ),
     ],
   ),
@@ -495,63 +428,36 @@ const allHelpArticles = <HelpArticle>[
   // ══════════════════════════════════════════════════════════════
   HelpArticle(
     id: 'drinks-add',
-    title: 'Adding a Drink',
+    title: 'Logging Drinks',
     category: HelpCategory.drinks,
-    icon: Icons.add_circle,
-    keywords: ['add', 'drink', 'form', 'name', 'type', 'serving', 'rating', 'favorite', 'purchase'],
+    icon: Icons.local_drink,
+    keywords: ['drink', 'wine', 'beer', 'log', 'add', 'taste', 'tasting', 'scan'],
     relatedRoutePrefix: '/trips',
     sections: [
       HelpSection(
-        body: 'The drink form lets you capture everything about what you tasted:',
+        body: 'After checking in, add drinks from the menu or manually:',
       ),
       HelpSection(
-        heading: 'Basic Info',
-        body:
-            'Drink Name (required) — the name of the wine or beer.\n'
-            'Type — the varietal (e.g., Chardonnay, IPA). Options change based on whether the place is a winery or brewery.\n'
-            'Serving — how it was served (tasting, glass, flight, pint, etc.).',
+        heading: 'From the Menu',
+        body: 'Tap any item in the drink menu scroll to pre-fill the form.',
       ),
       HelpSection(
-        heading: 'Notes & Rating',
+        heading: 'Scan a Label',
         body:
-            'Tasting Notes — describe the flavors, aromas, and mouthfeel.\n'
-            'Rating Comments — what you liked or disliked.\n'
-            'Rating — 1 to 5 stars.',
+            'Tap "Scan Label with AI" at the top of the drink form. '
+            'Point your camera at the label to auto-fill name, varietal, and vintage.',
       ),
       HelpSection(
-        heading: 'Photo, Favorite & Purchase',
+        heading: 'What You Can Log',
         body:
-            'Photo — take a picture with your camera or pick from your gallery.\n'
-            'Favorite — mark drinks you love for easy reference later.\n'
-            'Bought a bottle/to go — track purchases with price and quantity.',
-      ),
-    ],
-  ),
-
-  HelpArticle(
-    id: 'drinks-photos',
-    title: 'Drink Photos',
-    category: HelpCategory.drinks,
-    icon: Icons.camera_alt,
-    keywords: ['photo', 'camera', 'gallery', 'image', 'picture', 'zoom'],
-    relatedRoutePrefix: '/trips',
-    sections: [
-      HelpSection(
-        body:
-            'You can attach a photo to any drink. In the drink form, use the Camera button to take a new photo '
-            'or the Gallery button to pick an existing one.',
+            'Name, type (varietal), serving size, tasting notes, rating (1-5 stars), '
+            'rating comments, photo, favorite toggle, and purchase tracking (price + quantity).',
       ),
       HelpSection(
-        heading: 'Viewing Photos',
+        heading: 'Wishlist',
         body:
-            'Photos appear as thumbnails on the drink card. '
-            'Tap the thumbnail to open a full-screen view where you can pinch to zoom and pan.',
-      ),
-      HelpSection(
-        heading: 'Removing a Photo',
-        body:
-            'In the drink form, tap the X button on the photo preview to remove it. '
-            'Save the drink to confirm the removal.',
+            'Tap "Add to Wishlist" in the drink form to save a wine for later. '
+            'You can also bookmark drinks directly from the drink menu.',
       ),
     ],
   ),
@@ -564,72 +470,21 @@ const allHelpArticles = <HelpArticle>[
     title: 'Your Visit History',
     category: HelpCategory.visits,
     icon: Icons.history,
-    keywords: ['visit', 'history', 'list', 'sort', 'group', 'place'],
+    keywords: ['visit', 'history', 'list', 'sort', 'detail'],
     relatedRoutePrefix: '/visits',
     sections: [
       HelpSection(
         body:
             'The Visits screen shows every place you have checked into. '
-            'By default, visits are grouped by place so you can see how many times you have been to each venue.',
+            'Sort by date or rating, group by place, or search by name.',
       ),
       HelpSection(
-        heading: 'Sorting',
+        heading: 'Visit Details',
         body:
-            'Use the "Sort by" dropdown to change the order: Newest First, Oldest First, '
-            'Highest Rated, or Lowest Rated.',
-      ),
-      HelpSection(
-        heading: 'Grouping',
-        body:
-            'Toggle "Group by Place" to group visits under place headers with a visit count badge, '
-            'or turn it off for a flat chronological list.',
-      ),
-      HelpSection(
-        heading: 'Place Details',
-        body:
-            'Tap the info icon on any visit or place group header to go to the Place Details page. '
-            'Tap the visit itself to see its full details with ratings and drinks.',
-      ),
-    ],
-  ),
-
-  HelpArticle(
-    id: 'visits-checkin',
-    title: 'Standalone Check-In',
-    category: HelpCategory.visits,
-    icon: Icons.add_location_alt,
-    keywords: ['checkin', 'standalone', 'outside', 'trip', 'manual', 'walk-in'],
-    relatedRoutePrefix: '/visits',
-    sections: [
-      HelpSection(
-        body:
-            'You can check in to a place without being on a trip. '
-            'On the Visits screen, tap the "+" button to start a standalone check-in.',
-      ),
-      HelpSection(
-        body:
-            'Search for the place, select it, and add your ratings and notes. '
-            'The visit will appear in your history just like a trip check-in.',
-      ),
-    ],
-  ),
-
-  HelpArticle(
-    id: 'visits-detail',
-    title: 'Visit Details',
-    category: HelpCategory.visits,
-    icon: Icons.visibility,
-    keywords: ['visit', 'detail', 'ratings', 'wines', 'drinks', 'view'],
-    relatedRoutePrefix: '/visits',
-    sections: [
-      HelpSection(
-        body:
-            'Tap any visit to see its full details: the place, visit date, your four ratings '
-            '(Overall, Staff, Ambience, Food), any notes you wrote, and all the drinks you logged.',
-      ),
-      HelpSection(
-        body:
-            'Each drink shows its name, type, serving, rating, and any tasting notes or photos you added.',
+            'Tap a visit to see the full detail page with: place photo header, '
+            'quick stats (tastings, rating, favorites, purchases), '
+            'experience rating bars, notes, photo gallery, and all drinks tasted with '
+            'type badges, ratings, and tasting notes.',
       ),
     ],
   ),
@@ -638,104 +493,59 @@ const allHelpArticles = <HelpArticle>[
   // EXPLORE
   // ══════════════════════════════════════════════════════════════
   HelpArticle(
-    id: 'explore-list',
-    title: 'Browsing Places',
+    id: 'explore-overview',
+    title: 'Exploring Places',
     category: HelpCategory.explore,
-    icon: Icons.list,
-    keywords: ['explore', 'browse', 'list', 'search', 'places', 'find'],
+    icon: Icons.explore,
+    keywords: ['explore', 'browse', 'search', 'map', 'places', 'favorite'],
     relatedRoutePrefix: '/explore',
     sections: [
       HelpSection(
         body:
-            'The Explore screen has three tabs: Places (list), Map, and Favorites. '
-            'Use the search bar to find places by name or city.',
+            'Three tabs: Places (list), Map, and Favorites. '
+            'Search by name or city. Tap any place for full details.',
       ),
       HelpSection(
-        heading: 'Place Cards',
+        heading: 'Map',
         body:
-            'Each card shows the place name, type, location, visit count, and average rating. '
-            'Tap a card to see full details including address, phone, website, and drink menu.',
+            'Interactive map with color-coded markers (purple=winery, orange=brewery, green=restaurant). '
+            'Pan and zoom to explore. Nearby places load automatically.',
       ),
       HelpSection(
-        heading: 'From Place Details',
+        heading: 'Favorites',
         body:
-            'From a place detail page you can tap the heart to favorite it, '
-            'view the address on a map, call the phone number, or visit the website.',
-      ),
-    ],
-  ),
-
-  HelpArticle(
-    id: 'explore-map',
-    title: 'Map View',
-    category: HelpCategory.explore,
-    icon: Icons.map,
-    keywords: ['map', 'explore', 'marker', 'pin', 'search', 'nearby', 'location'],
-    relatedRoutePrefix: '/explore',
-    sections: [
-      HelpSection(
-        body:
-            'The Map tab shows places as markers on an interactive map. '
-            'Markers are color-coded: purple for wineries, orange for breweries, green for restaurants.',
+            'Tap the heart icon on any place to favorite it. '
+            'View all favorites in the Favorites tab.',
       ),
       HelpSection(
-        heading: 'Searching',
+        heading: 'Start a Trip',
         body:
-            'Type a name or city in the search bar and press enter. '
-            'Results appear as markers on the map and in a list below.',
-      ),
-      HelpSection(
-        heading: 'Browsing by Area',
-        body:
-            'Pan or zoom the map to explore different areas. '
-            'When you stop moving, nearby places load automatically based on the visible area.',
-      ),
-    ],
-  ),
-
-  HelpArticle(
-    id: 'explore-favorites',
-    title: 'Your Favorites',
-    category: HelpCategory.explore,
-    icon: Icons.favorite,
-    keywords: ['favorite', 'heart', 'save', 'like', 'bookmark'],
-    relatedRoutePrefix: '/explore',
-    sections: [
-      HelpSection(
-        body:
-            'The Favorites tab in Explore shows all places you have hearted. '
-            'Tap the heart icon on any place card or in the place detail header to toggle it.',
-      ),
-      HelpSection(
-        body:
-            'Favorites are a quick way to save places you want to visit later. '
-            'You can create a trip from your favorites by going to a favorite place and adding it as a stop.',
+            'From any place detail, tap "Start Trip" to create a new trip with that place as the first stop.',
       ),
     ],
   ),
 
   // ══════════════════════════════════════════════════════════════
-  // PROFILE
+  // PROFILE & TOOLS
   // ══════════════════════════════════════════════════════════════
   HelpArticle(
     id: 'profile-overview',
     title: 'Your Profile',
     category: HelpCategory.profile,
     icon: Icons.person,
-    keywords: ['profile', 'account', 'stats', 'avatar', 'info'],
+    keywords: ['profile', 'account', 'stats', 'menu', 'drawer'],
     relatedRoutePrefix: '/profile',
     sections: [
       HelpSection(
         body:
-            'Your profile shows your avatar, name, email, and key stats '
-            '(total visits, unique places, average rating).',
+            'Your profile shows your avatar, name, email, subscription status, and activity stats.',
       ),
       HelpSection(
-        heading: 'Menu Items',
+        heading: 'Quick Access (Main Menu)',
         body:
-            'My Palate — your taste preferences and palate profile.\n'
-            'Subscription — manage your subscription status and billing.\n'
-            'Help & Guide — the help system you are reading right now.',
+            'Tap the hamburger icon (top-left) on any main screen for:\n'
+            'Profile, Journey Map, My Wishlist, My Cellar, My Palate, '
+            'Achievements, Help & Guide, and Log Out.',
       ),
     ],
   ),
@@ -745,17 +555,125 @@ const allHelpArticles = <HelpArticle>[
     title: 'My Palate',
     category: HelpCategory.profile,
     icon: Icons.insights,
-    keywords: ['palate', 'taste', 'preference', 'profile', 'flavor'],
+    keywords: ['palate', 'taste', 'preference', 'analyze', 'sippy', 'ai'],
     relatedRoutePrefix: '/profile/palate',
     sections: [
       HelpSection(
         body:
-            'The Palate Profile captures your drink preferences — the types of wines or beers '
-            'you enjoy, flavor profiles you prefer, and your experience level.',
+            'Your AI-generated taste profile based on your tasting history.',
+      ),
+      HelpSection(
+        heading: 'Analyze My Palate',
+        body:
+            'Tap "Analyze My Palate with AI" to have Claude analyze your ratings, '
+            'wines, and notes. Get a summary of your preferences (sweetness, body, acidity, '
+            'tannins), favorite styles, and personalized recommendations.',
+      ),
+      HelpSection(
+        heading: 'Ask Sippy',
+        body:
+            'Tap the "Ask Sippy" button to chat about wine, beer, what to try next, '
+            'or any tasting questions based on your history.',
+      ),
+    ],
+  ),
+
+  HelpArticle(
+    id: 'profile-wishlist',
+    title: 'My Wishlist',
+    category: HelpCategory.profile,
+    icon: Icons.bookmark,
+    keywords: ['wishlist', 'want', 'try', 'bookmark', 'save', 'later'],
+    relatedRoutePrefix: '/profile/wishlist',
+    sections: [
+      HelpSection(
+        body:
+            'Your list of drinks to try later. Add drinks from the drink menu (bookmark icon) '
+            'or from the drink form ("Add to Wishlist").',
+      ),
+      HelpSection(
+        heading: 'Wishlist Alerts',
+        body:
+            'When you check in at a stop, the app checks if any wishlisted drinks '
+            'are on that place\'s menu. If found, you get a notification!',
+      ),
+      HelpSection(
+        body: 'Access from: Main Menu → My Wishlist, or Profile → My Wishlist.',
+      ),
+    ],
+  ),
+
+  HelpArticle(
+    id: 'profile-cellar',
+    title: 'My Cellar',
+    category: HelpCategory.profile,
+    icon: Icons.inventory_2,
+    keywords: ['cellar', 'purchase', 'bought', 'bottle', 'spend', 'collection'],
+    relatedRoutePrefix: '/profile/cellar',
+    sections: [
+      HelpSection(
+        body:
+            'Dashboard of drinks you have purchased. Shows total bottles, total spend, '
+            'average price, top places by spend, favorite varietals, and recent purchases.',
       ),
       HelpSection(
         body:
-            'This information can be used to help recommend drinks and places that match your taste.',
+            'Purchases are tracked when you toggle "Bought a bottle?" in the drink form '
+            'and enter the price and quantity.',
+      ),
+    ],
+  ),
+
+  HelpArticle(
+    id: 'profile-badges',
+    title: 'Achievements',
+    category: HelpCategory.profile,
+    icon: Icons.emoji_events,
+    keywords: ['badge', 'achievement', 'milestone', 'reward', 'progress'],
+    relatedRoutePrefix: '/profile/badges',
+    sections: [
+      HelpSection(
+        body:
+            '24 wine-themed badges across 6 categories: Explorer, Wine & Beer, Trips, '
+            'Sippy & AI, Ratings, and Purchases.',
+      ),
+      HelpSection(
+        heading: 'Examples',
+        body:
+            'First Sip — your first check-in.\n'
+            'Connoisseur — log 50 wines.\n'
+            'Road Tripper — complete your first trip.\n'
+            'Sippy\'s Friend — plan a trip with AI.\n'
+            'Take-Home — buy your first bottle.',
+      ),
+      HelpSection(
+        body: 'Tap any badge to see its description and your progress toward earning it.',
+      ),
+    ],
+  ),
+
+  HelpArticle(
+    id: 'profile-journey-map',
+    title: 'Journey Map',
+    category: HelpCategory.profile,
+    icon: Icons.map,
+    keywords: ['journey', 'map', 'history', 'visited', 'places', 'marker'],
+    relatedRoutePrefix: '/profile/history',
+    sections: [
+      HelpSection(
+        body:
+            'An interactive map showing every place you have visited. '
+            'Color-coded markers by place type.',
+      ),
+      HelpSection(
+        heading: 'Place Cards',
+        body:
+            'Tap any marker to see a card with: place photo, name, address, website, phone, '
+            'visit count, last visit date. Tap "Last Visit" to see the visit detail, '
+            'or "Start Trip" to create a new trip from that place.',
+      ),
+      HelpSection(
+        body: 'Access from: Main Menu → Journey Map.',
       ),
     ],
   ),
@@ -765,12 +683,12 @@ const allHelpArticles = <HelpArticle>[
     title: 'Subscription & Billing',
     category: HelpCategory.profile,
     icon: Icons.credit_card,
-    keywords: ['subscription', 'billing', 'payment', 'plan', 'trial', 'upgrade'],
+    keywords: ['subscription', 'billing', 'payment', 'plan', 'trial'],
     relatedRoutePrefix: '/profile/subscription',
     sections: [
       HelpSection(
         body:
-            'View your current subscription status, trial period, and billing details. '
+            'View your subscription status, trial period, and billing details. '
             'Manage your subscription through the customer portal.',
       ),
     ],
