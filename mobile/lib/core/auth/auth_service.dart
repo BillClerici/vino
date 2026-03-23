@@ -42,8 +42,12 @@ class AuthService {
     if (account == null) throw Exception('Google sign-in cancelled');
 
     final auth = await account.authentication;
-    final authCode = auth.serverAuthCode ?? auth.accessToken;
-    if (authCode == null) throw Exception('No auth code from Google');
+    print('[GoogleAuth] serverAuthCode: ${auth.serverAuthCode != null ? "present (${auth.serverAuthCode!.length} chars)" : "NULL"}');
+    print('[GoogleAuth] accessToken: ${auth.accessToken != null ? "present" : "NULL"}');
+    final authCode = auth.serverAuthCode;
+    if (authCode == null) {
+      throw Exception('No serverAuthCode from Google. Check that serverClientId is set and Android OAuth client SHA-1 matches.');
+    }
 
     final resp = await _api.post(
       '${ApiPaths.auth}/google/',
