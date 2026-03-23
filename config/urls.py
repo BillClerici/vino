@@ -9,11 +9,11 @@ from apps.api.views import auth_callback, health_check
 from apps.core.feature_views import (
     BadgesView,
     CellarView,
+    HelpView,
     JourneyMapView,
     SippyChatView,
     SippyHistoryView,
     SippyPlannerView,
-    HelpView,
     TripRecapView,
     UpdateOnboardingView,
     WishlistView,

@@ -9,7 +9,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.users.models import SocialAccount, User
 
-from .serializers import MobileGoogleAuthSerializer, MobileMicrosoftAuthSerializer
+from .serializers import MobileMicrosoftAuthSerializer
 
 logger = logging.getLogger(__name__)
 

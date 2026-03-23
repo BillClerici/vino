@@ -9,11 +9,9 @@ import logging
 
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Avg, Count, F, Max, Q, Sum
-from django.utils import timezone
 from django.views.generic import TemplateView
 
-from apps.palate.models import PalateProfile
-from apps.trips.models import SippyConversation, Trip, TripMember, TripStop
+from apps.trips.models import SippyConversation, Trip
 from apps.visits.models import VisitLog, VisitWine
 from apps.wineries.models import WineWishlist
 
