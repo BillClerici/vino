@@ -40,7 +40,7 @@ class WishlistViewSet(ModelViewSet):
         direct = list(
             self.get_queryset()
             .filter(menu_item__place_id=place_pk, menu_item__is_active=True)
-            .values("id", "wine_name", "wine_type", menu_item_name=None)
+            .values("id", "wine_name", "wine_type")
         )
 
         # Name-based matches
