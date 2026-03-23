@@ -1,4 +1,4 @@
-.PHONY: up down build migrate seed load-seed shell test lint
+.PHONY: up down build migrate seed load-seed seed-export seed-import shell test lint
 
 up:
 	docker-compose up -d
@@ -19,6 +19,27 @@ seed:
 
 load-seed:
 	docker-compose exec web python manage.py load_seed
+
+seed-export:
+	@echo "Exporting seed data from local DB..."
+	docker-compose exec web bash -c "python manage.py dumpdata \
+		--indent 2 \
+		--exclude contenttypes \
+		--exclude auth.permission \
+		--exclude admin.logentry \
+		--exclude sessions.session \
+		--exclude django_celery_results \
+		--exclude social_django \
+		--exclude users.socialaccount \
+		--exclude trips.sippyconversation \
+		> /app/seed_data.json"
+	docker cp vino-web:/app/seed_data.json ./seed_data.json
+	@echo "Exported to seed_data.json"
+
+seed-import:
+	@echo "Importing seed data into local DB..."
+	docker-compose exec web python manage.py loaddata seed_data.json
+	@echo "Done"
 
 shell:
 	docker-compose exec web python manage.py shell_plus

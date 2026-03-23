@@ -13,6 +13,11 @@ on:
         options:
           - dev
           - prod
+      seed_data:
+        description: 'Load seed data after migration'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   migrate:
@@ -34,6 +39,16 @@ jobs:
           DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
           FIELD_ENCRYPTION_KEY: ${{ secrets.FIELD_ENCRYPTION_KEY }}
         run: python manage.py migrate --no-input
+
+      - name: Load seed data
+        if: ${{ github.event.inputs.seed_data == 'true' }}
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.prod
+          DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL_DIRECT }}
+          DATABASE_URL_DIRECT: ${{ secrets.SUPABASE_DATABASE_URL_DIRECT }}
+          DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+          FIELD_ENCRYPTION_KEY: ${{ secrets.FIELD_ENCRYPTION_KEY }}
+        run: python manage.py loaddata seed_data.json
 
       - name: Verify no pending migrations
         env:
