@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../config/constants.dart';
 import '../../../core/api/api_client.dart';
+import '../../trips/widgets/sippy_planner_chat.dart';
 import '../providers/palate_provider.dart';
 
 class PalateScreen extends ConsumerStatefulWidget {
@@ -268,14 +269,65 @@ class _PalateScreenState extends ConsumerState<PalateScreen> {
   void _openChat(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                child: Container(
+                  width: 40, height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[400],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text('What would you like to do?',
+                  style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: Icon(Icons.chat, color: Theme.of(context).colorScheme.secondary),
+                title: const Text('Ask Sippy about wine & beer'),
+                subtitle: const Text('Get recommendations based on your palate'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  _openPalateChat(context);
+                },
+              ),
+              const Divider(),
+              ListTile(
+                leading: Icon(Icons.auto_awesome, color: Theme.of(context).colorScheme.primary),
+                title: const Text('Plan a trip with Sippy'),
+                subtitle: const Text('AI-powered trip planning'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  openSippyPlanner(context);
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openPalateChat(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => ProviderScope(
-        parent: ProviderScope.containerOf(context),
-        child: const _SommelierChat(),
-      ),
+      builder: (_) => const _SommelierChat(),
     );
   }
 }

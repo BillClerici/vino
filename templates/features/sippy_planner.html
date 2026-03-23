@@ -139,21 +139,53 @@
                 Hey, I'm Sippy! Tell me about the trip you're dreaming up — the more detail you give me upfront, the faster we'll get rolling!
             </div>
         </div>
+
+        <!-- What I'll ask you checklist -->
+        <div id="welcome-cards">
+            <div style="background:#e3f2fd;border:1px solid #90caf9;border-radius:12px;padding:14px;margin:8px 0 8px 0;max-width:75%;">
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+                    <i class="material-icons" style="font-size:16px;color:#1976d2;">checklist</i>
+                    <strong style="font-size:0.85rem;color:#1976d2;">What I'll ask you</strong>
+                </div>
+                <div style="font-size:0.85rem;color:#555;">
+                    <div style="padding:2px 0;"><i class="material-icons tiny grey-text">place</i> Where do you want to go?</div>
+                    <div style="padding:2px 0;"><i class="material-icons tiny grey-text">calendar_today</i> What date?</div>
+                    <div style="padding:2px 0;"><i class="material-icons tiny grey-text">access_time</i> What time to start?</div>
+                    <div style="padding:2px 0;"><i class="material-icons tiny grey-text">wine_bar</i> What do you like to drink?</div>
+                    <div style="padding:2px 0;"><i class="material-icons tiny grey-text">timer</i> How long at each stop?</div>
+                    <div style="padding:2px 0;"><i class="material-icons tiny grey-text">route</i> Max drive time between stops?</div>
+                    <div style="padding:2px 0;"><i class="material-icons tiny grey-text">music_note</i> Events or live music?</div>
+                </div>
+                <small style="color:#999;font-style:italic;">Include as many as you can in your first message!</small>
+            </div>
+
+            <!-- Example prompt -->
+            <div style="background:#fff8e1;border:1px solid #ffe082;border-radius:12px;padding:14px;margin:0 0 8px 0;max-width:75%;">
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+                    <i class="material-icons" style="font-size:16px;color:#f57f17;">lightbulb</i>
+                    <strong style="font-size:0.85rem;color:#f57f17;">Example prompt</strong>
+                </div>
+                <p style="font-size:0.85rem;color:#666;font-style:italic;margin:0 0 8px;" id="example-text">My wife and I would like to visit 3 wineries today starting around noon near I-77 in northern NC. We want to visit each stop for 60-90 minutes and keep drive time between stops to less than 20 minutes. We like both red and white wines. We also like live music.</p>
+                <button class="btn-small outlined blue-grey-text" style="border:1px solid #bdbdbd;background:#fff;" onclick="useExample()">
+                    <i class="material-icons left" style="font-size:14px;">edit</i>Use as template
+                </button>
+            </div>
+        </div>
     </div>
 
     <!-- Suggestions -->
     <div class="suggestions" id="suggestions">
         <div class="chip" onclick="sendSuggestion(this)">Wine trip to Napa today, 4 people, love Pinot</div>
         <div class="chip" onclick="sendSuggestion(this)">Brewery tour this Saturday near Portland</div>
-        <div class="chip" onclick="sendSuggestion(this)">Sonoma wine day tomorrow, start at 11am</div>
+        <div class="chip" onclick="sendSuggestion(this)">Sonoma wine day tomorrow, start at 11am, 3 stops</div>
     </div>
 
     <!-- Input -->
     <div class="chat-input">
         <form id="chat-form" onsubmit="return sendMessage(event)">
             {% csrf_token %}
-            <textarea id="msg-input" rows="1" placeholder="Describe your ideal trip..."
-                      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage(event);}"></textarea>
+            <textarea id="msg-input" rows="2" placeholder="Describe your ideal trip..."
+                      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage(event);}">
             <button type="submit" class="btn blue-grey" id="send-btn">
                 <i class="material-icons">send</i>
             </button>
@@ -252,7 +284,7 @@ async function sendMessage(event) {
 
     addMessage('user', text);
     input.value = '';
-    document.getElementById('suggestions').style.display = 'none';
+    hideWelcome();
     showThinking('Sippy is planning...');
 
     try {
@@ -320,6 +352,20 @@ function rejectTrip() {
     const input = document.getElementById('msg-input');
     input.value = "Let's start over with a different plan.";
     sendMessage(null);
+}
+
+function useExample() {
+    var text = document.getElementById('example-text').textContent;
+    document.getElementById('msg-input').value = text;
+    var cards = document.getElementById('welcome-cards');
+    if (cards) cards.remove();
+    document.getElementById('msg-input').focus();
+}
+
+function hideWelcome() {
+    var cards = document.getElementById('welcome-cards');
+    if (cards) cards.remove();
+    document.getElementById('suggestions').style.display = 'none';
 }
 
 function sendSuggestion(el) {
