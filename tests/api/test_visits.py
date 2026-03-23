@@ -10,14 +10,14 @@ class TestVisitAPI:
         VisitLogFactory.create_batch(3, user=authenticated_drf_client.user)
         resp = authenticated_drf_client.get("/api/v1/visits/")
         assert resp.status_code == 200
-        assert len(resp.data["data"]) == 3
+        assert len(resp.data["results"]) == 3
 
     def test_retrieve_visit(self, authenticated_drf_client):
         visit = VisitLogFactory(user=authenticated_drf_client.user)
         VisitWineFactory(visit=visit)
         resp = authenticated_drf_client.get(f"/api/v1/visits/{visit.id}/")
         assert resp.status_code == 200
-        assert len(resp.data["data"]["wines_tasted"]) == 1
+        assert len(resp.data["wines_tasted"]) == 1
 
     def test_checkin(self, authenticated_drf_client):
         place = PlaceFactory()
@@ -52,7 +52,7 @@ class TestVisitAPI:
         VisitLogFactory(user=authenticated_drf_client.user, rating_overall=2)
         resp = authenticated_drf_client.get("/api/v1/visits/?rating_min=4")
         assert resp.status_code == 200
-        assert len(resp.data["data"]) == 1
+        assert len(resp.data["results"]) == 1
 
     def test_soft_delete(self, authenticated_drf_client):
         visit = VisitLogFactory(user=authenticated_drf_client.user)
@@ -65,4 +65,4 @@ class TestVisitAPI:
         other_user = user_factory()
         VisitLogFactory(user=other_user)
         resp = authenticated_drf_client.get("/api/v1/visits/")
-        assert len(resp.data["data"]) == 0
+        assert len(resp.data["results"]) == 0

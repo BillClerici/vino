@@ -1,3 +1,5 @@
+import datetime
+
 import pytest
 
 from tests.factories.factories import (
@@ -10,8 +12,8 @@ from tests.factories.factories import (
 
 @pytest.mark.django_db
 class TestTripAPI:
-    def _make_trip(self, user):
-        trip = TripFactory(created_by=user)
+    def _make_trip(self, user, **kwargs):
+        trip = TripFactory(created_by=user, **kwargs)
         TripMemberFactory(trip=trip, user=user, role="organizer")
         return trip
 
@@ -19,7 +21,7 @@ class TestTripAPI:
         self._make_trip(authenticated_drf_client.user)
         resp = authenticated_drf_client.get("/api/v1/trips/")
         assert resp.status_code == 200
-        assert len(resp.data["data"]) == 1
+        assert len(resp.data["results"]) == 1
 
     def test_create_trip(self, authenticated_drf_client):
         resp = authenticated_drf_client.post("/api/v1/trips/", {
@@ -32,7 +34,7 @@ class TestTripAPI:
         trip = self._make_trip(authenticated_drf_client.user)
         resp = authenticated_drf_client.get(f"/api/v1/trips/{trip.id}/")
         assert resp.status_code == 200
-        assert resp.data["data"]["name"] == trip.name
+        assert resp.data["name"] == trip.name
 
     def test_add_stop(self, authenticated_drf_client):
         trip = self._make_trip(authenticated_drf_client.user)
@@ -64,12 +66,17 @@ class TestTripAPI:
         assert resp.status_code == 201
 
     def test_start_trip(self, authenticated_drf_client):
-        trip = self._make_trip(authenticated_drf_client.user)
+        # Use a future scheduled_date to prevent auto-activation in get_object()
+        future_date = datetime.date.today() + datetime.timedelta(days=7)
+        trip = self._make_trip(
+            authenticated_drf_client.user,
+            scheduled_date=future_date,
+        )
         trip.status = "confirmed"
         trip.save()
         resp = authenticated_drf_client.post(f"/api/v1/trips/{trip.id}/start/")
         assert resp.status_code == 200
-        assert resp.data["data"]["status"] == "in_progress"
+        assert resp.data["status"] == "in_progress"
 
     def test_complete_trip(self, authenticated_drf_client):
         trip = self._make_trip(authenticated_drf_client.user)
@@ -77,7 +84,7 @@ class TestTripAPI:
         trip.save()
         resp = authenticated_drf_client.post(f"/api/v1/trips/{trip.id}/complete/")
         assert resp.status_code == 200
-        assert resp.data["data"]["status"] == "completed"
+        assert resp.data["status"] == "completed"
 
     def test_live_checkin(self, authenticated_drf_client):
         trip = self._make_trip(authenticated_drf_client.user)
@@ -88,4 +95,4 @@ class TestTripAPI:
             f"/api/v1/trips/{trip.id}/live/checkin/{stop.id}/"
         )
         assert resp.status_code == 201
-        assert "visit_id" in resp.data["data"]
+        assert "visit_id" in resp.data

@@ -14,7 +14,7 @@ class TestDashboardAPI:
 
         resp = authenticated_drf_client.get("/api/v1/dashboard/")
         assert resp.status_code == 200
-        data = resp.data["data"]
+        data = resp.data
         assert data["stats"]["visit_count"] == 1
         assert data["stats"]["trips_completed"] == 1
         assert len(data["recent_visits"]) == 1

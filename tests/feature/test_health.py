@@ -10,9 +10,8 @@ class TestHealthEndpoint:
 
     def test_health_response_shape(self, api_client):
         response = api_client.get("/health/")
-        data = response.json()
-        assert "status" in data
-        assert "db" in data
+        body = response.json()
+        data = body["data"]
         assert data["status"] == "ok"
         assert data["db"] == "ok"
 

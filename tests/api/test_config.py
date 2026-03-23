@@ -8,7 +8,7 @@ class TestConfigAPI:
         client = APIClient()
         resp = client.get("/api/v1/config/")
         assert resp.status_code == 200
-        data = resp.data["data"]
+        data = resp.data
         assert "minimum_app_version" in data
         assert "features" in data
 

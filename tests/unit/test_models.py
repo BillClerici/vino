@@ -1,6 +1,6 @@
 import pytest
 
-from apps.users.models import User
+from apps.lookup.models import LookupValue
 
 pytestmark = pytest.mark.django_db
 
@@ -16,12 +16,13 @@ class TestBaseModelConventions:
         assert lookup.pk is not None
         assert len(str(lookup.pk)) == 36
 
-    def test_soft_delete(self, user_factory):
-        user = user_factory()
-        user.is_active = False
-        user.save()
-        assert User.objects.filter(pk=user.pk).count() == 0
-        assert User.all_objects.filter(pk=user.pk).count() == 1
+    def test_soft_delete(self, lookup_factory):
+        """Test soft delete using LookupValue which uses ActiveManager."""
+        item = lookup_factory()
+        item.is_active = False
+        item.save()
+        assert LookupValue.objects.filter(pk=item.pk).count() == 0
+        assert LookupValue.all_objects.filter(pk=item.pk).count() == 1
 
     def test_timestamps_set(self, user_factory):
         user = user_factory()
