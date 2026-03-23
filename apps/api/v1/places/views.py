@@ -376,6 +376,117 @@ IMPORTANT: Use exactly "item" and "pairs_with" as the key names. Provide 3-5 pai
             })
 
     @action(detail=False, methods=["get"])
+    def nearby(self, request):
+        """Search for nearby wineries and breweries via Google Places API."""
+        import logging
+
+        import httpx
+
+        logger = logging.getLogger(__name__)
+
+        lat = request.query_params.get("lat")
+        lng = request.query_params.get("lng")
+        radius = int(request.query_params.get("radius", 40000))  # 25 miles ≈ 40km
+
+        if not lat or not lng:
+            return Response(
+                {"detail": "lat and lng are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from django.conf import settings
+
+        api_key = getattr(settings, "GOOGLE_MAPS_API_KEY", "")
+        if not api_key:
+            return Response({"detail": "No Google Maps API key."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        results = []
+
+        # Search for wineries and breweries
+        for place_type in ["winery", "brewery"]:
+            try:
+                with httpx.Client(timeout=15) as client:
+                    resp = client.post(
+                        "https://places.googleapis.com/v1/places:searchNearby",
+                        headers={
+                            "Content-Type": "application/json",
+                            "X-Goog-Api-Key": api_key,
+                            "X-Goog-FieldMask": (
+                                "places.id,places.displayName,places.formattedAddress,"
+                                "places.location,places.rating,places.userRatingCount,"
+                                "places.websiteUri,places.nationalPhoneNumber,"
+                                "places.currentOpeningHours,places.regularOpeningHours,"
+                                "places.photos,places.editorialSummary,"
+                                "places.priceLevel,places.googleMapsUri"
+                            ),
+                        },
+                        json={
+                            "includedTypes": [place_type],
+                            "locationRestriction": {
+                                "circle": {
+                                    "center": {"latitude": float(lat), "longitude": float(lng)},
+                                    "radius": float(radius),
+                                }
+                            },
+                            "maxResultCount": 15,
+                            "languageCode": "en",
+                        },
+                    )
+                    resp.raise_for_status()
+                    data = resp.json()
+
+                for gp in data.get("places", []):
+                    name = gp.get("displayName", {}).get("text", "")
+                    location = gp.get("location", {})
+
+                    # Photo URL
+                    image_url = ""
+                    photos = gp.get("photos", [])
+                    if photos:
+                        photo_name = photos[0].get("name", "")
+                        if photo_name:
+                            image_url = f"https://places.googleapis.com/v1/{photo_name}/media?maxWidthPx=600&key={api_key}"
+
+                    # Opening hours
+                    hours = []
+                    reg_hours = gp.get("regularOpeningHours", {})
+                    for period_text in reg_hours.get("weekdayDescriptions", []):
+                        hours.append(period_text)
+
+                    current_hours = gp.get("currentOpeningHours", {})
+                    is_open = current_hours.get("openNow") if current_hours else None
+
+                    results.append({
+                        "google_place_id": gp.get("id", ""),
+                        "name": name,
+                        "place_type": place_type,
+                        "address": gp.get("formattedAddress", ""),
+                        "latitude": location.get("latitude"),
+                        "longitude": location.get("longitude"),
+                        "rating": gp.get("rating"),
+                        "rating_count": gp.get("userRatingCount"),
+                        "website": gp.get("websiteUri", ""),
+                        "phone": gp.get("nationalPhoneNumber", ""),
+                        "image_url": image_url,
+                        "description": gp.get("editorialSummary", {}).get("text", "") if gp.get("editorialSummary") else "",
+                        "hours": hours,
+                        "is_open_now": is_open,
+                        "price_level": gp.get("priceLevel", ""),
+                        "google_maps_url": gp.get("googleMapsUri", ""),
+                    })
+
+            except Exception:
+                logger.exception("Nearby search failed for %s", place_type)
+
+        # Sort by rating descending
+        results.sort(key=lambda x: x.get("rating") or 0, reverse=True)
+
+        return Response({
+            "places": results[:25],
+            "total": len(results),
+        })
+
+    @action(detail=False, methods=["get"])
     def map(self, request):
         """Lightweight endpoint for map markers."""
         qs = Place.objects.filter(

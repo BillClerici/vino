@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/auth/auth_provider.dart';
+import '../../../core/services/location_service.dart';
 import '../../../core/widgets/app_drawer.dart';
 import '../../help/help_launcher.dart';
 import '../../onboarding/onboarding_tour.dart';
@@ -33,6 +34,14 @@ class DashboardScreen extends ConsumerStatefulWidget {
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   bool _tourChecked = false;
+  bool _locationRequested = false;
+
+  void _requestLocation() {
+    if (_locationRequested) return;
+    _locationRequested = true;
+    // Pre-fetch location so it's cached for Explore/Journey maps
+    ref.read(userLocationProvider);
+  }
 
   void _checkOnboarding() {
     if (_tourChecked) return;
@@ -51,8 +60,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   Widget build(BuildContext context) {
     final dashboard = ref.watch(dashboardProvider);
 
-    // Check onboarding after first successful dashboard load
-    dashboard.whenData((_) => _checkOnboarding());
+    // Check onboarding and request location after first successful dashboard load
+    dashboard.whenData((_) {
+      _checkOnboarding();
+      _requestLocation();
+    });
 
     return Scaffold(
       drawer: const AppDrawer(),

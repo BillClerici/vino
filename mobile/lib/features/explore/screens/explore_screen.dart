@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/services/location_service.dart';
 
@@ -53,7 +54,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen>
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
-            Tab(text: 'List'),
+            Tab(text: 'Nearby'),
             Tab(text: 'Map'),
             Tab(text: 'Favorites'),
           ],
@@ -64,7 +65,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen>
         // Disable swipe between tabs so Google Map gestures work
         physics: const NeverScrollableScrollPhysics(),
         children: const [
-          _PlaceListTab(),
+          _NearbyTab(),
           _PlaceMapTab(),
           _FavoritesTab(),
         ],
@@ -130,6 +131,326 @@ class _PlaceListTab extends ConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _NearbyTab extends ConsumerStatefulWidget {
+  const _NearbyTab();
+
+  @override
+  ConsumerState<_NearbyTab> createState() => _NearbyTabState();
+}
+
+class _NearbyTabState extends ConsumerState<_NearbyTab> {
+  List<Map<String, dynamic>>? _places;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNearby();
+  }
+
+  Future<void> _loadNearby() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final loc = await ref.read(userLocationProvider.future);
+      final api = ref.read(apiClientProvider);
+      final resp = await api.get(ApiPaths.nearbyPlaces, queryParameters: {
+        'lat': '${loc.latitude}',
+        'lng': '${loc.longitude}',
+        'radius': '40000',
+      });
+      final data = resp.data['data'] as Map<String, dynamic>? ?? resp.data as Map<String, dynamic>;
+      final places = (data['places'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      if (mounted) setState(() { _places = places; _loading = false; });
+    } catch (e) {
+      if (mounted) setState(() { _error = '$e'; _loading = false; });
+    }
+  }
+
+  Color _typeColor(String? type) {
+    switch (type) {
+      case 'winery': return const Color(0xFF8E44AD);
+      case 'brewery': return Colors.orange;
+      default: return Colors.blueGrey;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 12),
+            Text('Finding places near you...', style: TextStyle(color: Colors.grey)),
+          ],
+        ),
+      );
+    }
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.location_off, size: 48, color: Colors.grey[400]),
+            const SizedBox(height: 12),
+            const Text('Could not get your location'),
+            const SizedBox(height: 8),
+            FilledButton(onPressed: _loadNearby, child: const Text('Retry')),
+          ],
+        ),
+      );
+    }
+    if (_places == null || _places!.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.explore_off, size: 48, color: Colors.grey[400]),
+            const SizedBox(height: 12),
+            const Text('No wineries or breweries found nearby'),
+            const SizedBox(height: 8),
+            FilledButton(onPressed: _loadNearby, child: const Text('Retry')),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadNearby,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(8),
+        itemCount: _places!.length,
+        itemBuilder: (_, i) => _NearbyPlaceCard(place: _places![i]),
+      ),
+    );
+  }
+}
+
+class _NearbyPlaceCard extends StatelessWidget {
+  final Map<String, dynamic> place;
+  const _NearbyPlaceCard({required this.place});
+
+  Color _typeColor(String? type) {
+    switch (type) {
+      case 'winery': return const Color(0xFF8E44AD);
+      case 'brewery': return Colors.orange;
+      default: return Colors.blueGrey;
+    }
+  }
+
+  IconData _typeIcon(String? type) {
+    switch (type) {
+      case 'winery': return Icons.wine_bar;
+      case 'brewery': return Icons.sports_bar;
+      default: return Icons.place;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final name = place['name'] as String? ?? '';
+    final type = place['place_type'] as String? ?? '';
+    final address = place['address'] as String? ?? '';
+    final rating = place['rating'] as num?;
+    final ratingCount = place['rating_count'] as int?;
+    final imageUrl = place['image_url'] as String? ?? '';
+    final description = place['description'] as String? ?? '';
+    final isOpen = place['is_open_now'] as bool?;
+    final hours = (place['hours'] as List?)?.cast<String>() ?? [];
+    final phone = place['phone'] as String? ?? '';
+    final website = place['website'] as String? ?? '';
+    final googleMapsUrl = place['google_maps_url'] as String? ?? '';
+    final typeColor = _typeColor(type);
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: Colors.grey[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Image header
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+            child: SizedBox(
+              height: 140,
+              width: double.infinity,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (imageUrl.isNotEmpty)
+                    Image.network(imageUrl, fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: typeColor.withValues(alpha: 0.1),
+                          child: Center(child: Icon(_typeIcon(type), size: 40, color: typeColor)),
+                        ))
+                  else
+                    Container(
+                      color: typeColor.withValues(alpha: 0.1),
+                      child: Center(child: Icon(_typeIcon(type), size: 40, color: typeColor)),
+                    ),
+                  // Open/Closed badge
+                  if (isOpen != null)
+                    Positioned(
+                      top: 8, right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: isOpen ? Colors.green : Colors.red,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          isOpen ? 'Open Now' : 'Closed',
+                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  // Type badge
+                  Positioned(
+                    top: 8, left: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: typeColor,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(_typeIcon(type), size: 12, color: Colors.white),
+                          const SizedBox(width: 4),
+                          Text(type[0].toUpperCase() + type.substring(1),
+                              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Content
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Name + rating
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(name,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          maxLines: 1, overflow: TextOverflow.ellipsis),
+                    ),
+                    if (rating != null) ...[
+                      const Icon(Icons.star, size: 16, color: Colors.amber),
+                      const SizedBox(width: 2),
+                      Text('$rating', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      if (ratingCount != null)
+                        Text(' ($ratingCount)', style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 4),
+
+                // Address
+                if (address.isNotEmpty)
+                  Row(
+                    children: [
+                      Icon(Icons.place, size: 14, color: Colors.grey[500]),
+                      const SizedBox(width: 4),
+                      Expanded(child: Text(address,
+                          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                          maxLines: 2, overflow: TextOverflow.ellipsis)),
+                    ],
+                  ),
+
+                // Description
+                if (description.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(description,
+                      style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                      maxLines: 2, overflow: TextOverflow.ellipsis),
+                ],
+
+                // Hours (today only)
+                if (hours.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Icon(Icons.access_time, size: 14, color: Colors.grey[500]),
+                      const SizedBox(width: 4),
+                      Expanded(child: Text(
+                        hours.firstWhere(
+                          (h) => h.toLowerCase().startsWith(_todayName().toLowerCase()),
+                          orElse: () => hours.first,
+                        ),
+                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                      )),
+                    ],
+                  ),
+                ],
+
+                // Action buttons
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    if (phone.isNotEmpty)
+                      _ActionChip(icon: Icons.phone, label: 'Call',
+                          onTap: () => launchUrl(Uri.parse('tel:$phone'))),
+                    if (website.isNotEmpty)
+                      _ActionChip(icon: Icons.language, label: 'Website',
+                          onTap: () => launchUrl(Uri.parse(website))),
+                    if (googleMapsUrl.isNotEmpty)
+                      _ActionChip(icon: Icons.directions, label: 'Directions',
+                          onTap: () => launchUrl(Uri.parse(googleMapsUrl))),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _todayName() {
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    return days[DateTime.now().weekday - 1];
+  }
+}
+
+class _ActionChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  const _ActionChip({required this.icon, required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: ActionChip(
+        avatar: Icon(icon, size: 14),
+        label: Text(label, style: const TextStyle(fontSize: 11)),
+        onPressed: onTap,
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        visualDensity: VisualDensity.compact,
+      ),
     );
   }
 }

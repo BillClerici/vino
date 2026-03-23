@@ -44,6 +44,9 @@ class ApiPaths {
   /// Sippy trip planner (LangGraph): POST /api/v1/trips/plan/
   static const tripPlan = '/api/v1/trips/plan/';
 
+  /// Nearby places search
+  static const nearbyPlaces = '/api/v1/places/nearby/';
+
   /// History map: all visited places with stats
   static const historyMap = '/api/v1/visits/history-map/';
 
