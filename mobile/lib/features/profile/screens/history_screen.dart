@@ -176,7 +176,8 @@ class _HistoryMapState extends ConsumerState<_HistoryMap> {
             Future.delayed(const Duration(milliseconds: 400), _fitBounds);
           },
           markers: _markers,
-          myLocationButtonEnabled: false,
+          myLocationEnabled: true,
+          myLocationButtonEnabled: true,
           zoomControlsEnabled: true,
           mapToolbarEnabled: false,
           onTap: (_) => setState(() => _selectedPlace = null),

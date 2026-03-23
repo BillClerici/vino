@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
+import '../../../core/services/location_service.dart';
+
 import '../../../config/constants.dart';
 import '../../../config/env.dart';
 import '../../../core/api/api_client.dart';
@@ -421,10 +423,11 @@ class _PlaceMapTabState extends ConsumerState<_PlaceMapTab>
           child: Stack(
             children: [
               GoogleMap(
-                initialCameraPosition: const CameraPosition(
-                    target: LatLng(35.2271, -80.8431), zoom: 10),
+                initialCameraPosition: CameraPosition(
+                    target: ref.read(userLocationProvider).valueOrNull ?? defaultLocation, zoom: 10),
                 markers: _markers,
-                myLocationButtonEnabled: false,
+                myLocationEnabled: true,
+                myLocationButtonEnabled: true,
                 zoomControlsEnabled: true,
                 onMapCreated: (c) {
                   _mapController = c;
