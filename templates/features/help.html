@@ -1,0 +1,228 @@
+{% extends 'base.html' %}
+{% block title %}Help & Guide — Trip Me{% endblock %}
+
+{% block extra_css %}
+<style>
+    .help-card {
+        cursor: pointer;
+        transition: box-shadow 0.15s;
+        border-radius: 8px;
+    }
+    .help-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    .help-card .card-content { padding: 16px; }
+    .help-card .card-title { font-size: 1rem !important; font-weight: 600; }
+    .category-chip {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 16px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        margin: 4px;
+        cursor: pointer;
+        transition: all 0.15s;
+    }
+    .category-chip.active { color: #fff; }
+    .category-chip:not(.active) { background: #f5f5f5; color: #666; }
+    .article-detail { display: none; }
+    .article-detail.active { display: block; }
+    .help-section { margin-bottom: 16px; }
+    .help-section h6 { font-size: 0.95rem; font-weight: 600; margin-bottom: 4px; }
+    .help-section p { color: #555; line-height: 1.6; }
+    .help-tip {
+        background: #e3f2fd;
+        border-left: 3px solid #1976d2;
+        padding: 10px 14px;
+        border-radius: 0 8px 8px 0;
+        font-size: 0.85rem;
+        color: #1565c0;
+        margin-top: 8px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:900px;padding-top:20px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+        <h5 style="flex:1;margin:0;"><i class="material-icons left">help_outline</i>Help & Guide</h5>
+        <a href="#" onclick="showTour(); return false;" class="btn-flat blue-grey-text">
+            <i class="material-icons left">tour</i>Take the Tour
+        </a>
+    </div>
+
+    <!-- Search -->
+    <div class="input-field" style="margin-bottom:16px;">
+        <i class="material-icons prefix">search</i>
+        <input type="text" id="help-search" placeholder="Search help articles..." oninput="filterArticles()">
+    </div>
+
+    <!-- Categories -->
+    <div id="category-chips" style="margin-bottom:16px;">
+        <span class="category-chip active" data-cat="all" onclick="filterCategory('all')" style="background:#2c3e50;">All</span>
+    </div>
+
+    <!-- Articles List -->
+    <div id="articles-list"></div>
+
+    <!-- Article Detail -->
+    <div id="article-detail" class="article-detail">
+        <a href="#" onclick="showList(); return false;" style="display:inline-flex;align-items:center;gap:4px;margin-bottom:16px;color:#2c3e50;">
+            <i class="material-icons" style="font-size:18px;">arrow_back</i> Back to articles
+        </a>
+        <div id="article-content"></div>
+    </div>
+</div>
+
+<script>
+var helpArticles = [
+    // Getting Started
+    { id: 'welcome', title: 'Welcome to Trip Me', category: 'Getting Started', catColor: '#e91e63', icon: 'waving_hand',
+      sections: [
+        { body: 'Trip Me helps you plan wine, brewery, and restaurant trips with AI-powered assistance. Check in at stops, log drinks, rate experiences, get personalized recommendations, and build a history of your tasting adventures.' },
+        { heading: 'Key Features', body: 'Plan trips manually or with Sippy AI. Check in at stops, log drinks with photos and ratings. Get AI-powered recommendations, food pairings, and tasting flights. Track your wishlist, cellar, palate profile, and achievements. View your journey on an interactive map.' },
+        { heading: 'Navigation', body: 'Use the left sidebar for main sections. The hamburger menu (top-left) opens on mobile. Click the pin icon to keep it open on desktop.', tip: 'Click "Guided Tour" in the sidebar to revisit this walkthrough anytime.' },
+      ]},
+    { id: 'first-trip', title: 'Planning Your First Trip', category: 'Getting Started', catColor: '#e91e63', icon: 'assistant',
+      sections: [
+        { heading: 'Option 1: Plan with Sippy AI', body: 'Go to My Trips and click "Plan with Sippy". Tell Sippy where you want to go, when, and what you like. Sippy will search for real places, build an itinerary, and let you preview before creating.' },
+        { heading: 'Option 2: Create Manually', body: 'Click "Plan Trip" to create a trip with a name and date, then add stops by searching for places.' },
+        { heading: 'Starting Your Trip', body: 'Trips automatically activate on the scheduled date and time. Navigate between stops, check in, log drinks, and rate your experience.' },
+      ]},
+
+    // Sippy AI
+    { id: 'sippy-plan', title: 'Plan with Sippy', category: 'Sippy AI', catColor: '#ff9800', icon: 'auto_awesome',
+      sections: [
+        { body: 'Sippy is your AI trip planning assistant. Click "Plan with Sippy" on the Trips page to start a conversation.' },
+        { heading: 'How It Works', body: '1. Tell Sippy where, when, and what you like.\n2. Sippy asks a few follow-up questions.\n3. Sippy searches for real places and builds an itinerary.\n4. Review the trip preview with stops and times.\n5. Click "Looks Good!" to create, or type changes.' },
+        { heading: 'Tips', body: 'Include as much detail as possible in your first message: location, date, start time, stop duration, max drive time, and drink preferences.' },
+      ]},
+    { id: 'sippy-ask', title: 'Ask Sippy', category: 'Sippy AI', catColor: '#ff9800', icon: 'chat',
+      sections: [
+        { body: 'On any trip detail page, click "Ask Sippy" to chat about that specific trip. Sippy knows your stops, menus, members, and palate profile.' },
+        { heading: 'What You Can Ask', body: 'What should I order at this stop?\nBest order to visit the stops?\nWine pairing suggestions.\nDrive times between stops.\nAny must-try wines on the menu?' },
+      ]},
+    { id: 'sippy-ai-tools', title: 'AI Recommendations & Pairings', category: 'Sippy AI', catColor: '#ff9800', icon: 'restaurant_menu',
+      sections: [
+        { body: 'After checking in at a stop with a drink menu, three AI tools appear:' },
+        { heading: 'Get Recommendations', body: 'AI picks the top 3 drinks from the menu based on your palate.' },
+        { heading: 'Get Food Pairings', body: 'At wineries: food pairings for drinks. At restaurants: wine pairings for food.' },
+        { heading: 'Build Tasting Flight', body: 'AI builds a curated 4-drink flight: Opener → Comfort → Stretch → Finisher.' },
+      ]},
+
+    // Trips
+    { id: 'trips', title: 'Managing Trips', category: 'Trips', catColor: '#2196f3', icon: 'map',
+      sections: [
+        { body: 'The Trips page lists all your trips. Search by name and filter by status.' },
+        { heading: 'Auto-Activation', body: 'Trips with a scheduled date automatically move to "In Progress" when the date and time arrive.' },
+        { heading: 'Trip Recap', body: 'Completed trips get a recap page with all stops, wines, ratings, and travel stats.' },
+      ]},
+    { id: 'live-trip', title: 'Live Trip Mode', category: 'Trips', catColor: '#2196f3', icon: 'play_circle',
+      sections: [
+        { body: 'During an active trip, check in at each stop to unlock drink logging, ratings, AI recommendations, food pairings, and tasting flights.' },
+        { heading: 'Activity Feed', body: 'See what other trip members are doing in real-time.' },
+      ]},
+
+    // Stops & Drinks
+    { id: 'checkin', title: 'Check-In & Drinks', category: 'Stops & Drinks', catColor: '#9c27b0', icon: 'wine_bar',
+      sections: [
+        { body: 'Tap "Check In" at a stop to record your arrival. This unlocks the drink menu, AI tools, drink logging, ratings, and notes.' },
+        { heading: 'Logging Drinks', body: 'Add drinks from the menu or manually. Enter name, type, serving, tasting notes, rating, and photo. You can also scan a wine label with AI.' },
+        { heading: 'Wishlist', body: 'Bookmark any drink menu item to add it to your wishlist. When you check in at a place with wishlisted drinks, you get a notification.' },
+      ]},
+
+    // Profile & Tools
+    { id: 'profile', title: 'Profile & Tools', category: 'Profile & Tools', catColor: '#607d8b', icon: 'person',
+      sections: [
+        { heading: 'My Palate', body: 'Your AI-generated taste profile. Click "Analyze My Palate" to have AI analyze your tasting history.' },
+        { heading: 'My Wishlist', body: 'Drinks you want to try later. Bookmark from any drink menu.' },
+        { heading: 'My Cellar', body: 'Dashboard of drinks purchased: bottles, spend, top places, varietals.' },
+        { heading: 'Achievements', body: '24 wine-themed badges across 6 categories. Tap any badge to see progress.' },
+        { heading: 'Journey Map', body: 'Interactive map of every place you have visited with visit counts and details.' },
+      ]},
+];
+
+// Build category chips
+var cats = [...new Set(helpArticles.map(a => a.category))];
+var chipsEl = document.getElementById('category-chips');
+cats.forEach(function(cat) {
+    var color = helpArticles.find(a => a.category === cat).catColor;
+    chipsEl.innerHTML += '<span class="category-chip" data-cat="' + cat + '" onclick="filterCategory(\'' + cat + '\')" style="border:1px solid ' + color + ';color:' + color + ';">' + cat + '</span>';
+});
+
+var currentCat = 'all';
+
+function filterCategory(cat) {
+    currentCat = cat;
+    document.querySelectorAll('.category-chip').forEach(function(c) {
+        var isActive = c.dataset.cat === cat;
+        c.classList.toggle('active', isActive);
+        if (isActive && cat !== 'all') {
+            var color = helpArticles.find(a => a.category === cat)?.catColor || '#2c3e50';
+            c.style.background = color;
+            c.style.color = '#fff';
+        } else if (isActive && cat === 'all') {
+            c.style.background = '#2c3e50';
+            c.style.color = '#fff';
+        } else {
+            c.style.background = '#f5f5f5';
+            c.style.color = '#666';
+        }
+    });
+    renderArticles();
+}
+
+function filterArticles() {
+    renderArticles();
+}
+
+function renderArticles() {
+    var q = (document.getElementById('help-search').value || '').toLowerCase();
+    var list = helpArticles.filter(function(a) {
+        if (currentCat !== 'all' && a.category !== currentCat) return false;
+        if (q && !a.title.toLowerCase().includes(q) && !a.sections.some(s => (s.body||'').toLowerCase().includes(q) || (s.heading||'').toLowerCase().includes(q))) return false;
+        return true;
+    });
+
+    var html = '<div class="row">';
+    list.forEach(function(a) {
+        html += '<div class="col s12 m6"><div class="card help-card" onclick="showArticle(\'' + a.id + '\')">' +
+            '<div class="card-content"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">' +
+            '<i class="material-icons" style="color:' + a.catColor + ';">' + a.icon + '</i>' +
+            '<span class="card-title" style="color:' + a.catColor + ';">' + a.title + '</span></div>' +
+            '<small style="background:' + a.catColor + '22;color:' + a.catColor + ';padding:2px 8px;border-radius:8px;font-size:0.7rem;font-weight:600;">' + a.category + '</small>' +
+            '<p style="margin-top:8px;font-size:0.85rem;color:#888;">' + (a.sections[0]?.body || '').substring(0, 100) + '...</p>' +
+            '</div></div></div>';
+    });
+    html += '</div>';
+    if (!list.length) html = '<div class="center-align" style="padding:40px;"><i class="material-icons grey-text" style="font-size:48px;">search_off</i><p class="grey-text">No articles found</p></div>';
+
+    document.getElementById('articles-list').innerHTML = html;
+    document.getElementById('articles-list').style.display = 'block';
+    document.getElementById('article-detail').classList.remove('active');
+}
+
+function showArticle(id) {
+    var a = helpArticles.find(x => x.id === id);
+    if (!a) return;
+    var html = '<h5 style="display:flex;align-items:center;gap:8px;"><i class="material-icons" style="color:' + a.catColor + ';">' + a.icon + '</i>' + a.title + '</h5>';
+    a.sections.forEach(function(s) {
+        html += '<div class="help-section">';
+        if (s.heading) html += '<h6>' + s.heading + '</h6>';
+        if (s.body) html += '<p>' + s.body.replace(/\n/g, '<br>') + '</p>';
+        if (s.tip) html += '<div class="help-tip"><i class="material-icons tiny">lightbulb</i> ' + s.tip + '</div>';
+        html += '</div>';
+    });
+
+    document.getElementById('article-content').innerHTML = html;
+    document.getElementById('articles-list').style.display = 'none';
+    document.getElementById('article-detail').classList.add('active');
+}
+
+function showList() {
+    document.getElementById('articles-list').style.display = 'block';
+    document.getElementById('article-detail').classList.remove('active');
+}
+
+// Initial render
+renderArticles();
+</script>
+{% endblock %}

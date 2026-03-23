@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% block title %}Sippy Conversations — Trip Me{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:800px;padding-top:20px;">
+    <div style="display:flex;align-items:center;gap:10px;">
+        <h5 style="flex:1;"><i class="material-icons left">history</i>
+            {% if chat_type == 'plan' %}Trip Planning History{% else %}Sippy Conversations{% endif %}
+        </h5>
+        <a href="{% if chat_type == 'plan' %}{% url 'sippy_planner' %}{% else %}{% url 'sippy_chat' %}{% endif %}"
+           class="btn blue-grey">
+            <i class="material-icons left">add</i>New
+        </a>
+    </div>
+
+    {% if conversations %}
+    <ul class="collection">
+        {% for conv in conversations %}
+        <li class="collection-item" style="display:flex;align-items:center;">
+            <div style="flex:1;">
+                <strong>{{ conv.title|default:"Untitled" }}</strong>
+                <br>
+                <small class="grey-text">{{ conv.updated_at|timesince }} ago</small>
+                {% if conv.phase %}
+                <span style="display:inline-block;padding:1px 6px;border-radius:8px;font-size:0.7rem;font-weight:600;
+                    {% if conv.phase == 'approved' %}background:#e8f5e9;color:#2e7d32;
+                    {% elif conv.phase == 'proposing' %}background:#fff3e0;color:#e65100;
+                    {% else %}background:#e3f2fd;color:#1565c0;{% endif %}">
+                    {% if conv.phase == 'approved' %}Created{% elif conv.phase == 'proposing' %}Preview Ready{% else %}In Progress{% endif %}
+                </span>
+                {% endif %}
+            </div>
+            <a href="{% if conv.chat_type == 'plan' %}{% url 'sippy_planner' %}?conv={{ conv.id }}{% else %}{% url 'sippy_chat' %}?conv={{ conv.id }}{% endif %}"
+               class="btn-flat"><i class="material-icons">chevron_right</i></a>
+            <form method="post" style="display:inline;" onsubmit="return confirm('Delete this conversation?')">
+                {% csrf_token %}
+                <input type="hidden" name="delete_id" value="{{ conv.id }}">
+                <button type="submit" class="btn-flat red-text"><i class="material-icons">delete</i></button>
+            </form>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <div class="center-align" style="padding:60px 20px;">
+        <i class="material-icons grey-text" style="font-size:64px;">chat_bubble_outline</i>
+        <h6 class="grey-text">No conversations yet</h6>
+        <a href="{% if chat_type == 'plan' %}{% url 'sippy_planner' %}{% else %}{% url 'sippy_chat' %}{% endif %}"
+           class="btn blue-grey" style="margin-top:16px;">
+            <i class="material-icons left">auto_awesome</i>Start a conversation
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

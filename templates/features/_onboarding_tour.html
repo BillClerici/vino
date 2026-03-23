@@ -1,0 +1,150 @@
+<!-- Onboarding Tour Modal -->
+<style>
+    .tour-overlay {
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.6);
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .tour-card {
+        background: #fff;
+        border-radius: 20px;
+        max-width: 500px;
+        width: 90%;
+        overflow: hidden;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+    }
+    .tour-content {
+        padding: 40px 32px 20px;
+        text-align: center;
+    }
+    .tour-icon {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 20px;
+    }
+    .tour-icon i { font-size: 40px; color: inherit; }
+    .tour-title { font-size: 1.4rem; font-weight: 700; margin-bottom: 12px; }
+    .tour-body { color: #666; line-height: 1.6; font-size: 0.95rem; }
+    .tour-dots {
+        display: flex;
+        justify-content: center;
+        gap: 6px;
+        padding: 16px 0;
+    }
+    .tour-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 4px;
+        background: #ddd;
+        transition: all 0.3s;
+    }
+    .tour-dot.active {
+        width: 24px;
+    }
+    .tour-actions {
+        padding: 0 32px 24px;
+        display: flex;
+        align-items: center;
+    }
+    .tour-actions .btn { margin: 0 4px; }
+</style>
+
+<div id="onboarding-tour" class="tour-overlay" style="display:none;">
+    <div class="tour-card">
+        <div class="tour-content" id="tour-content"></div>
+        <div class="tour-dots" id="tour-dots"></div>
+        <div class="tour-actions" id="tour-actions"></div>
+    </div>
+</div>
+
+<script>
+var tourSteps = [
+    { title: 'Welcome to Trip Me!', body: "Let's take a quick tour to show you what you can do. This will only take a minute.", icon: 'waving_hand', color: '#5DADE2' },
+    { title: 'Plan Trips with Sippy AI', body: 'Tell Sippy where and when you want to go. Our AI will find places, build an itinerary with times and drive distances, and let you preview before creating.', icon: 'auto_awesome', color: '#2C3E50' },
+    { title: 'Explore Places', body: 'Browse wineries, breweries, and restaurants on a map. Search by name or location, add favorites, and start trips from any place.', icon: 'explore', color: '#27AE60' },
+    { title: 'Check In & Log Drinks', body: 'When you arrive at a stop, check in to unlock drink logging, ratings, AI recommendations, food pairings, and tasting flights.', icon: 'wine_bar', color: '#8E44AD' },
+    { title: 'AI-Powered Features', body: 'Scan wine labels with your camera. Get personalized recommendations. Build curated tasting flights. Ask Sippy anything!', icon: 'psychology', color: '#E67E22' },
+    { title: 'Track Your Journey', body: 'View your visit history on a Journey Map. Earn achievement badges. Build your cellar. Keep a wishlist.', icon: 'emoji_events', color: '#C0392B' },
+    { title: "You're All Set!", body: 'Start by planning a trip with Sippy, or explore places near you. You can always revisit this tour from Help & Guide.', icon: 'celebration', color: '#1ABC9C' },
+];
+var tourStep = 0;
+
+function showTour() {
+    tourStep = 0;
+    document.getElementById('onboarding-tour').style.display = 'flex';
+    renderTourStep();
+}
+
+function renderTourStep() {
+    var s = tourSteps[tourStep];
+    var content = document.getElementById('tour-content');
+    content.innerHTML =
+        '<div class="tour-icon" style="background:' + s.color + '22;">' +
+        '<i class="material-icons" style="color:' + s.color + ';">' + s.icon + '</i></div>' +
+        '<div class="tour-title">' + s.title + '</div>' +
+        '<div class="tour-body">' + s.body + '</div>';
+
+    // Dots
+    var dots = '';
+    for (var i = 0; i < tourSteps.length; i++) {
+        dots += '<div class="tour-dot' + (i === tourStep ? ' active' : '') + '" style="' +
+            (i === tourStep ? 'background:' + s.color : '') + '"></div>';
+    }
+    document.getElementById('tour-dots').innerHTML = dots;
+
+    // Actions
+    var actions = document.getElementById('tour-actions');
+    if (tourStep === 0) {
+        actions.innerHTML =
+            '<a onclick="updateOnboarding(\'skipped\')" style="cursor:pointer;color:#999;font-size:0.9rem;">Skip</a>' +
+            '<a onclick="updateOnboarding(\'later\')" style="cursor:pointer;color:#999;font-size:0.9rem;margin-left:12px;">Maybe Later</a>' +
+            '<span style="flex:1;"></span>' +
+            '<a class="btn waves-effect" style="background:' + s.color + ';" onclick="nextTourStep()">Let\'s Go!</a>';
+    } else {
+        actions.innerHTML =
+            '<a onclick="updateOnboarding(\'skipped\')" style="cursor:pointer;color:#999;font-size:0.9rem;">Skip</a>' +
+            '<span style="flex:1;"></span>' +
+            '<a class="btn waves-effect" style="background:' + s.color + ';" onclick="nextTourStep()">' +
+            (tourStep === tourSteps.length - 1 ? 'Get Started!' : 'Next') + '</a>';
+    }
+}
+
+function nextTourStep() {
+    if (tourStep < tourSteps.length - 1) {
+        tourStep++;
+        renderTourStep();
+    } else {
+        updateOnboarding('completed');
+    }
+}
+
+function updateOnboarding(status) {
+    document.getElementById('onboarding-tour').style.display = 'none';
+    fetch('/onboarding/update/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': getCookie('csrftoken') },
+        credentials: 'same-origin',
+        body: 'status=' + status,
+    }).catch(function() {});
+}
+
+function getCookie(name) {
+    var v = '; ' + document.cookie;
+    var p = v.split('; ' + name + '=');
+    if (p.length === 2) return p.pop().split(';').shift();
+    return '';
+}
+
+// Auto-show tour for new users
+{% if user.is_authenticated and user.onboarding_status == 'pending' %}
+document.addEventListener('DOMContentLoaded', function() { setTimeout(showTour, 500); });
+{% endif %}
+</script>

@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+{% block title %}My Wishlist — Trip Me{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:900px;padding-top:20px;">
+    <h5><i class="material-icons left">bookmark</i>My Wishlist</h5>
+    <p class="grey-text">Drinks you want to try later</p>
+
+    {% if items %}
+    <table class="striped responsive-table">
+        <thead>
+            <tr>
+                <th>Wine / Beer</th>
+                <th>Type</th>
+                <th>From</th>
+                <th>Added</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for item in items %}
+            <tr id="wishlist-{{ item.id }}">
+                <td><strong>{{ item.display_name }}</strong></td>
+                <td>{{ item.wine_type }}</td>
+                <td>{% if item.source_place %}{{ item.source_place.name }}{% elif item.menu_item and item.menu_item.place %}{{ item.menu_item.place.name }}{% endif %}</td>
+                <td>{{ item.created_at|date:"M d, Y" }}</td>
+                <td>
+                    <form method="post" hx-post="" hx-target="#wishlist-{{ item.id }}" hx-swap="outerHTML">
+                        {% csrf_token %}
+                        <input type="hidden" name="item_id" value="{{ item.id }}">
+                        <button type="submit" class="btn-flat red-text" title="Remove"
+                            onclick="return confirm('Remove from wishlist?')">
+                            <i class="material-icons">delete</i>
+                        </button>
+                    </form>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="center-align" style="padding:60px 20px;">
+        <i class="material-icons grey-text" style="font-size:64px;">bookmark_border</i>
+        <h6 class="grey-text">No drinks on your wishlist yet</h6>
+        <p class="grey-text text-darken-1">Tap the bookmark icon on any drink menu item to save it for later</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

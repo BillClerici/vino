@@ -23,7 +23,7 @@ class UserSerializer(serializers.ModelSerializer):
             "id", "email", "first_name", "last_name", "avatar_url",
             "full_name", "timezone", "subscription_status", "subscription_plan",
             "has_active_subscription", "is_in_trial", "trial_days_remaining",
-            "social_accounts", "created_at",
+            "onboarding_status", "social_accounts", "created_at",
         ]
         read_only_fields = [
             "id", "email", "subscription_status", "subscription_plan", "created_at",
@@ -33,7 +33,7 @@ class UserSerializer(serializers.ModelSerializer):
 class UserProfileUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ["first_name", "last_name", "avatar_url", "timezone"]
+        fields = ["first_name", "last_name", "avatar_url", "timezone", "onboarding_status"]
 
 
 class UserSummarySerializer(serializers.ModelSerializer):

@@ -1,0 +1,153 @@
+{% extends 'base.html' %}
+{% block title %}Trip Recap — {{ trip.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .recap-stat { text-align: center; padding: 16px 8px; }
+    .recap-stat h5 { margin: 4px 0; }
+    .stop-timeline { position: relative; padding-left: 40px; }
+    .stop-timeline::before {
+        content: '';
+        position: absolute;
+        left: 14px;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: #e0e0e0;
+    }
+    .stop-item {
+        position: relative;
+        margin-bottom: 20px;
+    }
+    .stop-dot {
+        position: absolute;
+        left: -40px;
+        top: 0;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        font-size: 14px;
+    }
+    .stop-dot.visited { background: #2c3e50; }
+    .stop-dot.skipped { background: #bdbdbd; }
+    .wine-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 0;
+        font-size: 0.9rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:900px;padding-top:20px;">
+    <!-- Header -->
+    <h5>{{ trip.name }}</h5>
+    {% if trip.description %}<p class="grey-text">{{ trip.description }}</p>{% endif %}
+    {% if trip.scheduled_date %}
+    <p><i class="material-icons tiny grey-text">calendar_today</i> {{ trip.scheduled_date|date:"M d, Y" }}
+        {% if trip.end_date and trip.end_date != trip.scheduled_date %}
+        — {{ trip.end_date|date:"M d, Y" }}
+        {% endif %}
+    </p>
+    {% endif %}
+
+    <!-- Stats -->
+    <div class="row">
+        <div class="col s6 m3">
+            <div class="card-panel recap-stat">
+                <i class="material-icons blue-grey-text">place</i>
+                <h5>{{ stop_recaps|length }}</h5>
+                <small class="grey-text">Stops</small>
+            </div>
+        </div>
+        <div class="col s6 m3">
+            <div class="card-panel recap-stat">
+                <i class="material-icons purple-text">wine_bar</i>
+                <h5>{{ total_wines }}</h5>
+                <small class="grey-text">Wines</small>
+            </div>
+        </div>
+        <div class="col s6 m3">
+            <div class="card-panel recap-stat">
+                <i class="material-icons teal-text">route</i>
+                <h5>{{ total_miles }}</h5>
+                <small class="grey-text">Miles</small>
+            </div>
+        </div>
+        <div class="col s6 m3">
+            <div class="card-panel recap-stat">
+                <i class="material-icons blue-text">people</i>
+                <h5>{{ members|length }}</h5>
+                <small class="grey-text">Members</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Timeline -->
+    <h6 style="margin-top:24px;">Your Journey</h6>
+    <div class="stop-timeline" style="margin-top:16px;">
+        {% for recap in stop_recaps %}
+        <div class="stop-item">
+            <div class="stop-dot {% if recap.checked_in %}visited{% else %}skipped{% endif %}">
+                {% if recap.checked_in %}<i class="material-icons" style="font-size:16px;">check</i>{% else %}{{ forloop.counter }}{% endif %}
+            </div>
+            <div class="card-panel" style="margin:0;">
+                <div style="display:flex;gap:12px;align-items:start;">
+                    {% if recap.place.image_url %}
+                    <img src="{{ recap.place.image_url }}" style="width:60px;height:60px;border-radius:8px;object-fit:cover;">
+                    {% endif %}
+                    <div style="flex:1;">
+                        <strong>{{ recap.place.name }}</strong>
+                        {% if recap.place.city %}<br><small class="grey-text">{{ recap.place.city }}, {{ recap.place.state }}</small>{% endif %}
+                        {% if recap.avg_ratings.avg_overall %}
+                        <br><small>Overall: {{ recap.avg_ratings.avg_overall|floatformat:1 }}/5</small>
+                        {% endif %}
+                        {% if recap.stop.travel_miles %}
+                        <br><small class="grey-text">{{ recap.stop.travel_minutes }} min drive ({{ recap.stop.travel_miles }} mi)</small>
+                        {% endif %}
+                    </div>
+                </div>
+                {% if recap.wines %}
+                <div style="margin-top:8px;border-top:1px solid #eee;padding-top:8px;">
+                    {% for w in recap.wines %}
+                    <div class="wine-item">
+                        <i class="material-icons tiny purple-text">wine_bar</i>
+                        <span>{{ w.name }}</span>
+                        {% if w.rating %}<span class="grey-text">({{ w.rating }}/5)</span>{% endif %}
+                        {% if w.is_favorite %}<i class="material-icons tiny red-text">favorite</i>{% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                {% if not recap.checked_in %}
+                <p class="grey-text" style="font-style:italic;margin:8px 0 0;">Skipped</p>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Members -->
+    {% if members %}
+    <h6 style="margin-top:24px;">Trip Crew</h6>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
+        {% for m in members %}
+        <div class="chip">
+            <i class="material-icons tiny">person</i>
+            {{ m.display_name }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div style="margin-top:24px;">
+        <a href="{% url 'trip_detail' trip.pk %}" class="btn blue-grey">Back to Trip</a>
+    </div>
+</div>
+{% endblock %}

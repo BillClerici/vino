@@ -11,7 +11,10 @@ class User {
   final bool hasActiveSubscription;
   final bool isInTrial;
   final int trialDaysRemaining;
+  final String onboardingStatus;
   final List<SocialAccount> socialAccounts;
+
+  bool get needsOnboarding => onboardingStatus == 'pending' || onboardingStatus == 'later';
 
   const User({
     required this.id,
@@ -26,6 +29,7 @@ class User {
     this.hasActiveSubscription = false,
     this.isInTrial = false,
     this.trialDaysRemaining = 0,
+    this.onboardingStatus = 'pending',
     this.socialAccounts = const [],
   });
 
@@ -43,6 +47,7 @@ class User {
       hasActiveSubscription: json['has_active_subscription'] as bool? ?? false,
       isInTrial: json['is_in_trial'] as bool? ?? false,
       trialDaysRemaining: json['trial_days_remaining'] as int? ?? 0,
+      onboardingStatus: json['onboarding_status'] as String? ?? 'pending',
       socialAccounts: (json['social_accounts'] as List<dynamic>?)
               ?.map((e) => SocialAccount.fromJson(e as Map<String, dynamic>))
               .toList() ??

@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+{% block title %}Achievements — Trip Me{% endblock %}
+
+{% block extra_css %}
+<style>
+    .badge-tile {
+        display: inline-block;
+        width: 100px;
+        padding: 12px 8px;
+        margin: 4px;
+        border-radius: 12px;
+        text-align: center;
+        border: 1px solid #e0e0e0;
+        background: #fafafa;
+        cursor: pointer;
+        transition: transform 0.1s;
+    }
+    .badge-tile:hover { transform: scale(1.05); }
+    .badge-tile.earned {
+        background: #fff8e1;
+        border-color: #ffc107;
+    }
+    .badge-tile .badge-icon {
+        font-size: 32px;
+    }
+    .badge-tile.earned .badge-icon { color: #ffc107; }
+    .badge-tile:not(.earned) .badge-icon { color: #bdbdbd; }
+    .badge-tile .badge-name {
+        font-size: 0.7rem;
+        font-weight: 600;
+        margin-top: 4px;
+        line-height: 1.2;
+    }
+    .badge-tile .progress {
+        margin: 4px 0 0;
+        height: 4px;
+        border-radius: 2px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:900px;padding-top:20px;">
+    <h5><i class="material-icons left">emoji_events</i>Achievements</h5>
+
+    <!-- Summary -->
+    <div class="card-panel blue-grey lighten-5 center-align">
+        <h4>{{ earned_count }} / {{ total_count }}</h4>
+        <p class="grey-text text-darken-1">Badges Earned</p>
+        <div class="progress" style="height:8px;border-radius:4px;">
+            <div class="determinate amber" style="width:{% widthratio earned_count total_count 100 %}%;border-radius:4px;"></div>
+        </div>
+    </div>
+
+    <!-- Categories -->
+    {% for cat_key, cat_data in categories.items %}
+    <h6 style="margin-top:24px;">{{ cat_data.label }}</h6>
+    <div style="display:flex;flex-wrap:wrap;gap:4px;">
+        {% for badge in cat_data.badges %}
+        <div class="badge-tile {% if badge.earned %}earned{% endif %} tooltipped"
+             data-position="bottom" data-tooltip="{{ badge.description }}{% if not badge.earned %} ({{ badge.progress }}%){% endif %}">
+            <i class="material-icons badge-icon">{{ badge.icon }}</i>
+            <div class="badge-name">{{ badge.name }}</div>
+            {% if not badge.earned and badge.progress > 0 %}
+            <div class="progress">
+                <div class="determinate amber" style="width:{{ badge.progress }}%"></div>
+            </div>
+            {% endif %}
+            {% if badge.earned %}
+            <small class="green-text" style="font-size:0.6rem;">Earned!</small>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

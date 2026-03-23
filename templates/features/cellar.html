@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+{% block title %}My Cellar — Trip Me{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:900px;padding-top:20px;">
+    <h5><i class="material-icons left">inventory_2</i>My Cellar</h5>
+    <p class="grey-text">Drinks you've purchased</p>
+
+    {% if total_bottles %}
+    <!-- Stats -->
+    <div class="row">
+        <div class="col s6 m3">
+            <div class="card-panel center-align">
+                <i class="material-icons blue-text">inventory_2</i>
+                <h5 class="blue-text">{{ total_bottles }}</h5>
+                <small class="grey-text">Bottles</small>
+            </div>
+        </div>
+        <div class="col s6 m3">
+            <div class="card-panel center-align">
+                <i class="material-icons green-text">attach_money</i>
+                <h5 class="green-text">${{ total_spend|floatformat:0 }}</h5>
+                <small class="grey-text">Total Spend</small>
+            </div>
+        </div>
+        <div class="col s6 m3">
+            <div class="card-panel center-align">
+                <i class="material-icons purple-text">wine_bar</i>
+                <h5 class="purple-text">{{ unique_wines }}</h5>
+                <small class="grey-text">Unique Wines</small>
+            </div>
+        </div>
+        <div class="col s6 m3">
+            <div class="card-panel center-align">
+                <i class="material-icons orange-text">trending_up</i>
+                <h5 class="orange-text">{% if avg_price %}${{ avg_price|floatformat:0 }}{% else %}-{% endif %}</h5>
+                <small class="grey-text">Avg Price</small>
+            </div>
+        </div>
+    </div>
+
+    {% if top_places %}
+    <h6>Top Places by Spend</h6>
+    <ul class="collection">
+        {% for tp in top_places %}
+        <li class="collection-item">
+            <span class="title"><strong>{{ tp.place_name }}</strong></span>
+            <span class="secondary-content">${{ tp.total_spend|floatformat:0 }} · {{ tp.bottle_count }} bottles</span>
+        </li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% if top_varietals %}
+    <h6 style="margin-top:20px;">Favorite Varietals</h6>
+    <div>
+        {% for tv in top_varietals %}
+        <div class="chip">{{ tv.varietal }} ({{ tv.count }})</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <h6 style="margin-top:20px;">Recent Purchases</h6>
+    <table class="striped responsive-table">
+        <thead>
+            <tr><th>Wine</th><th>Type</th><th>Place</th><th>Price</th><th>Rating</th></tr>
+        </thead>
+        <tbody>
+        {% for w in recent %}
+            <tr>
+                <td><strong>{{ w.display_name|default:w.wine_name }}</strong></td>
+                <td>{{ w.wine_type }}</td>
+                <td>{% if w.visit.place %}{{ w.visit.place.name }}{% endif %}</td>
+                <td>{% if w.purchased_price %}${{ w.purchased_price|floatformat:0 }}{% endif %}</td>
+                <td>{% if w.rating %}{{ w.rating }}/5{% endif %} {% if w.is_favorite %}<i class="material-icons red-text tiny">favorite</i>{% endif %}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    {% else %}
+    <div class="center-align" style="padding:60px 20px;">
+        <i class="material-icons grey-text" style="font-size:64px;">inventory_2</i>
+        <h6 class="grey-text">Your cellar is empty</h6>
+        <p class="grey-text text-darken-1">When you buy drinks during visits, they'll show up here</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

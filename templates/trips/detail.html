@@ -166,6 +166,14 @@
         <a href="{% url 'trip_list' %}" style="display: inline-flex; align-items: center; gap: 5px; border: none; background: #455a64; border-radius: 18px; padding: 6px 16px; text-decoration: none; font-size: 0.82rem; font-weight: 600; color: #fff; line-height: 1.4; transition: background 0.15s;" onmouseover="this.style.background='#37474f'" onmouseout="this.style.background='#455a64'">
             <i class="material-icons" style="font-size: 1rem;">map</i> My Trips
         </a>
+        <a href="{% url 'sippy_trip_chat' trip_pk=trip.pk %}" style="display: inline-flex; align-items: center; gap: 5px; border: none; background: #5dade2; border-radius: 18px; padding: 6px 16px; text-decoration: none; font-size: 0.82rem; font-weight: 600; color: #fff; line-height: 1.4; transition: background 0.15s;" onmouseover="this.style.background='#3498db'" onmouseout="this.style.background='#5dade2'">
+            <i class="material-icons" style="font-size: 1rem;">auto_awesome</i> Ask Sippy
+        </a>
+        {% if trip.status == 'completed' %}
+        <a href="{% url 'trip_recap' trip.pk %}" style="display: inline-flex; align-items: center; gap: 5px; border: none; background: #8e44ad; border-radius: 18px; padding: 6px 16px; text-decoration: none; font-size: 0.82rem; font-weight: 600; color: #fff; line-height: 1.4; transition: background 0.15s;" onmouseover="this.style.background='#7b1fa2'" onmouseout="this.style.background='#8e44ad'">
+            <i class="material-icons" style="font-size: 1rem;">auto_stories</i> Trip Recap
+        </a>
+        {% endif %}
         {% if show_start_button and not is_readonly %}
         <a href="{% url 'trip_live' pk=trip.pk %}" style="display: inline-flex; align-items: center; gap: 5px; border: none; background: #7e57c2; border-radius: 18px; padding: 6px 16px; text-decoration: none; font-size: 0.82rem; font-weight: 600; color: #fff; line-height: 1.4; transition: background 0.15s;" onmouseover="this.style.background='#6a3fb5'" onmouseout="this.style.background='#7e57c2'">
             <i class="material-icons" style="font-size: 1rem;">play_arrow</i> {% if trip.status == 'in_progress' %}Continue Trip{% else %}Start Trip{% endif %}

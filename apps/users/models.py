@@ -64,6 +64,17 @@ class User(AbstractBaseUser, PermissionsMixin, BaseModel):
     stripe_subscription_id = models.CharField(max_length=255, blank=True)
     trial_end = models.DateTimeField(null=True, blank=True)
 
+    # Onboarding
+    class OnboardingStatus(models.TextChoices):
+        PENDING = "pending", "Pending"
+        COMPLETED = "completed", "Completed"
+        SKIPPED = "skipped", "Skipped"
+        LATER = "later", "Later"
+
+    onboarding_status = models.CharField(
+        max_length=20, choices=OnboardingStatus.choices, default=OnboardingStatus.PENDING,
+    )
+
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = []
 

@@ -22,6 +22,9 @@ class LandingPageView(TemplateView):
         if not user.is_authenticated:
             return ctx
 
+        # Auto-activate trips whose date/time has arrived
+        Trip.auto_activate_user_trips(user)
+
         # Personal stats
         my_visits = VisitLog.objects.filter(user=user, is_active=True)
         ctx["visit_count"] = my_visits.count()

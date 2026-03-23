@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../onboarding/onboarding_tour.dart';
+
 import '../../../core/widgets/search_bar.dart';
 import '../models/help_article.dart';
 import '../providers/help_provider.dart';
@@ -96,6 +98,21 @@ class _HelpIndexScreenState extends ConsumerState<HelpIndexScreen>
       ),
       body: Column(
         children: [
+          // Take the Tour card
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            child: Card(
+              color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.4),
+              child: ListTile(
+                leading: Icon(Icons.tour, color: Theme.of(context).colorScheme.primary),
+                title: const Text('Take the Guided Tour', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                subtitle: const Text('Quick walkthrough of all features', style: TextStyle(fontSize: 12)),
+                trailing: const Icon(Icons.arrow_forward),
+                dense: true,
+                onTap: () => showOnboardingTour(context, ref),
+              ),
+            ),
+          ),
           VinoSearchBar(
             hint: 'Search help articles...',
             onChanged: (q) => setState(() => _searchQuery = q.toLowerCase()),

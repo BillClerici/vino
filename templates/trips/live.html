@@ -292,6 +292,11 @@
 
             <!-- Post-Checkin Content (tabs) -->
             <div id="post-checkin-{{ forloop.counter0 }}" style="display:none;">
+                <!-- AI Tools -->
+                {% with place_id=stop.place.pk %}
+                {% include "features/_ai_tools.html" %}
+                {% endwith %}
+
                 <div class="live-tabs">
                     {% if stop.place.place_type == 'winery' %}
                     <div class="live-tab active" data-tab="wines" data-stop="{{ forloop.counter0 }}" onclick="switchTab({{ forloop.counter0 }}, 'wines')">

@@ -1,0 +1,121 @@
+<!-- AI Tools partial — include on any page with a place context -->
+<!-- Requires: place_id variable -->
+<div class="card-panel" style="padding:12px;">
+    <span style="font-size:0.82rem;font-weight:600;color:#757575;display:flex;align-items:center;gap:4px;margin-bottom:8px;">
+        <i class="material-icons" style="font-size:1rem;color:#ffc107;">auto_awesome</i> AI Tools
+    </span>
+
+    <!-- Recommendations -->
+    <div id="ai-recommendations" style="margin-bottom:8px;">
+        <button class="btn-flat btn-small blue-grey-text"
+                onclick="fetchAITool('{{ place_id }}', 'recommend', 'ai-recommendations-result')"
+                style="font-size:0.82rem;">
+            <i class="material-icons left" style="font-size:1rem;">auto_awesome</i>Get Recommendations
+        </button>
+        <div id="ai-recommendations-result"></div>
+    </div>
+
+    <!-- Pairings -->
+    <div id="ai-pairings" style="margin-bottom:8px;">
+        <button class="btn-flat btn-small blue-grey-text"
+                onclick="fetchAITool('{{ place_id }}', 'pairings', 'ai-pairings-result')"
+                style="font-size:0.82rem;">
+            <i class="material-icons left" style="font-size:1rem;">restaurant_menu</i>Get Food Pairings
+        </button>
+        <div id="ai-pairings-result"></div>
+    </div>
+
+    <!-- Flight Builder -->
+    <div id="ai-flight">
+        <button class="btn-flat btn-small blue-grey-text"
+                onclick="fetchAITool('{{ place_id }}', 'flight', 'ai-flight-result')"
+                style="font-size:0.82rem;">
+            <i class="material-icons left" style="font-size:1rem;">local_bar</i>Build Tasting Flight
+        </button>
+        <div id="ai-flight-result"></div>
+    </div>
+</div>
+
+<script>
+function fetchAITool(placeId, tool, targetId) {
+    var target = document.getElementById(targetId);
+    target.innerHTML = '<div style="padding:8px;color:#999;font-size:0.82rem;display:flex;align-items:center;gap:6px;">' +
+        '<div class="preloader-wrapper small active" style="width:16px;height:16px;"><div class="spinner-layer spinner-blue-only"><div class="circle-clipper left"><div class="circle"></div></div></div></div>' +
+        'Working...</div>';
+
+    var url = '/api/v1/places/' + placeId + '/' + tool + '/';
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken'),
+        },
+        credentials: 'same-origin',
+    })
+    .then(function(resp) { return resp.json(); })
+    .then(function(data) {
+        var d = data.data || data;
+        if (tool === 'recommend') renderRecommendations(target, d);
+        else if (tool === 'pairings') renderPairings(target, d);
+        else if (tool === 'flight') renderFlight(target, d);
+    })
+    .catch(function() {
+        target.innerHTML = '<p style="color:#c62828;font-size:0.82rem;">Failed. Try again.</p>';
+    });
+}
+
+function renderRecommendations(el, data) {
+    var recs = data.recommendations || [];
+    if (!recs.length) { el.innerHTML = '<p style="color:#999;font-size:0.82rem;">No recommendations available.</p>'; return; }
+    var html = '<div style="border:1px solid #5dade2;border-radius:8px;padding:10px;margin-top:6px;">';
+    html += '<strong style="font-size:0.82rem;color:#5dade2;">Recommended for You</strong>';
+    recs.forEach(function(r) {
+        html += '<div style="padding:4px 0;font-size:0.85rem;"><strong>' + (r.name||'') + '</strong>';
+        if (r.why) html += '<br><small style="color:#666;">' + r.why + '</small>';
+        html += '</div>';
+    });
+    html += '</div>';
+    el.innerHTML = html;
+}
+
+function renderPairings(el, data) {
+    var pairings = data.pairings || [];
+    if (!pairings.length) { el.innerHTML = '<p style="color:#999;font-size:0.82rem;">No pairings available.</p>'; return; }
+    var html = '<div style="border:1px solid #1abc9c;border-radius:8px;padding:10px;margin-top:6px;">';
+    html += '<strong style="font-size:0.82rem;color:#1abc9c;">' + (data.direction === 'food' ? 'Food Pairings' : 'Wine Pairings') + '</strong>';
+    if (data.general_tip) html += '<p style="font-size:0.78rem;color:#666;font-style:italic;">' + data.general_tip + '</p>';
+    pairings.forEach(function(p) {
+        html += '<div style="padding:4px 0;font-size:0.85rem;"><strong>' + (p.item||'') + '</strong> + ' + (p.pairs_with||'');
+        if (p.why) html += '<br><small style="color:#666;">' + p.why + '</small>';
+        html += '</div>';
+    });
+    html += '</div>';
+    el.innerHTML = html;
+}
+
+function renderFlight(el, data) {
+    var items = data.items || [];
+    if (!items.length) { el.innerHTML = '<p style="color:#999;font-size:0.82rem;">Not enough items for a flight.</p>'; return; }
+    var colorMap = { opener: '#4caf50', comfort: '#2196f3', stretch: '#ff9800', finisher: '#9c27b0' };
+    var html = '<div style="border:1px solid #2c3e50;border-radius:8px;padding:10px;margin-top:6px;">';
+    html += '<strong style="font-size:0.82rem;color:#2c3e50;">' + (data.flight_name||'Your Flight') + '</strong>';
+    if (data.description) html += '<p style="font-size:0.78rem;color:#666;">' + data.description + '</p>';
+    items.forEach(function(item, i) {
+        var color = colorMap[item.role] || '#999';
+        html += '<div style="display:flex;gap:6px;padding:4px 0;font-size:0.85rem;">';
+        html += '<span style="background:' + color + ';color:#fff;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.7rem;flex-shrink:0;">' + (i+1) + '</span>';
+        html += '<div><strong>' + (item.name||'') + '</strong> <span style="font-size:0.7rem;padding:1px 4px;border-radius:4px;background:' + color + '22;color:' + color + ';font-weight:600;">' + (item.role||'').toUpperCase() + '</span>';
+        if (item.tasting_tip) html += '<br><small style="color:#666;font-style:italic;">' + item.tasting_tip + '</small>';
+        html += '</div></div>';
+    });
+    html += '</div>';
+    el.innerHTML = html;
+}
+
+function getCookie(name) {
+    var value = '; ' + document.cookie;
+    var parts = value.split('; ' + name + '=');
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    return '';
+}
+</script>

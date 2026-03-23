@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/auth/auth_provider.dart';
 import '../../../core/widgets/app_drawer.dart';
 import '../../help/help_launcher.dart';
+import '../../onboarding/onboarding_tour.dart';
 
 import '../../../core/models/place.dart';
 import '../../../core/models/visit.dart';
@@ -22,12 +24,35 @@ final _carouselScrollBehavior = const MaterialScrollBehavior().copyWith(
   },
 );
 
-class DashboardScreen extends ConsumerWidget {
+class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+  bool _tourChecked = false;
+
+  void _checkOnboarding() {
+    if (_tourChecked) return;
+    _tourChecked = true;
+    final user = ref.read(authStateProvider).valueOrNull;
+    if (user != null && user.needsOnboarding) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          showOnboardingTour(context, ref);
+        }
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final dashboard = ref.watch(dashboardProvider);
+
+    // Check onboarding after first successful dashboard load
+    dashboard.whenData((_) => _checkOnboarding());
 
     return Scaffold(
       drawer: const AppDrawer(),

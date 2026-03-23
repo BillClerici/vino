@@ -6,6 +6,18 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from apps.api.views import auth_callback, health_check
+from apps.core.feature_views import (
+    BadgesView,
+    CellarView,
+    JourneyMapView,
+    SippyChatView,
+    SippyHistoryView,
+    SippyPlannerView,
+    HelpView,
+    TripRecapView,
+    UpdateOnboardingView,
+    WishlistView,
+)
 from apps.core.views import AppSettingsView, LandingPageView, SetTimezoneView
 from apps.partners.urls import admin_patterns as partner_admin_patterns
 from apps.partners.urls import partner_portal_patterns
@@ -66,6 +78,18 @@ urlpatterns = [
     path('subscription/success/', CheckoutSuccessView.as_view(), name='checkout_success'),
     path('subscription/portal/', CustomerPortalView.as_view(), name='customer_portal'),
     path('subscription/webhook/', StripeWebhookView.as_view(), name='stripe_webhook'),
+    # New feature pages (synced from mobile)
+    path('wishlist/', WishlistView.as_view(), name='wishlist_list'),
+    path('cellar/', CellarView.as_view(), name='cellar_view'),
+    path('badges/', BadgesView.as_view(), name='badges_view'),
+    path('journey/', JourneyMapView.as_view(), name='journey_map'),
+    path('trips/<uuid:pk>/recap/', TripRecapView.as_view(), name='trip_recap'),
+    path('sippy/', SippyPlannerView.as_view(), name='sippy_planner'),
+    path('sippy/chat/', SippyChatView.as_view(), name='sippy_chat'),
+    path('sippy/chat/<uuid:trip_pk>/', SippyChatView.as_view(), name='sippy_trip_chat'),
+    path('sippy/history/', SippyHistoryView.as_view(), name='sippy_history'),
+    path('help/', HelpView.as_view(), name='help_guide'),
+    path('onboarding/update/', UpdateOnboardingView.as_view(), name='update_onboarding'),
     # User-facing features
     path('places/', include('apps.wineries.urls')),
     path('visits/', include('apps.visits.urls')),

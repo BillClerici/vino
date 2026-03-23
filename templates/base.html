@@ -228,13 +228,38 @@
         <li class="{% if 'palate' in request.resolver_match.url_name %}active{% endif %}">
             <a href="{% url 'palate_profile' %}"><i class="material-icons">wine_bar</i>My Palate</a>
         </li>
+        <li class="{% if 'wishlist' in request.resolver_match.url_name %}active{% endif %}">
+            <a href="{% url 'wishlist_list' %}"><i class="material-icons">bookmark</i>My Wishlist</a>
+        </li>
+        <li class="{% if 'cellar' in request.resolver_match.url_name %}active{% endif %}">
+            <a href="{% url 'cellar_view' %}"><i class="material-icons">inventory_2</i>My Cellar</a>
+        </li>
+        <li class="{% if 'badges' in request.resolver_match.url_name %}active{% endif %}">
+            <a href="{% url 'badges_view' %}"><i class="material-icons">emoji_events</i>Achievements</a>
+        </li>
+        <li class="{% if 'journey' in request.resolver_match.url_name %}active{% endif %}">
+            <a href="{% url 'journey_map' %}"><i class="material-icons">map</i>Journey Map</a>
+        </li>
         {% if is_approved_partner %}
         <li><div class="divider"></div></li>
-        <li><a class="subheader">Partner Portal</a></li>
-        <li><a href="/partners/dashboard/"><i class="material-icons">dashboard</i>Partner Dashboard</a></li>
-        <li><a href="/partners/claims/"><i class="material-icons">store</i>My Places</a></li>
-        <li><a href="/partners/promotions/"><i class="material-icons">campaign</i>Promotions</a></li>
-        <li><a href="/partners/subscription/"><i class="material-icons">card_membership</i>Subscription</a></li>
+        <li class="no-padding">
+            <ul class="collapsible collapsible-accordion">
+                <li class="admin-collapsible {% if 'partner' in request.resolver_match.url_name %}active{% endif %}">
+                    <a class="collapsible-header">
+                        <i class="material-icons">handshake</i>Partner Portal
+                        <i class="material-icons right" style="margin-left:auto;">expand_more</i>
+                    </a>
+                    <div class="collapsible-body" {% if 'partner' in request.resolver_match.url_name %}style="display: block;"{% endif %}>
+                        <ul>
+                            <li><a href="/partners/dashboard/"><i class="material-icons">dashboard</i>Dashboard</a></li>
+                            <li><a href="/partners/claims/"><i class="material-icons">store</i>My Places</a></li>
+                            <li><a href="/partners/promotions/"><i class="material-icons">campaign</i>Promotions</a></li>
+                            <li><a href="/partners/subscription/"><i class="material-icons">card_membership</i>Subscription</a></li>
+                        </ul>
+                    </div>
+                </li>
+            </ul>
+        </li>
         {% endif %}
         {% else %}
         <!-- No active subscription — show subscribe prompt -->
@@ -341,6 +366,15 @@
             </a>
         </li>
 
+        <!-- Help & Tour -->
+        <li><div class="divider"></div></li>
+        <li class="{% if request.resolver_match.url_name == 'help_guide' %}active{% endif %}">
+            <a href="{% url 'help_guide' %}"><i class="material-icons">help_outline</i>Help & Guide</a>
+        </li>
+        <li>
+            <a href="#" onclick="showTour(); return false;"><i class="material-icons">tour</i>Guided Tour</a>
+        </li>
+
         <!-- Logout -->
         <li><div class="divider"></div></li>
         <li>
@@ -365,6 +399,9 @@
         </div>
     </footer>
 
+    {% if user.is_authenticated %}
+    {% include "features/_onboarding_tour.html" %}
+    {% endif %}
     <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
@@ -386,7 +423,7 @@
             // State
             var pinBtn = document.getElementById('pin-nav-btn');
             var toggleBtn = document.getElementById('nav-toggle-btn');
-            var isPinned = localStorage.getItem('gsd_nav_pinned') === 'true';
+            var isPinned = localStorage.getItem('gsd_nav_pinned') !== 'false';
 
             function removeOverlay() {
                 var ov = document.querySelector('.sidenav-overlay');
