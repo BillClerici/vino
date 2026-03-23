@@ -24,6 +24,8 @@ ignore = ["E501", "E402", "F841", "N806", "N814", "N817", "F405"]
 python_version = "3.12"
 plugins = ["mypy_django_plugin.main"]
 ignore_missing_imports = true
+explicit_package_bases = true
+mypy_path = "."
 
 [tool.django-stubs]
 django_settings_module = "config.settings.local"
