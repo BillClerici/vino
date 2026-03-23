@@ -1,0 +1,17 @@
+.git
+.github
+.env
+.env.docker
+.env.local
+__pycache__
+*.pyc
+*.pyo
+.mypy_cache
+.pytest_cache
+.ruff_cache
+node_modules
+mobile
+*.md
+*.log
+docker-compose.yml
+seed_data.json
