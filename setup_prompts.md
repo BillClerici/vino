@@ -1,7 +1,6 @@
 # GSD Framework -- Setup Prompts
 
 These prompts are designed to be run sequentially in Claude Code (Cursor or CLI) after generating a project with `gsd-init.py`. The skeleton is already fully scaffolded -- config/, apps/, templates/, requirements/, docker/, migrations, Makefile, and docker-compose.yml are all in place.
-
 ---
 
 ## CRITICAL: .env Protection Rules
