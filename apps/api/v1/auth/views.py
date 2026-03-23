@@ -18,13 +18,17 @@ def _exchange_google_code(auth_code):
     """Exchange a Google auth code for user info."""
     import requests
 
-    token_resp = requests.post("https://oauth2.googleapis.com/token", data={
+    # For mobile (Android/iOS) server auth codes, redirect_uri is not needed
+    # Some Google configurations require it to be omitted entirely
+    payload = {
         "code": auth_code,
         "client_id": settings.SOCIAL_AUTH_GOOGLE_OAUTH2_KEY,
         "client_secret": settings.SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET,
-        "redirect_uri": "",  # empty for mobile
         "grant_type": "authorization_code",
-    }, timeout=10)
+    }
+    token_resp = requests.post("https://oauth2.googleapis.com/token", data=payload, timeout=10)
+    if not token_resp.ok:
+        logger.error("Google token exchange failed: %s %s", token_resp.status_code, token_resp.text)
     token_resp.raise_for_status()
     tokens = token_resp.json()
 
