@@ -48,6 +48,8 @@ jobs:
   deploy:
     needs: migrate
     runs-on: ubuntu-latest
+    # Skip deploy if AWS credentials are not configured
+    if: ${{ secrets.AWS_ACCESS_KEY_ID != '' }}
     environment: ${{ github.event.inputs.environment || 'dev' }}
     steps:
       - uses: actions/checkout@v4
