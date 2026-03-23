@@ -154,10 +154,17 @@ def mobile_google_auth(request):
 
     try:
         tokens, userinfo = _exchange_google_code(serializer.validated_data["auth_code"])
-    except Exception:
+    except Exception as exc:
         logger.exception("Google auth code exchange failed")
+        detail = "Failed to authenticate with Google."
+        # Include Google's error for debugging
+        if hasattr(exc, 'response') and exc.response is not None:
+            try:
+                detail += f" Google says: {exc.response.json()}"
+            except Exception:
+                detail += f" Status: {exc.response.status_code}"
         return Response(
-            {"detail": "Failed to authenticate with Google."},
+            {"detail": detail},
             status=status.HTTP_401_UNAUTHORIZED,
         )
 
