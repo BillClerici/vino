@@ -76,8 +76,9 @@ class ScanLabelView(APIView):
             )
 
         try:
-            from apps.api.ai_utils import get_gemini
             from langchain_core.messages import HumanMessage
+
+            from apps.api.ai_utils import get_gemini
 
             llm = get_gemini()
             message = HumanMessage(

@@ -6,13 +6,14 @@ Trip, and SippyConversation counts. This keeps them always accurate and
 avoids migration overhead.
 """
 
-from django.db.models import Avg, Count, Q, Sum
+from django.db.models import Count, Q
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.trips.models import SippyConversation, Trip
 from apps.visits.models import VisitLog, VisitWine
 from apps.wineries.models import WineWishlist
+
 from ..permissions import HasActiveSubscription
 
 # Badge definitions: (id, name, icon, description, category, check_function_name)
@@ -69,7 +70,6 @@ class BadgesView(APIView):
         unique_places = visits.values("place").distinct().count()
         max_visits_one_place = 0
         if total_visits > 0:
-            from django.db.models.functions import Coalesce
             place_counts = visits.values("place").annotate(c=Count("id")).order_by("-c")
             if place_counts:
                 max_visits_one_place = place_counts[0]["c"]

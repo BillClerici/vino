@@ -8,7 +8,7 @@ The planner uses a conversational agent pattern:
 
 import json
 import logging
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
@@ -121,7 +121,8 @@ If the user wants changes after seeing the preview, adjust the plan and propose 
 def planner_conversation(state: dict) -> dict:
     """Core conversation node — runs Claude with tools and the planner system prompt."""
     from apps.api.ai_utils import get_claude
-    from .tools import search_places, get_drive_time
+
+    from .tools import get_drive_time, search_places
 
     llm = get_claude()
     tools = [search_places, get_drive_time]

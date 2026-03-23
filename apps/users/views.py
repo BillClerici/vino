@@ -2,7 +2,7 @@ from django import forms
 from django.contrib import messages
 from django.contrib.auth import logout
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Avg, Count
+from django.db.models import Avg
 from django.shortcuts import redirect, render
 from django.views import View
 from django.views.generic import TemplateView
@@ -41,8 +41,8 @@ class ProfileView(LoginRequiredMixin, View):
     """Comprehensive user profile page."""
 
     def get(self, request):
-        from apps.visits.models import VisitLog, VisitWine
         from apps.trips.models import Trip
+        from apps.visits.models import VisitLog, VisitWine
 
         user = request.user
 

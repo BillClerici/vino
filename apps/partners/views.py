@@ -2,7 +2,6 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.db.models import Count, Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
@@ -19,9 +18,7 @@ from apps.partners.forms import (
     PlaceClaimForm,
     PromotionForm,
 )
-from apps.partners.models import Partner, PlaceClaim, Promotion, PromotionImpression
-
-from apps.partners.models import PartnerOwner
+from apps.partners.models import Partner, PartnerOwner, PlaceClaim, Promotion, PromotionImpression
 
 User = get_user_model()
 
@@ -327,7 +324,6 @@ class AdminPartnerEditView(_AdminPartnerBaseMixin, View):
         owners = partner.partner_owners.filter(is_active=True).select_related("user")[:5]
         claims = partner.claims.filter(is_active=True).select_related("place").order_by("-claimed_at")[:5]
         promotions = partner.promotions.filter(is_active=True).select_related("place", "promotion_type").order_by("-start_date")[:5]
-        from django.db.models import Count
         impressions_count = PromotionImpression.objects.filter(promotion__partner=partner).count()
 
         ctx = self.get_partner_nav(partner, "dashboard")
@@ -426,6 +422,7 @@ class AdminPartnerAddOwnerView(SuperuserRequiredMixin, View):
 
     def post(self, request, pk):
         import json
+
         from django.http import JsonResponse
         partner = get_object_or_404(Partner.all_objects, pk=pk)
         try:
@@ -473,6 +470,7 @@ class AdminPartnerUpdateOwnerView(SuperuserRequiredMixin, View):
 
     def post(self, request, pk, owner_pk):
         import json
+
         from django.http import JsonResponse
         partner = get_object_or_404(Partner.all_objects, pk=pk)
         po = get_object_or_404(PartnerOwner, pk=owner_pk, partner=partner)
@@ -531,6 +529,7 @@ class AdminPartnerDecisionView(SuperuserRequiredMixin, View):
 
     def post(self, request, pk):
         import json as _json
+
         from django.core.mail import send_mail
         from django.http import JsonResponse
 
@@ -610,8 +609,9 @@ class AdminPlaceSearchView(SuperuserRequiredMixin, View):
     """AJAX: search places by name, city, or state."""
 
     def get(self, request):
-        from django.http import JsonResponse
         from django.db.models import Q
+        from django.http import JsonResponse
+
         from apps.wineries.models import Place
 
         q = request.GET.get("q", "").strip()
@@ -649,8 +649,10 @@ class AdminPartnerCreatePlaceAndClaimView(SuperuserRequiredMixin, View):
 
     def post(self, request, pk):
         import json as _json
-        from django.http import JsonResponse
         from decimal import Decimal
+
+        from django.http import JsonResponse
+
         from apps.wineries.models import Place
 
         partner = get_object_or_404(Partner.all_objects, pk=pk)
@@ -741,9 +743,11 @@ class AdminPartnerAddPromotionView(SuperuserRequiredMixin, View):
 
     def post(self, request, pk):
         import json as _json
+
         from django.http import JsonResponse
-        from apps.wineries.models import Place
+
         from apps.lookup.models import LookupValue
+        from apps.wineries.models import Place
 
         partner = get_object_or_404(Partner.all_objects, pk=pk)
         try:
@@ -805,7 +809,9 @@ class AdminPartnerAddClaimView(SuperuserRequiredMixin, View):
 
     def post(self, request, pk):
         import json as _json
+
         from django.http import JsonResponse
+
         from apps.wineries.models import Place
 
         partner = get_object_or_404(Partner.all_objects, pk=pk)

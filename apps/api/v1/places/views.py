@@ -2,9 +2,10 @@ from django.db.models import Avg, Count, Exists, OuterRef, Q
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
+from rest_framework.viewsets import ModelViewSet
 
 from apps.wineries.models import FavoritePlace, MenuItem, Place
+
 from ..permissions import HasActiveSubscription
 from .filters import PlaceFilter
 from .serializers import (
@@ -202,8 +203,9 @@ Return ONLY a JSON array of exactly 3 objects with these exact keys:
 [{{"name": "Wine name from menu", "why": "1 sentence why this matches their palate"}}]"""
 
         try:
-            from apps.api.ai_utils import get_claude
             from langchain_core.messages import HumanMessage
+
+            from apps.api.ai_utils import get_claude
 
             llm = get_claude()
             response = llm.invoke([HumanMessage(content=prompt)])
@@ -261,8 +263,9 @@ Return ONLY valid JSON:
 {{"flight_name": "Creative name for this flight", "description": "1 sentence theme", "items": [{{"menu_item_id": "uuid", "name": "...", "order": 1, "role": "opener|comfort|stretch|finisher", "tasting_tip": "1 sentence tasting guidance"}}]}}"""
 
         try:
-            from apps.api.ai_utils import get_claude
             from langchain_core.messages import HumanMessage
+
+            from apps.api.ai_utils import get_claude
 
             llm = get_claude()
             response = llm.invoke([HumanMessage(content=prompt)])
@@ -332,8 +335,9 @@ Return ONLY valid JSON with EXACTLY these keys (do not rename them):
 IMPORTANT: Use exactly "item" and "pairs_with" as the key names. Provide 3-5 pairings."""
 
         try:
-            from apps.api.ai_utils import get_claude
             from langchain_core.messages import HumanMessage
+
+            from apps.api.ai_utils import get_claude
 
             llm = get_claude()
             response = llm.invoke([HumanMessage(content=prompt)])

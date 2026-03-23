@@ -1,6 +1,5 @@
-from datetime import date
 
-from django.db.models import Avg, Count, Q, Sum
+from django.db.models import Avg, Count, Q
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import action
@@ -10,6 +9,7 @@ from rest_framework.viewsets import ModelViewSet
 from apps.palate.models import PalateProfile
 from apps.trips.models import Trip, TripMember, TripStop
 from apps.visits.models import VisitLog, VisitWine
+
 from ..permissions import HasActiveSubscription, IsTripMemberOrReadOnly
 from .filters import TripFilter
 from .serializers import (
@@ -269,7 +269,7 @@ class TripViewSet(ModelViewSet):
         )
 
         # Check for wishlist matches at this place
-        from apps.wineries.models import WineWishlist, MenuItem
+        from apps.wineries.models import MenuItem, WineWishlist
         wishlist_matches = []
         # Direct menu_item matches
         direct = WineWishlist.objects.filter(
@@ -349,7 +349,7 @@ class TripViewSet(ModelViewSet):
         except VisitLog.DoesNotExist:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
-        from ..visits.serializers import VisitWineWriteSerializer, VisitWineSerializer
+        from ..visits.serializers import VisitWineSerializer, VisitWineWriteSerializer
         serializer = VisitWineWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         wine = serializer.save(visit=visit)
@@ -577,8 +577,9 @@ GROUP MEMBERS:
             prompt += f"Visits: {mp['visit_count']}, Avg rating: {mp['avg_rating']}\n"
 
         try:
-            from apps.api.ai_utils import get_claude
             from langchain_core.messages import HumanMessage
+
+            from apps.api.ai_utils import get_claude
 
             llm = get_claude()
             response = llm.invoke([HumanMessage(content=prompt)])
@@ -800,8 +801,9 @@ Keep responses conversational, warm, and concise (2-4 sentences unless more deta
 """ + trip_context
 
         try:
-            from apps.api.ai_utils import get_claude
             from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+
+            from apps.api.ai_utils import get_claude
 
             llm = get_claude()
             messages = [SystemMessage(content=system_prompt)]
@@ -863,8 +865,8 @@ Keep responses conversational, warm, and concise (2-4 sentences unless more deta
     @action(detail=False, methods=["post"])
     def plan(self, request):
         """Conversational trip planner powered by LangGraph."""
-        import time
         import logging
+        import time
 
         logger = logging.getLogger(__name__)
 
@@ -893,8 +895,10 @@ Keep responses conversational, warm, and concise (2-4 sentences unless more deta
             ).first()
 
         try:
+            from langchain_core.messages import AIMessage as AI
+            from langchain_core.messages import HumanMessage as HM
+
             from apps.api.agents.graph import get_compiled_graph
-            from langchain_core.messages import AIMessage as AI, HumanMessage as HM
 
             graph = get_compiled_graph("trip_planner")
             config = {"configurable": {"thread_id": session_id}}

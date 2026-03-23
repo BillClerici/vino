@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from apps.wineries.models import MenuItem, WineWishlist
+
 from ..permissions import HasActiveSubscription
 from .serializers import WishlistSerializer, WishlistWriteSerializer
 

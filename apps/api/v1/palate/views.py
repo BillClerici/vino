@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 
 from apps.palate.models import PalateProfile
 from apps.visits.models import VisitLog, VisitWine
+
 from ..permissions import HasActiveSubscription
 from .serializers import PalateProfileSerializer
 
@@ -145,8 +146,9 @@ class PalateAnalyzeView(APIView):
             )
 
         try:
-            from apps.api.ai_utils import get_claude
             from langchain_core.messages import HumanMessage
+
+            from apps.api.ai_utils import get_claude
 
             llm = get_claude()
             message = HumanMessage(content=ANALYZE_PROMPT + history)
@@ -210,8 +212,9 @@ class PalateChatView(APIView):
 {history}"""
 
         try:
-            from apps.api.ai_utils import get_claude
             from langchain_core.messages import HumanMessage, SystemMessage
+
+            from apps.api.ai_utils import get_claude
 
             llm = get_claude()
             messages = [

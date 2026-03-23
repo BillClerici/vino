@@ -5,9 +5,10 @@ from rest_framework.views import APIView
 from apps.trips.models import Trip
 from apps.visits.models import VisitLog
 from apps.wineries.models import Place
+
 from ..permissions import HasActiveSubscription
-from ..visits.serializers import VisitLogListSerializer
 from ..places.serializers import PlaceListSerializer
+from ..visits.serializers import VisitLogListSerializer
 
 
 class DashboardView(APIView):

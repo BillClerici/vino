@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from apps.users.models import User, SocialAccount
+
+from apps.users.models import SocialAccount, User
 
 
 @admin.register(User)

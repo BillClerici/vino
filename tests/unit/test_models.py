@@ -1,8 +1,6 @@
 import pytest
-from apps.core.models import BaseModel
-from apps.lookup.models import LookupValue
-from apps.users.models import User
 
+from apps.users.models import User
 
 pytestmark = pytest.mark.django_db
 

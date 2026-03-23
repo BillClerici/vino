@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from apps.trips.models import Trip, TripMember, TripStop
+
 from ..places.serializers import PlaceListSerializer
 from ..users.serializers import UserSummarySerializer
 

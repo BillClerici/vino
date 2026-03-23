@@ -5,11 +5,12 @@ from VisitWine records where purchased=True.
 
 from decimal import Decimal
 
-from django.db.models import Avg, Count, F, Q, Sum
+from django.db.models import Avg, F, Sum
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.visits.models import VisitWine
+
 from ..permissions import HasActiveSubscription
 
 

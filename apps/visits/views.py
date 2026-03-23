@@ -193,7 +193,6 @@ class VisitDetailView(LoginRequiredMixin, View):
                 rating_comparison["color"] = "#e53935"
 
         # Place menu items (for the drinks grid when user hasn't logged wines)
-        from apps.wineries.models import MenuItem
         menu_items = place.menu_items.filter(is_active=True).order_by("name")
 
         return render(request, "visits/detail.html", {

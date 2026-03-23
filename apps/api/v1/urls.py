@@ -5,10 +5,14 @@ from rest_framework.response import Response
 from rest_framework.routers import DefaultRouter
 
 from .auth.views import dev_login, mobile_google_auth, mobile_microsoft_auth
+from .badges.views import BadgesView
+from .cellar.views import CellarView
+from .conversations.views import SippyConversationViewSet
 from .dashboard.views import DashboardView
 from .lookups.views import LookupValueViewSet
 from .palate.views import PalateAnalyzeView, PalateChatView, PalateProfileView
 from .places.views import MenuItemViewSet, PlaceViewSet
+from .scan_label import ScanLabelView
 from .subscriptions.views import (
     CreateMobileCheckoutView,
     CustomerPortalURLView,
@@ -16,10 +20,6 @@ from .subscriptions.views import (
 )
 from .trips.views import TripViewSet
 from .users.views import UserProfileViewSet
-from .scan_label import ScanLabelView
-from .conversations.views import SippyConversationViewSet
-from .badges.views import BadgesView
-from .cellar.views import CellarView
 from .visits.views import VisitLogViewSet
 from .wishlist.views import WishlistViewSet
 

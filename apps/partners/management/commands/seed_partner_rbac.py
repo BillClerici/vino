@@ -3,7 +3,6 @@ from django.core.management.base import BaseCommand
 from apps.lookup.models import LookupValue
 from apps.rbac.models import ControlPoint, ControlPointGroup, Role
 
-
 LOOKUP_TYPES = [
     {
         "code": "PARTNER_TIER",

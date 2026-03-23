@@ -1,5 +1,4 @@
 import pytest
-from django.utils import timezone
 
 from tests.factories.factories import (
     PlaceFactory,

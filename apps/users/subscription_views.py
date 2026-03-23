@@ -5,6 +5,7 @@ Uses Stripe Checkout (hosted) for the payment flow.
 
 import json
 import logging
+from datetime import UTC
 
 import stripe
 from django.conf import settings
@@ -156,8 +157,8 @@ class CheckoutSuccessView(LoginRequiredMixin, View):
                 user.subscription_plan = plan
 
                 if subscription.get("trial_end"):
-                    from datetime import datetime, timezone as tz
-                    user.trial_end = datetime.fromtimestamp(subscription["trial_end"], tz=tz.utc)
+                    from datetime import datetime
+                    user.trial_end = datetime.fromtimestamp(subscription["trial_end"], tz=UTC)
 
                 user.save(update_fields=[
                     "stripe_subscription_id", "subscription_status",
@@ -211,7 +212,6 @@ class StripeWebhookView(View):
 
         logger.info("Stripe webhook: %s", event_type)
 
-        from apps.users.models import User
 
         if event_type in (
             "customer.subscription.created",
@@ -257,8 +257,8 @@ class StripeWebhookView(View):
 
         trial_end = subscription.get("trial_end")
         if trial_end:
-            from datetime import datetime, timezone
-            user.trial_end = datetime.fromtimestamp(trial_end, tz=timezone.utc)
+            from datetime import datetime
+            user.trial_end = datetime.fromtimestamp(trial_end, tz=UTC)
 
         user.save(update_fields=[
             "stripe_subscription_id", "subscription_status",

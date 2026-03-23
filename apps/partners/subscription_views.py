@@ -13,7 +13,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views import View
 
-from apps.partners.models import Partner, PartnerOwner
+from apps.partners.models import Partner
 from apps.partners.views import ApprovedPartnerRequiredMixin, _get_user_partner
 
 
@@ -140,7 +140,7 @@ class PartnerCheckoutView(ApprovedPartnerRequiredMixin, View):
             line_items=[{"price": price_id, "quantity": 1}],
             mode="subscription",
             success_url=request.build_absolute_uri(
-                f"/partners/subscription/success/?session_id={{CHECKOUT_SESSION_ID}}"
+                "/partners/subscription/success/?session_id={CHECKOUT_SESSION_ID}"
             ),
             cancel_url=request.build_absolute_uri("/partners/subscription/"),
             metadata={"partner_id": str(partner.pk), "plan": plan, "type": "partner"},

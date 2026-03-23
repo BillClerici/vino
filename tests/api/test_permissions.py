@@ -1,6 +1,7 @@
 import pytest
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
+
 from tests.factories.factories import UserFactory
 
 
@@ -23,8 +24,9 @@ class TestSubscriptionPermission:
         assert resp.status_code == 200
 
     def test_trial_user_allowed(self):
-        from django.utils import timezone
         from datetime import timedelta
+
+        from django.utils import timezone
         user = UserFactory(
             subscription_status="trialing",
             trial_end=timezone.now() + timedelta(days=7),

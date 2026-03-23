@@ -1,6 +1,6 @@
 import json as _json
 import logging
-from datetime import datetime, time, timedelta, timezone
+from datetime import UTC, datetime, time, timedelta
 from decimal import Decimal
 
 import httpx
@@ -31,7 +31,7 @@ def _user_tz(user):
     try:
         return zoneinfo.ZoneInfo(tz_name)
     except (KeyError, Exception):
-        return timezone.utc
+        return UTC
 
 
 class TripListView(LoginRequiredMixin, ListView):
@@ -41,7 +41,7 @@ class TripListView(LoginRequiredMixin, ListView):
     paginate_by = 10
 
     def get_queryset(self):
-        from django.db.models import Avg, Count, Q
+        from django.db.models import Count, Q
 
         qs = (
             Trip.objects.filter(members=self.request.user)
@@ -205,6 +205,7 @@ class TripCopyView(LoginRequiredMixin, View):
             body = {}
 
         from datetime import date as _date
+
         from django.utils import timezone as _tz
         today = _tz.localdate()
         default_meeting = time(12, 0)
@@ -682,8 +683,8 @@ class TripInviteView(LoginRequiredMixin, View):
     """AJAX: invite a member by email with optional personalised message."""
 
     def post(self, request, pk):
-        from django.core.mail import send_mail
         from django.conf import settings as django_settings
+        from django.core.mail import send_mail
         from django.utils import timezone
 
         trip = get_object_or_404(Trip, pk=pk)
@@ -965,6 +966,7 @@ class QuickTripView(LoginRequiredMixin, View):
 def _find_trip_visit(trip, place, user):
     """Find a user's visit at a place during the trip's date range."""
     from datetime import timedelta
+
     from django.utils import timezone
 
     qs = VisitLog.objects.filter(user=user, place=place)
@@ -1118,8 +1120,9 @@ class LiveTripView(LoginRequiredMixin, View):
                 }
 
         # Compute per-place stats: past visit count and favorite/top wine count
+        from django.db.models import Q
+
         from apps.visits.models import VisitWine
-        from django.db.models import Count, Q
         place_stats = {}
         for stop in stops:
             place_id = stop.place_id
@@ -1153,8 +1156,8 @@ class LiveTripCheckinView(LoginRequiredMixin, View):
     """AJAX: check in at a stop — creates a VisitLog."""
 
     def post(self, request, pk, stop_pk):
+
         from django.utils import timezone
-        from datetime import timedelta
 
         trip = get_object_or_404(Trip, pk=pk)
         stop = get_object_or_404(TripStop, pk=stop_pk, trip=trip)
@@ -1182,7 +1185,7 @@ class LiveTripUndoCheckinView(LoginRequiredMixin, View):
     """AJAX: undo a check-in — soft-deletes the VisitLog and its wines."""
 
     def post(self, request, pk, stop_pk):
-        from django.utils import timezone
+
         from apps.visits.models import VisitWine
 
         trip = get_object_or_404(Trip, pk=pk)

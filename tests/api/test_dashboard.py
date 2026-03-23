@@ -1,4 +1,5 @@
 import pytest
+
 from tests.factories.factories import PlaceFactory, TripFactory, TripMemberFactory, VisitLogFactory
 
 

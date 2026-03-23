@@ -65,7 +65,7 @@ class Command(BaseCommand):
             self.stdout.write(f"  Product: {name}")
 
             if dry_run:
-                self.stdout.write(f"    [DRY RUN] Would create product + 2 prices")
+                self.stdout.write("    [DRY RUN] Would create product + 2 prices")
                 env_lines.append(f"STRIPE_PARTNER_{tier.upper()}_MONTHLY_PRICE_ID=price_xxx")
                 env_lines.append(f"STRIPE_PARTNER_{tier.upper()}_YEARLY_PRICE_ID=price_xxx")
                 continue

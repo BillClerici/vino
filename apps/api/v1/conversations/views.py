@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from apps.trips.models import SippyConversation
+
 from ..permissions import HasActiveSubscription
 from .serializers import (
     SippyConversationDetailSerializer,
@@ -89,8 +90,9 @@ class SippyConversationViewSet(ModelViewSet):
     def _retry_plan(self, request, conversation, user_text, messages):
         """Retry a planner conversation."""
         try:
-            from apps.api.agents.graph import get_compiled_graph
             from langchain_core.messages import AIMessage, HumanMessage
+
+            from apps.api.agents.graph import get_compiled_graph
 
             session_id = conversation.session_id
             if not session_id:
@@ -143,12 +145,13 @@ class SippyConversationViewSet(ModelViewSet):
     def _retry_ask(self, request, conversation, user_text, messages):
         """Retry an Ask Sippy conversation."""
         try:
-            from apps.api.ai_utils import get_claude
             from langchain_core.messages import (
                 AIMessage,
                 HumanMessage,
                 SystemMessage,
             )
+
+            from apps.api.ai_utils import get_claude
 
             # Rebuild context (simplified — trip chat context)
             trip = conversation.trip

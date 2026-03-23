@@ -76,7 +76,7 @@ def process_label_image(state: VinoState) -> dict:
 
 def build_trip_planner_graph() -> StateGraph:
     """Build the conversational trip planner graph."""
-    from .nodes import planner_conversation, planner_route, planner_commit
+    from .nodes import planner_commit, planner_conversation, planner_route
 
     builder = StateGraph(TripPlannerState)
 
@@ -145,7 +145,6 @@ def get_compiled_graph(graph_name: str = "palate"):
         return _compiled_graphs[graph_name]
 
     import psycopg
-
     from django.conf import settings
     from langgraph.checkpoint.postgres import PostgresSaver
 

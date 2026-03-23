@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
-from apps.rbac.models import ControlPointGroup, ControlPoint, Role
 
+from apps.rbac.models import ControlPoint, ControlPointGroup, Role
 
 # Control Point Groups and their CRUD control points
 SEED_DATA = {

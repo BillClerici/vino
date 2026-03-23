@@ -1,6 +1,7 @@
 import os
-from pathlib import Path
 from datetime import timedelta
+from pathlib import Path
+
 import environ
 
 env = environ.Env()
@@ -259,6 +260,7 @@ PINECONE_INDEX_NAME = env('PINECONE_INDEX_NAME', default='vinovoyage')
 # Sentry
 import sentry_sdk
 from sentry_sdk.integrations.django import DjangoIntegration
+
 if env('SENTRY_DSN', default=''):
     sentry_sdk.init(
         dsn=env('SENTRY_DSN'),

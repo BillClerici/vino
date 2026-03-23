@@ -6,7 +6,6 @@ to the pricing page. Allows access to subscription, auth, and admin pages.
 from django.shortcuts import redirect
 from django.urls import reverse
 
-
 ALLOWED_PATHS = [
     "/subscription/",
     "/login/",

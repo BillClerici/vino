@@ -1,5 +1,4 @@
-from django.db.models import Avg, Count
-from rest_framework import status
+from django.db.models import Avg
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
@@ -7,6 +6,7 @@ from rest_framework.viewsets import GenericViewSet
 from apps.trips.models import Trip
 from apps.visits.models import VisitLog
 from apps.wineries.models import FavoritePlace
+
 from ..permissions import HasActiveSubscription
 from .serializers import UserProfileUpdateSerializer, UserSerializer
 

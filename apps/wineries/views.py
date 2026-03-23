@@ -511,7 +511,7 @@ class PlaceAdminEditView(AppAdminRequiredMixin, UpdateView):
         ctx["cancel_url"] = reverse("admin_places_list")
 
         # Stats
-        from django.db.models import Avg, Count
+        from django.db.models import Avg
         ctx["trip_count"] = place.trip_stops.filter(is_active=True).values("trip").distinct().count()
         ctx["favorite_count"] = place.favorited_by.filter(is_active=True).count()
         ctx["visit_count"] = place.visits.filter(is_active=True).count()

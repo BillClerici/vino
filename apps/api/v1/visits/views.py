@@ -1,5 +1,4 @@
 import io
-import uuid
 from pathlib import Path
 
 from django.conf import settings
@@ -12,6 +11,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from apps.visits.models import VisitLog, VisitWine
+
 from ..permissions import HasActiveSubscription, IsOwnerOrReadOnly
 from .filters import VisitLogFilter
 from .serializers import (

@@ -1,6 +1,7 @@
 from django import forms
 from django.contrib.auth import get_user_model
-from apps.rbac.models import Role, ControlPoint, ControlPointGroup
+
+from apps.rbac.models import ControlPoint, ControlPointGroup, Role
 
 User = get_user_model()
 

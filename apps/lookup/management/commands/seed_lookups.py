@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
-from apps.lookup.models import LookupValue
 
+from apps.lookup.models import LookupValue
 
 LOOKUP_SEED = {
     'CUSTOMER_TYPE': ['Enterprise', 'SMB', 'Startup', 'Individual'],

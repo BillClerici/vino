@@ -1,4 +1,5 @@
 import pytest
+
 from tests.factories.factories import FavoritePlaceFactory, MenuItemFactory, PlaceFactory
 
 

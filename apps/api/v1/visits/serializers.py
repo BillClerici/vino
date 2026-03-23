@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from apps.visits.models import VisitLog, VisitWine
-from apps.wineries.models import MenuItem
+
 from ..places.serializers import PlaceListSerializer
 
 

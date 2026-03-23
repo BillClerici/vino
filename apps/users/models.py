@@ -1,6 +1,7 @@
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
 from encrypted_model_fields.fields import EncryptedTextField
+
 from apps.core.models import BaseModel
 
 
@@ -13,9 +14,10 @@ class UserManager(BaseUserManager):
         user.set_unusable_password()
         # Set 14-day free trial
         if not user.trial_end and not user.is_superuser:
-            from django.utils import timezone
             from datetime import timedelta
+
             from django.conf import settings
+            from django.utils import timezone
             trial_days = getattr(settings, 'STRIPE_TRIAL_DAYS', 14)
             user.trial_end = timezone.now() + timedelta(days=trial_days)
             user.subscription_status = 'trialing'

@@ -1,14 +1,14 @@
+from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
-from django.views.generic import ListView, CreateView, UpdateView, View
+from django.views.generic import CreateView, ListView, UpdateView, View
 
-from apps.rbac.models import Role, ControlPoint, ControlPointGroup
-from apps.rbac.forms import RoleForm, ControlPointForm, ControlPointGroupForm, UserEditForm
-from apps.lookup.models import LookupValue
 from apps.lookup.forms import LookupValueForm
+from apps.lookup.models import LookupValue
+from apps.rbac.forms import ControlPointForm, ControlPointGroupForm, RoleForm, UserEditForm
+from apps.rbac.models import ControlPoint, ControlPointGroup, Role
 
 User = get_user_model()
 

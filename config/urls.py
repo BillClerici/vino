@@ -2,11 +2,13 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from rest_framework_simplejwt.views import TokenRefreshView
 
-from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from apps.api.views import auth_callback, health_check
 from apps.core.views import AppSettingsView, LandingPageView, SetTimezoneView
+from apps.partners.urls import admin_patterns as partner_admin_patterns
+from apps.partners.urls import partner_portal_patterns
 from apps.rbac.views import (
     ControlPointCreateView,
     ControlPointDeleteView,
@@ -29,7 +31,6 @@ from apps.rbac.views import (
     UserEditView,
     UserListView,
 )
-from apps.users.views import LoginView, LogoutView, ProfileView, RegisterView
 from apps.users.subscription_views import (
     CheckoutSuccessView,
     CreateCheckoutSessionView,
@@ -37,14 +38,13 @@ from apps.users.subscription_views import (
     PricingView,
     StripeWebhookView,
 )
+from apps.users.views import LoginView, LogoutView, ProfileView, RegisterView
 from apps.wineries.views import (
     PlaceAdminCreateView,
     PlaceAdminDeleteView,
     PlaceAdminEditView,
     PlaceAdminListView,
 )
-from apps.partners.urls import admin_patterns as partner_admin_patterns
-from apps.partners.urls import partner_portal_patterns
 
 urlpatterns = [
     path('admin/', admin.site.urls),

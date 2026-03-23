@@ -1,5 +1,6 @@
-from apps.users.models import SocialAccount
 from rest_framework_simplejwt.tokens import RefreshToken
+
+from apps.users.models import SocialAccount
 
 
 def save_social_account(backend, user, response, *args, **kwargs):
