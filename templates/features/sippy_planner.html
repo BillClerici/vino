@@ -55,8 +55,8 @@
         padding: 10px 16px;
         resize: none;
         font-size: 0.95rem;
-        min-height: 42px;
-        max-height: 100px;
+        min-height: 80px;
+        max-height: 150px;
     }
     .chat-input button {
         border-radius: 50%;
@@ -166,12 +166,23 @@
                     <strong style="font-size:0.85rem;color:#f57f17;">Example prompt</strong>
                 </div>
                 <p style="font-size:0.85rem;color:#666;font-style:italic;margin:0 0 8px;" id="example-text">My wife and I would like to visit 3 wineries today starting around noon near I-77 in northern NC. We want to visit each stop for 60-90 minutes and keep drive time between stops to less than 20 minutes. We like both red and white wines. We also like live music.</p>
-                <button class="btn-small outlined blue-grey-text" style="border:1px solid #bdbdbd;background:#fff;" onclick="useExample()">
+                <button class="btn-small outlined blue-grey-text" style="border:1px solid #bdbdbd;background:#fff;" id="use-example-btn">
                     <i class="material-icons left" style="font-size:14px;">edit</i>Use as template
                 </button>
             </div>
         </div>
     </div>
+
+    <script>
+    // Inline so it's available immediately for the welcome cards
+    document.getElementById('use-example-btn')?.addEventListener('click', function() {
+        var text = document.getElementById('example-text')?.textContent || '';
+        var input = document.getElementById('msg-input');
+        if (input) { input.value = text; input.focus(); }
+        var cards = document.getElementById('welcome-cards');
+        if (cards) cards.remove();
+    });
+    </script>
 
     <!-- Suggestions -->
     <div class="suggestions" id="suggestions">
@@ -184,8 +195,8 @@
     <div class="chat-input">
         <form id="chat-form" onsubmit="return sendMessage(event)">
             {% csrf_token %}
-            <textarea id="msg-input" rows="2" placeholder="Describe your ideal trip..."
-                      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage(event);}">
+            <textarea id="msg-input" rows="4" placeholder="Describe your ideal trip..."
+                      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage(event);}"></textarea>
             <button type="submit" class="btn blue-grey" id="send-btn">
                 <i class="material-icons">send</i>
             </button>
