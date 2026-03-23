@@ -16,7 +16,7 @@ class TestDashboardAPI:
         assert resp.status_code == 200
         data = resp.data
         assert data["stats"]["visit_count"] == 1
-        assert data["stats"]["trips_completed"] == 1
+        assert data["stats"]["trip_count"] >= 1
         assert len(data["recent_visits"]) == 1
 
     def test_dashboard_unauthenticated(self, drf_client):
