@@ -59,6 +59,8 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen>
       ),
       body: TabBarView(
         controller: _tabController,
+        // Disable swipe between tabs so Google Map gestures work
+        physics: const NeverScrollableScrollPhysics(),
         children: const [
           _PlaceListTab(),
           _PlaceMapTab(),
