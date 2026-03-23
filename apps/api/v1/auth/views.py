@@ -149,19 +149,51 @@ def dev_login(request):
     return Response(_issue_tokens(user))
 
 
+def _verify_google_id_token(id_token):
+    """Verify a Google ID token and return user info."""
+    import requests
+
+    # Use Google's tokeninfo endpoint to verify
+    resp = requests.get(
+        f"https://oauth2.googleapis.com/tokeninfo?id_token={id_token}",
+        timeout=10,
+    )
+    resp.raise_for_status()
+    payload = resp.json()
+
+    # Verify the audience matches our client ID
+    if payload.get("aud") != settings.SOCIAL_AUTH_GOOGLE_OAUTH2_KEY:
+        raise ValueError("Token audience mismatch")
+
+    return {}, {
+        "email": payload.get("email"),
+        "given_name": payload.get("given_name", ""),
+        "family_name": payload.get("family_name", ""),
+        "sub": payload.get("sub", ""),
+    }
+
+
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def mobile_google_auth(request):
-    """Exchange Google auth code from mobile app for JWT tokens."""
-    serializer = MobileGoogleAuthSerializer(data=request.data)
-    serializer.is_valid(raise_exception=True)
+    """Exchange Google auth code or ID token from mobile app for JWT tokens."""
+    auth_code = request.data.get("auth_code")
+    id_token = request.data.get("id_token")
+
+    if not auth_code and not id_token:
+        return Response(
+            {"detail": "auth_code or id_token is required."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
     try:
-        tokens, userinfo = _exchange_google_code(serializer.validated_data["auth_code"])
+        if auth_code:
+            tokens, userinfo = _exchange_google_code(auth_code)
+        else:
+            tokens, userinfo = _verify_google_id_token(id_token)
     except Exception as exc:
-        logger.exception("Google auth code exchange failed")
+        logger.exception("Google auth failed")
         detail = "Failed to authenticate with Google."
-        # Include Google's error for debugging
         if hasattr(exc, 'response') and exc.response is not None:
             try:
                 detail += f" Google says: {exc.response.json()}"
