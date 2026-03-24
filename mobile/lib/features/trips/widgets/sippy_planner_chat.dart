@@ -6,11 +6,13 @@ import 'package:dio/dio.dart' show DioException, Options;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart' show DateFormat;
 
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../../config/constants.dart';
 import '../../../core/api/api_client.dart';
+import '../../../core/services/location_service.dart';
 import '../../dashboard/providers/dashboard_provider.dart';
 import '../providers/trips_provider.dart';
 import 'sippy_history.dart';
@@ -51,10 +53,20 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
   Map<String, dynamic>? _proposedTrip;
   String? _createdTripId;
   String? _lastFailedMessage;
+  String _userCity = '';
+
+  // Track which required info has been provided
+  bool _hasLocation = false;
+  bool _hasDate = false;
+  bool _hasDuration = false;
+  bool _hasStartTime = false;
+  bool _hasNumStops = false;
+  bool _hasStopDuration = false;
 
   @override
   void initState() {
     super.initState();
+    _loadUserCity();
     if (widget.conversationId != null) {
       _conversationId = widget.conversationId;
       _loadConversation();
@@ -63,6 +75,76 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
         'role': 'welcome',
         'content': '',  // rendered by _WelcomeCard, content ignored
       });
+    }
+  }
+
+  Future<void> _loadUserCity() async {
+    try {
+      final loc = await ref.read(userLocationProvider.future);
+      // Use a simple region label based on coordinates
+      // The suggestions will use "near me" which the backend resolves
+      if (mounted && loc != defaultLocation) {
+        setState(() => _userCity = 'near me');
+      }
+    } catch (_) {}
+  }
+
+  /// Scan user messages to track what required info has been gathered.
+  void _updateGatheredInfo(String userText) {
+    final lower = userText.toLowerCase();
+    // Location: any place/region/city name or "near me"
+    if (lower.contains('napa') || lower.contains('sonoma') ||
+        lower.contains('near') || lower.contains('in ') ||
+        lower.contains('around') || lower.contains('portland') ||
+        lower.contains('charlotte') || lower.contains('valley') ||
+        lower.contains('county') || lower.contains('downtown') ||
+        RegExp(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*').hasMatch(userText)) {
+      _hasLocation = true;
+    }
+    // Date
+    if (lower.contains('today') || lower.contains('tomorrow') ||
+        lower.contains('saturday') || lower.contains('sunday') ||
+        lower.contains('monday') || lower.contains('tuesday') ||
+        lower.contains('wednesday') || lower.contains('thursday') ||
+        lower.contains('friday') || lower.contains('this week') ||
+        lower.contains('next week') ||
+        RegExp(r'\d{1,2}/\d{1,2}').hasMatch(lower) ||
+        RegExp(r'(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+\d').hasMatch(lower)) {
+      _hasDate = true;
+    }
+    // Duration
+    if (RegExp(r'\d+\s*(hours?|hrs?|h)\b').hasMatch(lower) ||
+        lower.contains('half day') || lower.contains('full day') ||
+        lower.contains('all day') || lower.contains('afternoon') ||
+        lower.contains('duration')) {
+      _hasDuration = true;
+    }
+    // Start time
+    if (RegExp(r'\d{1,2}(:\d{2})?\s*(am|pm)\b', caseSensitive: false).hasMatch(lower) ||
+        lower.contains('noon') || lower.contains('morning') ||
+        lower.contains('start at') || lower.contains('starting at') ||
+        lower.contains('begin at') || lower.contains('first stop at')) {
+      _hasStartTime = true;
+    }
+    // Number of stops
+    if (RegExp(r'[1-5]\s*stops?\b').hasMatch(lower) ||
+        RegExp(r'(one|two|three|four|five)\s*stops?').hasMatch(lower) ||
+        lower.contains('just 1') || lower.contains('single stop')) {
+      _hasNumStops = true;
+      // If only 1 stop, stop duration not needed separately
+      if (lower.contains('1 stop') || lower.contains('one stop') ||
+          lower.contains('single stop') || lower.contains('just 1')) {
+        _hasStopDuration = true;
+      }
+    }
+    // Stop duration (per stop)
+    if (RegExp(r'(30|60|90)\s*min').hasMatch(lower) ||
+        RegExp(r'(2|1\.5|1)\s*hours?\s*(each|per|at each|per stop)').hasMatch(lower) ||
+        lower.contains('hour each') || lower.contains('minutes each') ||
+        lower.contains('per stop') || lower.contains('at each stop') ||
+        lower.contains('30 min') || lower.contains('60 min') ||
+        lower.contains('90 min') || lower.contains('2 hours')) {
+      _hasStopDuration = true;
     }
   }
 
@@ -106,6 +188,183 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
     }
   }
 
+  /// Detect what topic Sippy's last message is asking about.
+  String _detectSippyTopic() {
+    // Find the last assistant message
+    final lastAssistant = _messages.lastWhere(
+      (m) => m['role'] == 'assistant',
+      orElse: () => {'content': ''},
+    );
+    final text = (lastAssistant['content'] ?? '').toLowerCase();
+
+    if (text.contains('where') || text.contains('region') ||
+        text.contains('location') || text.contains('area')) {
+      return 'location';
+    }
+    if (text.contains('what date') || text.contains('when') ||
+        text.contains('which day')) {
+      return 'date';
+    }
+    if (text.contains('how long') && (text.contains('trip') || text.contains('total') || text.contains('overall'))) {
+      return 'duration';
+    }
+    if (text.contains('what time') || text.contains('start') && text.contains('time') ||
+        text.contains('kick off') || text.contains('first stop')) {
+      return 'startTime';
+    }
+    if (text.contains('how many stop') || text.contains('number of stop')) {
+      return 'numStops';
+    }
+    if ((text.contains('how long') && (text.contains('each') || text.contains('stop') || text.contains('per'))) ||
+        text.contains('duration at') || text.contains('spend at each')) {
+      return 'stopDuration';
+    }
+    return 'general';
+  }
+
+  /// Build suggestion chips that match what Sippy is currently asking.
+  List<Widget> _buildSuggestionChips() {
+    final hasAnyUserMessage = _messages.any((m) => m['role'] == 'user');
+    final region = _userCity.isNotEmpty ? _userCity : 'Napa Valley';
+    final todayLabel = DateFormat('EEEE').format(DateTime.now());
+    final tomorrowLabel = DateFormat('EEEE').format(
+        DateTime.now().add(const Duration(days: 1)));
+
+    // Before any messages: full starter prompts with all required info
+    if (!hasAnyUserMessage) {
+      return [
+        _SuggestionChip(
+          '3 wineries $region today, 4 hours, 60 min each, start 11am',
+          onTap: (t) { _controller.text = t; _send(); },
+        ),
+        _SuggestionChip(
+          '2 breweries $region $tomorrowLabel, 3 hours, 90 min each, noon',
+          onTap: (t) { _controller.text = t; _send(); },
+        ),
+        _SuggestionChip(
+          '4 stops $region Saturday, 6 hours, 60 min each, 10:30am',
+          onTap: (t) { _controller.text = t; _send(); },
+        ),
+      ];
+    }
+
+    final allRequired = _hasLocation && _hasDate && _hasDuration &&
+        _hasStartTime && _hasNumStops && _hasStopDuration;
+
+    // All required gathered — show "go" button + preference chips
+    if (allRequired) {
+      return [
+        _GoChip(
+          "Let's Go, Sippy!",
+          onTap: () { _controller.text = "That's everything, let's go!"; _send(); },
+        ),
+        _SuggestionChip(
+          'I love red wines',
+          onTap: (t) { _controller.text = t; _send(); },
+        ),
+        _SuggestionChip(
+          'We prefer craft beer',
+          onTap: (t) { _controller.text = t; _send(); },
+        ),
+        _SuggestionChip(
+          'Live music please',
+          onTap: (t) { _controller.text = t; _send(); },
+        ),
+      ];
+    }
+
+    // Show chips matching what Sippy just asked about
+    final topic = _detectSippyTopic();
+
+    switch (topic) {
+      case 'location':
+        return [
+          _SuggestionChip(
+            _userCity.isNotEmpty ? 'Near my location' : 'Near Napa Valley',
+            onTap: (t) { _controller.text = t; _send(); },
+          ),
+          _SuggestionChip('Sonoma County', onTap: (t) { _controller.text = t; _send(); }),
+          _SuggestionChip('Willamette Valley', onTap: (t) { _controller.text = t; _send(); }),
+        ];
+      case 'date':
+        return [
+          _SuggestionChip('Today', onTap: (t) { _controller.text = t; _send(); }),
+          _SuggestionChip('Tomorrow, $tomorrowLabel', onTap: (t) { _controller.text = t; _send(); }),
+          _SuggestionChip('This Saturday', onTap: (t) { _controller.text = t; _send(); }),
+        ];
+      case 'duration':
+        return [
+          _SuggestionChip('3 hours', onTap: (t) { _controller.text = t; _send(); }),
+          _SuggestionChip('4 hours', onTap: (t) { _controller.text = t; _send(); }),
+          _SuggestionChip('5 hours', onTap: (t) { _controller.text = t; _send(); }),
+          _SuggestionChip('6 hours', onTap: (t) { _controller.text = t; _send(); }),
+        ];
+      case 'startTime':
+        return [
+          _SuggestionChip('10 AM', onTap: (t) { _controller.text = t; _send(); }),
+          _SuggestionChip('11 AM', onTap: (t) { _controller.text = t; _send(); }),
+          _SuggestionChip('Noon', onTap: (t) { _controller.text = t; _send(); }),
+          _SuggestionChip('1 PM', onTap: (t) { _controller.text = t; _send(); }),
+        ];
+      case 'numStops':
+        return [
+          _SuggestionChip('1 stop', onTap: (t) { _controller.text = t; _send(); }),
+          _SuggestionChip('2 stops', onTap: (t) { _controller.text = t; _send(); }),
+          _SuggestionChip('3 stops', onTap: (t) { _controller.text = t; _send(); }),
+          _SuggestionChip('4 stops', onTap: (t) { _controller.text = t; _send(); }),
+          _SuggestionChip('5 stops', onTap: (t) { _controller.text = t; _send(); }),
+        ];
+      case 'stopDuration':
+        return [
+          _SuggestionChip('30 min each', onTap: (t) { _controller.text = t; _send(); }),
+          _SuggestionChip('60 min each', onTap: (t) { _controller.text = t; _send(); }),
+          _SuggestionChip('90 min each', onTap: (t) { _controller.text = t; _send(); }),
+          _SuggestionChip('2 hours each', onTap: (t) { _controller.text = t; _send(); }),
+        ];
+      default:
+        // Fallback: show chips for the first missing required item only
+        if (!_hasLocation) {
+          return [
+            _SuggestionChip(
+              _userCity.isNotEmpty ? 'Near my location' : 'Near Napa Valley',
+              onTap: (t) { _controller.text = t; _send(); },
+            ),
+          ];
+        }
+        if (!_hasDate) {
+          return [
+            _SuggestionChip('Today', onTap: (t) { _controller.text = t; _send(); }),
+            _SuggestionChip('Tomorrow', onTap: (t) { _controller.text = t; _send(); }),
+          ];
+        }
+        if (!_hasDuration) {
+          return [
+            _SuggestionChip('4 hours', onTap: (t) { _controller.text = t; _send(); }),
+            _SuggestionChip('6 hours', onTap: (t) { _controller.text = t; _send(); }),
+          ];
+        }
+        if (!_hasStartTime) {
+          return [
+            _SuggestionChip('11 AM', onTap: (t) { _controller.text = t; _send(); }),
+            _SuggestionChip('Noon', onTap: (t) { _controller.text = t; _send(); }),
+          ];
+        }
+        if (!_hasNumStops) {
+          return [
+            _SuggestionChip('2 stops', onTap: (t) { _controller.text = t; _send(); }),
+            _SuggestionChip('3 stops', onTap: (t) { _controller.text = t; _send(); }),
+          ];
+        }
+        if (!_hasStopDuration) {
+          return [
+            _SuggestionChip('60 min each', onTap: (t) { _controller.text = t; _send(); }),
+            _SuggestionChip('90 min each', onTap: (t) { _controller.text = t; _send(); }),
+          ];
+        }
+        return [];
+    }
+  }
+
   @override
   void dispose() {
     _controller.dispose();
@@ -124,6 +383,7 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
         : 'Sippy is thinking...';
 
     if (text.isNotEmpty) {
+      _updateGatheredInfo(text);
       setState(() {
         _messages.add({'role': 'user', 'content': text});
         _sending = true;
@@ -415,6 +675,7 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
                     }
                     if (msg['role'] == 'welcome') {
                       return _WelcomeCard(
+                        userCity: _userCity,
                         onUseExample: (text) {
                           _controller.text = text;
                           setState(() {
@@ -500,8 +761,8 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
               ),
             ),
 
-            // Quick suggestions at start
-            if (_messages.any((m) => m['role'] == 'welcome') && _createdTripId == null)
+            // Dynamic suggestion chips
+            if (_createdTripId == null && _phase != 'proposing')
               SizedBox(
                 height: 40,
                 child: ScrollConfiguration(
@@ -515,20 +776,7 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
                   child: ListView(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    children: [
-                      _SuggestionChip('Wine trip to Napa today, 4 people, love Pinot', onTap: (t) {
-                        _controller.text = t;
-                        _send();
-                      }),
-                      _SuggestionChip('Brewery tour this Saturday near Portland', onTap: (t) {
-                        _controller.text = t;
-                        _send();
-                      }),
-                      _SuggestionChip('Sonoma wine day tomorrow, start at 11am, 3 stops', onTap: (t) {
-                        _controller.text = t;
-                        _send();
-                      }),
-                    ],
+                    children: _buildSuggestionChips(),
                   ),
                 ),
               ),
@@ -942,18 +1190,19 @@ class _ChatBubble extends StatelessWidget {
 
 class _WelcomeCard extends StatelessWidget {
   final void Function(String) onUseExample;
-  const _WelcomeCard({required this.onUseExample});
+  final String userCity;
+  const _WelcomeCard({required this.onUseExample, this.userCity = ''});
 
-  static const _examplePrompt =
-      "My wife and I would like to visit 3 wineries today starting "
-      "around noon near I-77 in northern NC. We want to visit each "
-      "stop for 60-90 minutes and keep drive time between stops to "
-      "less than 20 minutes. We like both red and white wines. "
-      "We also like live music.";
+  String get _examplePrompt {
+    final region = userCity.isNotEmpty ? 'near me' : 'near I-77 in northern NC';
+    return "My wife and I want to visit 3 wineries today for about 4 hours, "
+        "60 min at each stop, starting around noon $region. "
+        "We like both red and white wines and enjoy live music.";
+  }
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final cs = Theme.of(context).colorScheme;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -968,7 +1217,7 @@ class _WelcomeCard extends StatelessWidget {
               maxWidth: MediaQuery.of(context).size.width * 0.78,
             ),
             decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest,
+              color: cs.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(16),
             ),
             child: const Text(
@@ -978,40 +1227,60 @@ class _WelcomeCard extends StatelessWidget {
           ),
         ),
 
-        // What I need card
+        // What I need card — compact 2-column layout
         Container(
           margin: const EdgeInsets.only(bottom: 8, right: 32),
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: colorScheme.primaryContainer.withValues(alpha: 0.4),
+            color: cs.primaryContainer.withValues(alpha: 0.4),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: colorScheme.primary.withValues(alpha: 0.2)),
+            border: Border.all(color: cs.primary.withValues(alpha: 0.2)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  Icon(Icons.checklist, size: 16, color: colorScheme.primary),
+                  Icon(Icons.checklist, size: 14, color: cs.primary),
                   const SizedBox(width: 6),
-                  Text("What I'll ask you",
+                  Text("What I need to know",
                       style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: colorScheme.primary)),
+                          color: cs.primary)),
                 ],
               ),
-              const SizedBox(height: 8),
-              _CheckItem(icon: Icons.place, text: 'Where do you want to go?'),
-              _CheckItem(icon: Icons.calendar_today, text: 'What date?'),
-              _CheckItem(icon: Icons.access_time, text: 'What time to start?'),
-              _CheckItem(icon: Icons.wine_bar, text: 'What do you like to drink?'),
-              _CheckItem(icon: Icons.timer, text: 'How long at each stop?'),
-              _CheckItem(icon: Icons.route, text: 'Max drive time between stops?'),
-              _CheckItem(icon: Icons.music_note, text: 'Events or live music?'),
+              const SizedBox(height: 6),
+              // Required items — bold with star
+              Row(
+                children: [
+                  Expanded(child: _CheckItem(icon: Icons.place, text: 'Where *', required_: true)),
+                  Expanded(child: _CheckItem(icon: Icons.calendar_today, text: 'Date *', required_: true)),
+                ],
+              ),
+              Row(
+                children: [
+                  Expanded(child: _CheckItem(icon: Icons.timer, text: 'Trip duration *', required_: true)),
+                  Expanded(child: _CheckItem(icon: Icons.access_time, text: 'Start time *', required_: true)),
+                ],
+              ),
+              Row(
+                children: [
+                  Expanded(child: _CheckItem(icon: Icons.pin_drop, text: '# of stops *', required_: true)),
+                  Expanded(child: _CheckItem(icon: Icons.hourglass_bottom, text: 'Time per stop *', required_: true)),
+                ],
+              ),
+              const SizedBox(height: 2),
+              // Optional items
+              Row(
+                children: [
+                  Expanded(child: _CheckItem(icon: Icons.wine_bar, text: 'Preferences')),
+                  Expanded(child: _CheckItem(icon: Icons.music_note, text: 'Events')),
+                ],
+              ),
               const SizedBox(height: 4),
-              Text('Include as many as you can in your first message!',
-                  style: TextStyle(fontSize: 10, color: Colors.grey[500], fontStyle: FontStyle.italic)),
+              Text('* Required — include these for the best results!',
+                  style: TextStyle(fontSize: 9, color: cs.primary.withValues(alpha: 0.6), fontStyle: FontStyle.italic)),
             ],
           ),
         ),
@@ -1019,39 +1288,39 @@ class _WelcomeCard extends StatelessWidget {
         // Example prompt card
         Container(
           margin: const EdgeInsets.only(bottom: 8, right: 32),
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: colorScheme.secondaryContainer.withValues(alpha: 0.4),
+            color: cs.secondaryContainer.withValues(alpha: 0.4),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: colorScheme.secondary.withValues(alpha: 0.2)),
+            border: Border.all(color: cs.secondary.withValues(alpha: 0.2)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  Icon(Icons.lightbulb_outline, size: 16, color: colorScheme.secondary),
+                  Icon(Icons.lightbulb_outline, size: 14, color: cs.secondary),
                   const SizedBox(width: 6),
                   Text('Example prompt',
                       style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: colorScheme.secondary)),
+                          color: cs.secondary)),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Text(_examplePrompt,
-                  style: TextStyle(fontSize: 12, color: Colors.grey[700], fontStyle: FontStyle.italic)),
-              const SizedBox(height: 10),
+                  style: TextStyle(fontSize: 11, color: Colors.grey[700], fontStyle: FontStyle.italic)),
+              const SizedBox(height: 8),
               SizedBox(
-                height: 32,
+                height: 30,
                 child: OutlinedButton.icon(
                   onPressed: () => onUseExample(_examplePrompt),
-                  icon: const Icon(Icons.edit, size: 14),
+                  icon: const Icon(Icons.edit, size: 13),
                   label: const Text('Use as template', style: TextStyle(fontSize: 11)),
                   style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    side: BorderSide(color: colorScheme.secondary),
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    side: BorderSide(color: cs.secondary),
                   ),
                 ),
               ),
@@ -1066,17 +1335,24 @@ class _WelcomeCard extends StatelessWidget {
 class _CheckItem extends StatelessWidget {
   final IconData icon;
   final String text;
-  const _CheckItem({required this.icon, required this.text});
+  final bool required_;
+  const _CheckItem({required this.icon, required this.text, this.required_ = false});
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
+      padding: const EdgeInsets.symmetric(vertical: 1.5),
       child: Row(
         children: [
-          Icon(icon, size: 13, color: Colors.grey[600]),
-          const SizedBox(width: 8),
-          Text(text, style: TextStyle(fontSize: 12, color: Colors.grey[700])),
+          Icon(icon, size: 12,
+              color: required_ ? cs.primary : Colors.grey[500]),
+          const SizedBox(width: 5),
+          Text(text,
+              style: TextStyle(
+                  fontSize: 11,
+                  color: required_ ? cs.primary : Colors.grey[600],
+                  fontWeight: required_ ? FontWeight.w600 : FontWeight.normal)),
         ],
       ),
     );
@@ -1201,6 +1477,32 @@ class _SuggestionChip extends StatelessWidget {
       child: ActionChip(
         label: Text(label, style: const TextStyle(fontSize: 12)),
         onPressed: () => onTap(label),
+      ),
+    );
+  }
+}
+
+/// A prominent "go" chip for signaling Sippy to start planning.
+class _GoChip extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  const _GoChip(this.label, {required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ActionChip(
+        avatar: Icon(Icons.rocket_launch, size: 15, color: cs.onPrimary),
+        label: Text(label,
+            style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: cs.onPrimary)),
+        backgroundColor: cs.primary,
+        side: BorderSide.none,
+        onPressed: onTap,
       ),
     );
   }
