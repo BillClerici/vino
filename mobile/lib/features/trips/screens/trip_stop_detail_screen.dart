@@ -9,6 +9,7 @@ import 'package:intl/intl.dart' show DateFormat;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../config/constants.dart';
@@ -54,7 +55,24 @@ class _TripStopDetailScreenState extends ConsumerState<TripStopDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _loadMapPreference();
     _checkExistingVisit();
+  }
+
+  Future<void> _loadMapPreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _showMap = prefs.getBool('stop_detail_map_visible') ?? true;
+      });
+    }
+  }
+
+  Future<void> _toggleMap() async {
+    final newValue = !_showMap;
+    setState(() => _showMap = newValue);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('stop_detail_map_visible', newValue);
   }
 
   @override
@@ -65,7 +83,6 @@ class _TripStopDetailScreenState extends ConsumerState<TripStopDetailScreen> {
       _checkedIn = false;
       _visitId = null;
       _existingVisitData = null;
-      _showMap = true;
       _isFavorited = false;
       _checkExistingVisit();
     }
@@ -166,7 +183,7 @@ class _TripStopDetailScreenState extends ConsumerState<TripStopDetailScreen> {
           existingVisitData: _existingVisitData,
           showMap: _showMap,
           isFavorited: _isFavorited,
-          onToggleMap: () => setState(() => _showMap = !_showMap),
+          onToggleMap: _toggleMap,
           onCheckIn: () => _doCheckIn(stop),
           onToggleFavorite: () => _toggleFavorite(place),
           onNavigate: _navigateToStop,
