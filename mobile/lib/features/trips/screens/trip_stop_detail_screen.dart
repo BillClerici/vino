@@ -24,6 +24,7 @@ import '../widgets/flight_builder_button.dart';
 import '../widgets/sippy_chat.dart';
 import '../widgets/sippy_history.dart';
 import '../widgets/trip_stop_drawer.dart';
+import 'stop_drinks_screen.dart';
 import 'trip_detail_screen.dart' show TripRouteMapScreen;
 
 class TripStopDetailScreen extends ConsumerStatefulWidget {
@@ -173,6 +174,7 @@ class _TripStopDetailScreenState extends ConsumerState<TripStopDetailScreen> {
           onEditStop: () => _editStop(stop),
           onCompleteTrip: _completeTrip,
           onUncheckIn: _undoCheckIn,
+          onRefreshVisit: _checkExistingVisit,
           drinksSectionKey: _drinksSectionKey,
         );
       },
@@ -429,6 +431,7 @@ class _StopView extends StatefulWidget {
   final VoidCallback onEditStop;
   final VoidCallback onCompleteTrip;
   final VoidCallback onUncheckIn;
+  final VoidCallback onRefreshVisit;
   final GlobalKey<_DrinksSectionState> drinksSectionKey;
 
   const _StopView({
@@ -452,6 +455,7 @@ class _StopView extends StatefulWidget {
     required this.onEditStop,
     required this.onCompleteTrip,
     required this.onUncheckIn,
+    required this.onRefreshVisit,
     required this.drinksSectionKey,
   });
 
@@ -483,6 +487,7 @@ class _StopViewState extends State<_StopView> {
   VoidCallback get onEditStop => widget.onEditStop;
   VoidCallback get onCompleteTrip => widget.onCompleteTrip;
   VoidCallback get onUncheckIn => widget.onUncheckIn;
+  VoidCallback get onRefreshVisit => widget.onRefreshVisit;
   GlobalKey<_DrinksSectionState> get drinksSectionKey => widget.drinksSectionKey;
 
   @override
@@ -502,14 +507,47 @@ class _StopViewState extends State<_StopView> {
           MaterialPageRoute(builder: (_) => TripRouteMapScreen(trip: trip)),
         ),
       ),
-      floatingActionButton: GestureDetector(
-        onLongPress: () => openSippyHistory(context, tripId: tripId, chatType: 'ask'),
-        child: FloatingActionButton.extended(
-          onPressed: () => openSippyChat(context, tripId),
-          tooltip: 'Ask Sippy (long-press for history)',
-          icon: const Icon(Icons.auto_awesome, size: 18),
-          label: const Text('Sippy', style: TextStyle(fontWeight: FontWeight.bold)),
-        ),
+      floatingActionButton: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (checkedIn && visitId != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: FloatingActionButton.extended(
+                heroTag: 'drinks_fab',
+                onPressed: () async {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => ProviderScope(
+                        parent: ProviderScope.containerOf(context),
+                        child: StopDrinksScreen(
+                          tripId: tripId,
+                          visitId: visitId!,
+                          place: place,
+                          existingWines: (existingVisitData?['wines_tasted'] as List<dynamic>?) ?? [],
+                        ),
+                      ),
+                    ),
+                  );
+                  onRefreshVisit();
+                },
+                icon: const Icon(Icons.local_bar, size: 18),
+                label: const Text('Drinks', style: TextStyle(fontWeight: FontWeight.bold)),
+                backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+                foregroundColor: Theme.of(context).colorScheme.onSecondaryContainer,
+              ),
+            ),
+          GestureDetector(
+            onLongPress: () => openSippyHistory(context, tripId: tripId, chatType: 'ask'),
+            child: FloatingActionButton.extended(
+              heroTag: 'sippy_fab',
+              onPressed: () => openSippyChat(context, tripId),
+              tooltip: 'Ask Sippy (long-press for history)',
+              icon: const Icon(Icons.auto_awesome, size: 18),
+              label: const Text('Sippy', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
       ),
       body: CustomScrollView(
         slivers: [
@@ -987,12 +1025,10 @@ class _DrinksSection extends ConsumerStatefulWidget {
 }
 
 class _DrinksSectionState extends ConsumerState<_DrinksSection> {
-  late final List<Map<String, dynamic>> _addedDrinks;
+  late List<Map<String, dynamic>> _addedDrinks;
 
-  @override
-  void initState() {
-    super.initState();
-    _addedDrinks = widget.existingWines.map((w) {
+  List<Map<String, dynamic>> _parseWines(List<dynamic> wines) {
+    return wines.map((w) {
       final wine = w as Map<String, dynamic>;
       return <String, dynamic>{
         'id': wine['id'] ?? '',
@@ -1009,6 +1045,20 @@ class _DrinksSectionState extends ConsumerState<_DrinksSection> {
         'photo': wine['photo'] ?? '',
       };
     }).toList();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _addedDrinks = _parseWines(widget.existingWines);
+  }
+
+  @override
+  void didUpdateWidget(_DrinksSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.existingWines != widget.existingWines) {
+      setState(() => _addedDrinks = _parseWines(widget.existingWines));
+    }
   }
 
   Future<void> _deleteDrink(int index) async {
@@ -1739,15 +1789,23 @@ class _DrinkFormSheetState extends ConsumerState<_DrinkFormSheet> {
     final typeList = ref.watch(lookupProvider(codes.typeCode));
     final servingList = ref.watch(lookupProvider(codes.servingCode));
 
+    final defaultType = widget.placeType == 'brewery' ? 'Lager' : 'Red';
+    const defaultServing = 'Tasting';
     final typeOptions = typeList.when(
-      data: (items) => items.map((l) => l.label).toList(),
-      loading: () => <String>['Loading...'],
-      error: (_, __) => <String>['Other'],
+      data: (items) {
+        final labels = items.map((l) => l.label).toList();
+        return labels.isEmpty ? <String>[defaultType] : labels;
+      },
+      loading: () => <String>[defaultType],
+      error: (_, __) => <String>[defaultType],
     );
     final servingOptions = servingList.when(
-      data: (items) => items.map((l) => l.label).toList(),
-      loading: () => <String>['Loading...'],
-      error: (_, __) => <String>['Glass'],
+      data: (items) {
+        final labels = items.map((l) => l.label).toList();
+        return labels.isEmpty ? <String>[defaultServing] : labels;
+      },
+      loading: () => <String>[defaultServing],
+      error: (_, __) => <String>[defaultServing],
     );
 
     return Padding(
@@ -1986,12 +2044,22 @@ class _DrinkFormSheetState extends ConsumerState<_DrinkFormSheet> {
             ],
 
             const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: _done,
-                child: Text(widget.initial != null ? 'Update Drink' : 'Add Drink'),
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton(
+                    onPressed: _done,
+                    child: Text(widget.initial != null ? 'Update Drink' : 'Add Drink'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Cancel'),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 8),
           ],
