@@ -31,6 +31,95 @@ void openSippyPlanner(BuildContext context, {String? conversationId}) {
   );
 }
 
+// ── Structured conversation steps ──────────────────────────────
+
+enum _GatherStep { location, date, startTime, duration, numStops, stopDuration, preferences, ready }
+
+/// Each step: Sippy's question, reaction to the answer, and chips.
+class _StepConfig {
+  final String question;
+  final String Function(String answer) reaction;
+  final List<String> Function(String userCity) chips;
+
+  const _StepConfig({
+    required this.question,
+    required this.reaction,
+    required this.chips,
+  });
+}
+
+final Map<_GatherStep, _StepConfig> _stepConfigs = {
+  _GatherStep.location: _StepConfig(
+    question: "First things first — where are we headed? Pick a region or tell me a city!",
+    reaction: (a) => _locationReaction(a),
+    chips: (city) => [
+      if (city.isNotEmpty) 'Near me',
+      'Napa Valley',
+      'Sonoma County',
+      'Willamette Valley',
+    ],
+  ),
+  _GatherStep.date: _StepConfig(
+    question: "Love it! Now, when are you thinking? Today? This weekend?",
+    reaction: (a) => "Got it — marking the calendar for $a.",
+    chips: (_) {
+      final now = DateTime.now();
+      final tomorrow = now.add(const Duration(days: 1));
+      final tomorrowLabel = DateFormat('EEEE').format(tomorrow);
+      return ['Today', 'Tomorrow ($tomorrowLabel)', 'This Saturday', 'This Sunday'];
+    },
+  ),
+  _GatherStep.startTime: _StepConfig(
+    question: "What time should we kick things off? Early birds or a leisurely start?",
+    reaction: (a) => "Nice, $a it is!",
+    chips: (_) => ['10:00 AM', '11:00 AM', 'Noon', '1:00 PM', '2:00 PM'],
+  ),
+  _GatherStep.duration: _StepConfig(
+    question: "How long do you want the whole trip to be? A quick afternoon or an all-day adventure?",
+    reaction: (a) => "Perfect — $a gives us plenty to work with!",
+    chips: (_) => ['3 hours', '4 hours', '5 hours', '6 hours', 'All day'],
+  ),
+  _GatherStep.numStops: _StepConfig(
+    question: "How many stops are you thinking? I'd suggest 2-3 for a relaxed vibe, or 4-5 if you want to really explore.",
+    reaction: (a) => _numStopsReaction(a),
+    chips: (_) => ['1 stop', '2 stops', '3 stops', '4 stops', '5 stops'],
+  ),
+  _GatherStep.stopDuration: _StepConfig(
+    question: "About how long at each stop? Enough to taste a few pours, or a longer hang?",
+    reaction: (a) => "Sounds perfect — $a per stop.",
+    chips: (_) => ['30 minutes', '45 minutes', '1 hour', '90 minutes', '2 hours'],
+  ),
+  _GatherStep.preferences: _StepConfig(
+    question: "Almost there! Anything else I should know? Wine preferences, food cravings, special occasions? Or we can jump right in!",
+    reaction: (a) => "Great taste! I'll factor that in.",
+    chips: (_) => [
+      "I love reds",
+      "White wine fan",
+      "Craft beer lover",
+      "We want food too",
+      "Live music please",
+      "No preference",
+    ],
+  ),
+};
+
+String _locationReaction(String answer) {
+  final lower = answer.toLowerCase();
+  if (lower.contains('near me') || lower.contains('near my')) {
+    return "I like your style — let's see what's nearby!";
+  }
+  return "Ooh, $answer is a great pick!";
+}
+
+String _numStopsReaction(String answer) {
+  final lower = answer.toLowerCase();
+  if (lower.contains('1')) return "Quality over quantity — I respect that!";
+  if (lower.contains('4') || lower.contains('5')) return "Ambitious! I love it — let's map out an epic route.";
+  return "Great choice — that'll be a solid lineup!";
+}
+
+// ── Main Chat Widget ───────────────────────────────────────────
+
 class _SippyPlannerChat extends ConsumerStatefulWidget {
   final String? conversationId;
   const _SippyPlannerChat({this.conversationId});
@@ -55,13 +144,10 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
   String? _lastFailedMessage;
   String _userCity = '';
 
-  // Track which required info has been provided
-  bool _hasLocation = false;
-  bool _hasDate = false;
-  bool _hasDuration = false;
-  bool _hasStartTime = false;
-  bool _hasNumStops = false;
-  bool _hasStopDuration = false;
+  // Structured gathering state
+  _GatherStep _currentStep = _GatherStep.location;
+  final Map<_GatherStep, String> _answers = {};
+  bool _gatheringComplete = false;
 
   @override
   void initState() {
@@ -71,9 +157,23 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
       _conversationId = widget.conversationId;
       _loadConversation();
     } else {
+      // Start with Sippy's greeting + first question
       _messages.add({
-        'role': 'welcome',
-        'content': '',  // rendered by _WelcomeCard, content ignored
+        'role': 'assistant',
+        'content': "Hey there! I'm Sippy, your trip planning buddy. "
+            "Let's build you an amazing tasting adventure — I just need a few details!",
+      });
+      // Small delay before first question to feel natural
+      Future.delayed(const Duration(milliseconds: 400), () {
+        if (mounted) {
+          setState(() {
+            _messages.add({
+              'role': 'assistant',
+              'content': _stepConfigs[_GatherStep.location]!.question,
+            });
+          });
+          _scrollToBottom();
+        }
       });
     }
   }
@@ -81,71 +181,10 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
   Future<void> _loadUserCity() async {
     try {
       final loc = await ref.read(userLocationProvider.future);
-      // Use a simple region label based on coordinates
-      // The suggestions will use "near me" which the backend resolves
       if (mounted && loc != defaultLocation) {
         setState(() => _userCity = 'near me');
       }
     } catch (_) {}
-  }
-
-  /// Scan user messages to track what required info has been gathered.
-  void _updateGatheredInfo(String userText) {
-    final lower = userText.toLowerCase();
-    // Location: any place/region/city name or "near me"
-    if (lower.contains('napa') || lower.contains('sonoma') ||
-        lower.contains('near') || lower.contains('in ') ||
-        lower.contains('around') || lower.contains('portland') ||
-        lower.contains('charlotte') || lower.contains('valley') ||
-        lower.contains('county') || lower.contains('downtown') ||
-        RegExp(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*').hasMatch(userText)) {
-      _hasLocation = true;
-    }
-    // Date
-    if (lower.contains('today') || lower.contains('tomorrow') ||
-        lower.contains('saturday') || lower.contains('sunday') ||
-        lower.contains('monday') || lower.contains('tuesday') ||
-        lower.contains('wednesday') || lower.contains('thursday') ||
-        lower.contains('friday') || lower.contains('this week') ||
-        lower.contains('next week') ||
-        RegExp(r'\d{1,2}/\d{1,2}').hasMatch(lower) ||
-        RegExp(r'(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+\d').hasMatch(lower)) {
-      _hasDate = true;
-    }
-    // Duration
-    if (RegExp(r'\d+\s*(hours?|hrs?|h)\b').hasMatch(lower) ||
-        lower.contains('half day') || lower.contains('full day') ||
-        lower.contains('all day') || lower.contains('afternoon') ||
-        lower.contains('duration')) {
-      _hasDuration = true;
-    }
-    // Start time
-    if (RegExp(r'\d{1,2}(:\d{2})?\s*(am|pm)\b', caseSensitive: false).hasMatch(lower) ||
-        lower.contains('noon') || lower.contains('morning') ||
-        lower.contains('start at') || lower.contains('starting at') ||
-        lower.contains('begin at') || lower.contains('first stop at')) {
-      _hasStartTime = true;
-    }
-    // Number of stops
-    if (RegExp(r'[1-5]\s*stops?\b').hasMatch(lower) ||
-        RegExp(r'(one|two|three|four|five)\s*stops?').hasMatch(lower) ||
-        lower.contains('just 1') || lower.contains('single stop')) {
-      _hasNumStops = true;
-      // If only 1 stop, stop duration not needed separately
-      if (lower.contains('1 stop') || lower.contains('one stop') ||
-          lower.contains('single stop') || lower.contains('just 1')) {
-        _hasStopDuration = true;
-      }
-    }
-    // Stop duration (per stop)
-    if (RegExp(r'(30|60|90)\s*min').hasMatch(lower) ||
-        RegExp(r'(2|1\.5|1)\s*hours?\s*(each|per|at each|per stop)').hasMatch(lower) ||
-        lower.contains('hour each') || lower.contains('minutes each') ||
-        lower.contains('per stop') || lower.contains('at each stop') ||
-        lower.contains('30 min') || lower.contains('60 min') ||
-        lower.contains('90 min') || lower.contains('2 hours')) {
-      _hasStopDuration = true;
-    }
   }
 
   Future<void> _loadConversation() async {
@@ -160,17 +199,16 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
               ?.map((m) => Map<String, String>.from(m as Map))
               .toList() ??
           [];
-      final sessionId = data['session_id'] as String?;
       final phase = data['phase'] as String? ?? 'gathering';
       final proposed = data['proposed_trip'] as Map<String, dynamic>?;
 
       if (mounted) {
         setState(() {
           _messages.addAll(msgs);
-          // Always use a fresh session to avoid corrupt LangGraph checkpoints.
-          // The conversation history provides all the context Claude needs.
           _sessionId = null;
           _phase = phase;
+          _gatheringComplete = phase != 'gathering';
+          if (phase != 'gathering') _currentStep = _GatherStep.ready;
           if (proposed != null && proposed.isNotEmpty) _proposedTrip = proposed;
           _loadingHistory = false;
         });
@@ -188,202 +226,266 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
     }
   }
 
-  /// Detect what topic Sippy's last message is asking about.
-  String _detectSippyTopic() {
-    // Find the last assistant message
-    final lastAssistant = _messages.lastWhere(
-      (m) => m['role'] == 'assistant',
-      orElse: () => {'content': ''},
-    );
-    final text = (lastAssistant['content'] ?? '').toLowerCase();
+  /// Handle the user's answer during the structured gathering phase.
+  void _handleGatherAnswer(String text) {
+    // Save this answer
+    _answers[_currentStep] = text;
 
-    if (text.contains('where') || text.contains('region') ||
-        text.contains('location') || text.contains('area')) {
-      return 'location';
-    }
-    if (text.contains('what date') || text.contains('when') ||
-        text.contains('which day')) {
-      return 'date';
-    }
-    if (text.contains('how long') && (text.contains('trip') || text.contains('total') || text.contains('overall'))) {
-      return 'duration';
-    }
-    if (text.contains('what time') || text.contains('start') && text.contains('time') ||
-        text.contains('kick off') || text.contains('first stop')) {
-      return 'startTime';
-    }
-    if (text.contains('how many stop') || text.contains('number of stop')) {
-      return 'numStops';
-    }
-    if ((text.contains('how long') && (text.contains('each') || text.contains('stop') || text.contains('per'))) ||
-        text.contains('duration at') || text.contains('spend at each')) {
-      return 'stopDuration';
-    }
-    return 'general';
+    // Add user message
+    setState(() {
+      _messages.add({'role': 'user', 'content': text});
+    });
+    _scrollToBottom();
+
+    // Get Sippy's reaction + next question after a brief delay
+    final config = _stepConfigs[_currentStep];
+    final reaction = config?.reaction(text) ?? '';
+    final nextStep = _nextStep(_currentStep);
+
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (!mounted) return;
+
+      if (nextStep == _GatherStep.ready) {
+        // All required info gathered — show summary + let user add preferences or go
+        setState(() {
+          _currentStep = _GatherStep.ready;
+          _gatheringComplete = true;
+          _messages.add({
+            'role': 'assistant',
+            'content': "$reaction\n\nI've got everything I need! Here's the plan so far:",
+          });
+          _messages.add({
+            'role': 'summary',
+            'content': _buildSummaryText(),
+          });
+          _messages.add({
+            'role': 'assistant',
+            'content': "Want to add any preferences (wine styles, food, live music), ask me anything about the area, or should I start finding amazing spots?",
+          });
+        });
+        _scrollToBottom();
+      } else {
+        // Show reaction + next question
+        final nextConfig = _stepConfigs[nextStep]!;
+        setState(() {
+          _currentStep = nextStep;
+          _messages.add({
+            'role': 'assistant',
+            'content': "$reaction ${nextConfig.question}",
+          });
+        });
+        _scrollToBottom();
+      }
+    });
   }
 
-  /// Build suggestion chips that match what Sippy is currently asking.
+  _GatherStep _nextStep(_GatherStep current) {
+    switch (current) {
+      case _GatherStep.location: return _GatherStep.date;
+      case _GatherStep.date: return _GatherStep.startTime;
+      case _GatherStep.startTime: return _GatherStep.duration;
+      case _GatherStep.duration: return _GatherStep.numStops;
+      case _GatherStep.numStops:
+        // If 1 stop, skip stopDuration (it equals trip duration)
+        final answer = (_answers[_GatherStep.numStops] ?? '').toLowerCase();
+        if (answer.contains('1')) {
+          _answers[_GatherStep.stopDuration] = _answers[_GatherStep.duration] ?? '1 hour';
+          return _GatherStep.ready;
+        }
+        return _GatherStep.stopDuration;
+      case _GatherStep.stopDuration: return _GatherStep.ready;
+      case _GatherStep.preferences: return _GatherStep.ready;
+      case _GatherStep.ready: return _GatherStep.ready;
+    }
+  }
+
+  String _buildSummaryText() {
+    final lines = <String>[];
+    if (_answers.containsKey(_GatherStep.location)) {
+      lines.add('Location: ${_answers[_GatherStep.location]}');
+    }
+    if (_answers.containsKey(_GatherStep.date)) {
+      lines.add('Date: ${_answers[_GatherStep.date]}');
+    }
+    if (_answers.containsKey(_GatherStep.startTime)) {
+      lines.add('Start: ${_answers[_GatherStep.startTime]}');
+    }
+    if (_answers.containsKey(_GatherStep.duration)) {
+      lines.add('Duration: ${_answers[_GatherStep.duration]}');
+    }
+    if (_answers.containsKey(_GatherStep.numStops)) {
+      lines.add('Stops: ${_answers[_GatherStep.numStops]}');
+    }
+    if (_answers.containsKey(_GatherStep.stopDuration)) {
+      lines.add('Time per stop: ${_answers[_GatherStep.stopDuration]}');
+    }
+    if (_answers.containsKey(_GatherStep.preferences)) {
+      lines.add('Preferences: ${_answers[_GatherStep.preferences]}');
+    }
+    return lines.join('\n');
+  }
+
+  /// Build the structured prompt to send to the LLM with all gathered info.
+  String _buildPlannerPrompt() {
+    final parts = <String>[];
+    parts.add('Plan a trip with these details:');
+    if (_answers.containsKey(_GatherStep.location)) {
+      parts.add('Location: ${_answers[_GatherStep.location]}');
+    }
+    if (_answers.containsKey(_GatherStep.date)) {
+      parts.add('Date: ${_answers[_GatherStep.date]}');
+    }
+    if (_answers.containsKey(_GatherStep.startTime)) {
+      parts.add('First stop time: ${_answers[_GatherStep.startTime]}');
+    }
+    if (_answers.containsKey(_GatherStep.duration)) {
+      parts.add('Total trip duration: ${_answers[_GatherStep.duration]}');
+    }
+    if (_answers.containsKey(_GatherStep.numStops)) {
+      parts.add('Number of stops: ${_answers[_GatherStep.numStops]}');
+    }
+    if (_answers.containsKey(_GatherStep.stopDuration)) {
+      parts.add('Time at each stop: ${_answers[_GatherStep.stopDuration]}');
+    }
+    if (_answers.containsKey(_GatherStep.preferences)) {
+      parts.add('Preferences: ${_answers[_GatherStep.preferences]}');
+    }
+    return parts.join('\n');
+  }
+
+  /// User wants to add a preference during the ready phase.
+  void _handlePreference(String text) {
+    final existing = _answers[_GatherStep.preferences] ?? '';
+    if (existing.isNotEmpty) {
+      _answers[_GatherStep.preferences] = '$existing, $text';
+    } else {
+      _answers[_GatherStep.preferences] = text;
+    }
+
+    setState(() {
+      _messages.add({'role': 'user', 'content': text});
+    });
+    _scrollToBottom();
+
+    Future.delayed(const Duration(milliseconds: 400), () {
+      if (!mounted) return;
+      final reactions = [
+        "Noted! Anything else, or shall I start planning?",
+        "Good to know! Ready to find some great spots, or anything else?",
+        "Love it! Want to add more, or should I get to work?",
+        "Got it locked in! Ready when you are.",
+      ];
+      final idx = _messages.length % reactions.length;
+      setState(() {
+        _messages.add({'role': 'assistant', 'content': reactions[idx]});
+      });
+      _scrollToBottom();
+    });
+  }
+
+  /// Kick off the LLM planning with all collected data.
+  void _startPlanning() {
+    setState(() {
+      _messages.add({'role': 'user', 'content': "Let's go, Sippy!"});
+    });
+    _scrollToBottom();
+
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+      setState(() {
+        _messages.add({
+          'role': 'assistant',
+          'content': "On it! Let me search for the best spots and build your perfect itinerary...",
+        });
+      });
+      _scrollToBottom();
+
+      // Now send structured data to the LLM
+      _sendToLLM(message: _buildPlannerPrompt());
+    });
+  }
+
+  /// Build suggestion chips based on the current gathering step.
   List<Widget> _buildSuggestionChips() {
-    final hasAnyUserMessage = _messages.any((m) => m['role'] == 'user');
-    final region = _userCity.isNotEmpty ? _userCity : 'Napa Valley';
-    final todayLabel = DateFormat('EEEE').format(DateTime.now());
-    final tomorrowLabel = DateFormat('EEEE').format(
-        DateTime.now().add(const Duration(days: 1)));
-
-    // Before any messages: full starter prompts with all required info
-    if (!hasAnyUserMessage) {
+    // During LLM phase (proposing, modifying), show revision chips
+    if (_phase == 'proposing') {
       return [
-        _SuggestionChip(
-          '3 wineries $region today, 4 hours, 60 min each, start 11am',
-          onTap: (t) { _controller.text = t; _send(); },
-        ),
-        _SuggestionChip(
-          '2 breweries $region $tomorrowLabel, 3 hours, 90 min each, noon',
-          onTap: (t) { _controller.text = t; _send(); },
-        ),
-        _SuggestionChip(
-          '4 stops $region Saturday, 6 hours, 60 min each, 10:30am',
-          onTap: (t) { _controller.text = t; _send(); },
-        ),
+        _SuggestionChip('Swap a stop', onTap: (t) { _controller.text = 'Can you swap one of the stops for a different option?'; _sendToLLM(); }),
+        _SuggestionChip('Change times', onTap: (t) { _controller.text = 'Can you adjust the timing?'; _sendToLLM(); }),
+        _SuggestionChip('Add a food stop', onTap: (t) { _controller.text = 'Can you add a restaurant stop?'; _sendToLLM(); }),
       ];
     }
 
-    final allRequired = _hasLocation && _hasDate && _hasDuration &&
-        _hasStartTime && _hasNumStops && _hasStopDuration;
-
-    // All required gathered — show "go" button + preference chips
-    if (allRequired) {
-      return [
-        _GoChip(
-          "Let's Go, Sippy!",
-          onTap: () { _controller.text = "That's everything, let's go!"; _send(); },
-        ),
-        _SuggestionChip(
-          'I love red wines',
-          onTap: (t) { _controller.text = t; _send(); },
-        ),
-        _SuggestionChip(
-          'We prefer craft beer',
-          onTap: (t) { _controller.text = t; _send(); },
-        ),
-        _SuggestionChip(
-          'Live music please',
-          onTap: (t) { _controller.text = t; _send(); },
-        ),
-      ];
+    // During structured gathering
+    if (!_gatheringComplete) {
+      final config = _stepConfigs[_currentStep];
+      if (config == null) return [];
+      return config.chips(_userCity).map((label) =>
+        _SuggestionChip(label, onTap: (t) => _handleGatherAnswer(t)),
+      ).toList();
     }
 
-    // Show chips matching what Sippy just asked about
-    final topic = _detectSippyTopic();
+    // Ready phase — preferences + go button
+    return [
+      _GoChip("Let's Go, Sippy!", onTap: _startPlanning),
+      _SuggestionChip('I love reds', onTap: (t) => _handlePreference(t)),
+      _SuggestionChip('White wine fan', onTap: (t) => _handlePreference(t)),
+      _SuggestionChip('Craft beer', onTap: (t) => _handlePreference(t)),
+      _SuggestionChip('Food stops too', onTap: (t) => _handlePreference(t)),
+      _SuggestionChip('Live music', onTap: (t) => _handlePreference(t)),
+      _SuggestionChip('Pet friendly', onTap: (t) => _handlePreference(t)),
+    ];
+  }
 
-    switch (topic) {
-      case 'location':
-        return [
-          _SuggestionChip(
-            _userCity.isNotEmpty ? 'Near my location' : 'Near Napa Valley',
-            onTap: (t) { _controller.text = t; _send(); },
-          ),
-          _SuggestionChip('Sonoma County', onTap: (t) { _controller.text = t; _send(); }),
-          _SuggestionChip('Willamette Valley', onTap: (t) { _controller.text = t; _send(); }),
-        ];
-      case 'date':
-        return [
-          _SuggestionChip('Today', onTap: (t) { _controller.text = t; _send(); }),
-          _SuggestionChip('Tomorrow, $tomorrowLabel', onTap: (t) { _controller.text = t; _send(); }),
-          _SuggestionChip('This Saturday', onTap: (t) { _controller.text = t; _send(); }),
-        ];
-      case 'duration':
-        return [
-          _SuggestionChip('3 hours', onTap: (t) { _controller.text = t; _send(); }),
-          _SuggestionChip('4 hours', onTap: (t) { _controller.text = t; _send(); }),
-          _SuggestionChip('5 hours', onTap: (t) { _controller.text = t; _send(); }),
-          _SuggestionChip('6 hours', onTap: (t) { _controller.text = t; _send(); }),
-        ];
-      case 'startTime':
-        return [
-          _SuggestionChip('10 AM', onTap: (t) { _controller.text = t; _send(); }),
-          _SuggestionChip('11 AM', onTap: (t) { _controller.text = t; _send(); }),
-          _SuggestionChip('Noon', onTap: (t) { _controller.text = t; _send(); }),
-          _SuggestionChip('1 PM', onTap: (t) { _controller.text = t; _send(); }),
-        ];
-      case 'numStops':
-        return [
-          _SuggestionChip('1 stop', onTap: (t) { _controller.text = t; _send(); }),
-          _SuggestionChip('2 stops', onTap: (t) { _controller.text = t; _send(); }),
-          _SuggestionChip('3 stops', onTap: (t) { _controller.text = t; _send(); }),
-          _SuggestionChip('4 stops', onTap: (t) { _controller.text = t; _send(); }),
-          _SuggestionChip('5 stops', onTap: (t) { _controller.text = t; _send(); }),
-        ];
-      case 'stopDuration':
-        return [
-          _SuggestionChip('30 min each', onTap: (t) { _controller.text = t; _send(); }),
-          _SuggestionChip('60 min each', onTap: (t) { _controller.text = t; _send(); }),
-          _SuggestionChip('90 min each', onTap: (t) { _controller.text = t; _send(); }),
-          _SuggestionChip('2 hours each', onTap: (t) { _controller.text = t; _send(); }),
-        ];
-      default:
-        // Fallback: show chips for the first missing required item only
-        if (!_hasLocation) {
-          return [
-            _SuggestionChip(
-              _userCity.isNotEmpty ? 'Near my location' : 'Near Napa Valley',
-              onTap: (t) { _controller.text = t; _send(); },
-            ),
-          ];
-        }
-        if (!_hasDate) {
-          return [
-            _SuggestionChip('Today', onTap: (t) { _controller.text = t; _send(); }),
-            _SuggestionChip('Tomorrow', onTap: (t) { _controller.text = t; _send(); }),
-          ];
-        }
-        if (!_hasDuration) {
-          return [
-            _SuggestionChip('4 hours', onTap: (t) { _controller.text = t; _send(); }),
-            _SuggestionChip('6 hours', onTap: (t) { _controller.text = t; _send(); }),
-          ];
-        }
-        if (!_hasStartTime) {
-          return [
-            _SuggestionChip('11 AM', onTap: (t) { _controller.text = t; _send(); }),
-            _SuggestionChip('Noon', onTap: (t) { _controller.text = t; _send(); }),
-          ];
-        }
-        if (!_hasNumStops) {
-          return [
-            _SuggestionChip('2 stops', onTap: (t) { _controller.text = t; _send(); }),
-            _SuggestionChip('3 stops', onTap: (t) { _controller.text = t; _send(); }),
-          ];
-        }
-        if (!_hasStopDuration) {
-          return [
-            _SuggestionChip('60 min each', onTap: (t) { _controller.text = t; _send(); }),
-            _SuggestionChip('90 min each', onTap: (t) { _controller.text = t; _send(); }),
-          ];
-        }
-        return [];
+  /// Handle free-text input from the text field.
+  void _handleTextInput() {
+    final text = _controller.text.trim();
+    if (text.isEmpty) return;
+    _controller.clear();
+
+    if (_gatheringComplete && _phase == 'gathering') {
+      // In ready phase — check if user is saying "go", asking a question, or adding preferences
+      final lower = text.toLowerCase();
+      if (lower.contains("let's go") || lower.contains("plan it") ||
+          lower.contains("start planning") || lower.contains("go ahead") ||
+          lower.contains("i'm good") || lower.contains("that's it") ||
+          lower.contains("ready")) {
+        _startPlanning();
+      } else if (lower.contains('?') || lower.startsWith('what') ||
+          lower.startsWith('how') || lower.startsWith('where') ||
+          lower.startsWith('which') || lower.startsWith('are there') ||
+          lower.startsWith('do they') || lower.startsWith('can you') ||
+          lower.startsWith('tell me')) {
+        // User is asking a question — send to LLM for a conversational answer
+        setState(() {
+          _messages.add({'role': 'user', 'content': text});
+        });
+        _scrollToBottom();
+        _sendToLLM(message: 'Context: I\'m planning a trip with these details:\n${_buildPlannerPrompt()}\n\nUser question: $text\n\nAnswer the question conversationally as a friendly trip guide. Do NOT search for places or propose a trip plan yet — just answer the question.');
+      } else {
+        _handlePreference(text);
+      }
+    } else if (!_gatheringComplete) {
+      // Still in gathering phase — accept typed answer for current step
+      _handleGatherAnswer(text);
+    } else {
+      // LLM phase — send as chat message
+      _sendToLLM(message: text);
     }
   }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    _scrollController.dispose();
-    _inputFocusNode.dispose();
-    super.dispose();
-  }
-
-  Future<void> _send({String? overrideText, String? action}) async {
-    final text = overrideText ?? _controller.text.trim();
+  /// Send a message to the backend LLM (planning/revision phase only).
+  Future<void> _sendToLLM({String? message, String? action}) async {
+    final text = message ?? _controller.text.trim();
     if (text.isEmpty && action == null) return;
     if (_sending) return;
 
     final initialThinking = action == 'approve'
         ? 'Creating your trip...'
-        : 'Sippy is thinking...';
+        : 'Sippy is searching for spots...';
 
-    if (text.isNotEmpty) {
-      _updateGatheredInfo(text);
+    if (text.isNotEmpty && message == null) {
+      // Only add user bubble if it wasn't already added by caller
       setState(() {
         _messages.add({'role': 'user', 'content': text});
         _sending = true;
@@ -398,7 +500,7 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
     }
     _scrollToBottom();
 
-    // Cycle thinking messages — context-sensitive
+    // Cycle thinking messages
     final isApproving = action == 'approve';
     final thinkingMessages = isApproving
         ? [
@@ -406,13 +508,12 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
             'Setting up your stops...',
             'Calculating drive times...',
             'Adding the finishing touches...',
-            'Almost ready...',
           ]
         : [
-            'Sippy is thinking...',
-            'Searching for great places...',
+            'Sippy is searching for spots...',
             'Checking menus and reviews...',
             'Building your itinerary...',
+            'Mapping out the best route...',
             'Almost there...',
           ];
     int thinkingIdx = 0;
@@ -430,12 +531,10 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
       if (action != null) body['action'] = action;
       if (_sessionId != null) body['session_id'] = _sessionId;
       if (_conversationId != null) body['conversation_id'] = _conversationId;
-      // Send display history so backend can replay context for fresh sessions
       body['history'] = _messages
           .where((m) => m['role'] == 'user' || m['role'] == 'assistant')
           .toList();
 
-      // Planner calls can take 60-90s (multiple LLM + tool calls)
       final resp = await api.dio.post(
         ApiPaths.tripPlan,
         data: body,
@@ -468,7 +567,6 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
           if (convId != null) _conversationId = convId;
           _lastFailedMessage = null;
           _sending = false;
-          // Refresh trips list and dashboard if a trip was created
           if (tripId != null) {
             ref.invalidate(tripsProvider);
             ref.invalidate(dashboardProvider);
@@ -479,8 +577,6 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
     } catch (e) {
       thinkingTimer.cancel();
 
-      // Try to extract a fresh session_id from the error response
-      // so retry doesn't hit the corrupt LangGraph checkpoint
       if (e is DioException && e.response?.data is Map) {
         final errData = e.response!.data as Map;
         final newSession = errData['session_id'] as String?;
@@ -505,7 +601,6 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
   Future<void> _retry() async {
     if (_lastFailedMessage == null && _conversationId == null) return;
 
-    // Remove the error message
     setState(() {
       if (_messages.isNotEmpty && _messages.last['role'] == 'error') {
         _messages.removeLast();
@@ -513,14 +608,11 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
     });
 
     if (_lastFailedMessage != null) {
-      // Client-side retry: resend the last message
-      // Remove the user message too since _send will re-add it
       if (_messages.isNotEmpty && _messages.last['role'] == 'user') {
         _messages.removeLast();
       }
-      await _send(overrideText: _lastFailedMessage);
+      await _sendToLLM(message: _lastFailedMessage);
     } else if (_conversationId != null) {
-      // Server-side retry via API
       setState(() => _sending = true);
       try {
         final api = ref.read(apiClientProvider);
@@ -565,6 +657,14 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
         );
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _scrollController.dispose();
+    _inputFocusNode.dispose();
+    super.dispose();
   }
 
   @override
@@ -620,6 +720,9 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
                         ],
                       ),
                       const Spacer(),
+                      // Progress indicator during gathering
+                      if (!_gatheringComplete && _currentStep != _GatherStep.ready)
+                        _GatherProgress(current: _currentStep),
                       IconButton(
                         onPressed: () {
                           Navigator.of(context).pop();
@@ -650,11 +753,10 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
                     (_proposedTrip != null && _phase == 'proposing' ? 1 : 0) +
                     (_createdTripId != null ? 1 : 0),
                 itemBuilder: (_, i) {
-                  // Chat messages
                   if (i < _messages.length) {
                     final msg = _messages[i];
-                    final isError = msg['role'] == 'error';
-                    if (isError) {
+                    final role = msg['role'] ?? '';
+                    if (role == 'error') {
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 4),
                         child: Row(
@@ -673,31 +775,23 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
                         ),
                       );
                     }
-                    if (msg['role'] == 'welcome') {
-                      return _WelcomeCard(
-                        userCity: _userCity,
-                        onUseExample: (text) {
-                          _controller.text = text;
-                          setState(() {
-                            _messages.removeWhere((m) => m['role'] == 'welcome');
-                          });
-                        },
-                      );
+                    if (role == 'summary') {
+                      return _SummaryCard(text: msg['content'] ?? '');
                     }
                     return _ChatBubble(
                       text: msg['content'] ?? '',
-                      isUser: msg['role'] == 'user',
+                      isUser: role == 'user',
                     );
                   }
 
-                  // Trip preview card (after messages, before typing indicator)
+                  // Trip preview card
                   final previewIdx = _messages.length;
                   if (_proposedTrip != null &&
                       _phase == 'proposing' &&
                       i == previewIdx) {
                     return _TripPreviewCard(
                       trip: _proposedTrip!,
-                      onApprove: () => _send(overrideText: 'Looks good! Create it.', action: 'approve'),
+                      onApprove: () => _sendToLLM(message: 'Looks good! Create it.', action: 'approve'),
                       onReject: () async {
                         final confirmed = await showDialog<bool>(
                           context: context,
@@ -721,7 +815,7 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
                           _proposedTrip = null;
                           _phase = 'gathering';
                         });
-                        _send(overrideText: 'Let\'s start over with a different plan.', action: 'reject');
+                        _sendToLLM(message: 'Let\'s start over with a different plan.', action: 'reject');
                       },
                     );
                   }
@@ -732,7 +826,7 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
                       tripId: _createdTripId!,
                       tripName: _proposedTrip?['name'] as String? ?? 'Your Trip',
                       onView: () {
-                        Navigator.of(context).pop(); // Close sheet
+                        Navigator.of(context).pop();
                         context.go('/trips/$_createdTripId');
                       },
                     );
@@ -762,9 +856,9 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
             ),
 
             // Dynamic suggestion chips
-            if (_createdTripId == null && _phase != 'proposing')
+            if (_createdTripId == null && !_sending)
               SizedBox(
-                height: 40,
+                height: 44,
                 child: ScrollConfiguration(
                   behavior: ScrollConfiguration.of(context).copyWith(
                     dragDevices: {
@@ -795,22 +889,24 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
                         minLines: 1,
                         maxLines: 4,
                         decoration: InputDecoration(
-                          hintText: _phase == 'proposing'
+                          hintText: _gatheringComplete && _phase != 'gathering'
                               ? 'Request changes or approve...'
-                              : 'Describe your ideal trip...',
+                              : _gatheringComplete
+                                  ? 'Add preferences or type "let\'s go"...'
+                                  : _hintForStep(_currentStep),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(16),
                           ),
                           contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16, vertical: 12),
                         ),
-                        textInputAction: TextInputAction.newline,
-                        keyboardType: TextInputType.multiline,
+                        textInputAction: TextInputAction.send,
+                        onSubmitted: (_) => _handleTextInput(),
                       ),
                     ),
                     const SizedBox(width: 8),
                     IconButton.filled(
-                      onPressed: _sending ? null : () => _send(),
+                      onPressed: _sending ? null : _handleTextInput,
                       icon: const Icon(Icons.send),
                     ),
                   ],
@@ -820,6 +916,129 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
         ),
       ),
     );
+  }
+
+  String _hintForStep(_GatherStep step) {
+    switch (step) {
+      case _GatherStep.location: return 'City, region, or "near me"...';
+      case _GatherStep.date: return 'Today, tomorrow, this Saturday...';
+      case _GatherStep.startTime: return '10 AM, noon, 1 PM...';
+      case _GatherStep.duration: return '3 hours, 4 hours, all day...';
+      case _GatherStep.numStops: return '1-5 stops...';
+      case _GatherStep.stopDuration: return '30 min, 1 hour, 90 min...';
+      case _GatherStep.preferences: return 'Wine, beer, food preferences...';
+      case _GatherStep.ready: return 'Add preferences or type "let\'s go"...';
+    }
+  }
+}
+
+// ── Gathering Progress Indicator ─────────────────────────────────
+
+class _GatherProgress extends StatelessWidget {
+  final _GatherStep current;
+  const _GatherProgress({required this.current});
+
+  int get _stepIndex {
+    switch (current) {
+      case _GatherStep.location: return 0;
+      case _GatherStep.date: return 1;
+      case _GatherStep.startTime: return 2;
+      case _GatherStep.duration: return 3;
+      case _GatherStep.numStops: return 4;
+      case _GatherStep.stopDuration: return 5;
+      case _GatherStep.preferences: return 6;
+      case _GatherStep.ready: return 6;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(right: 4),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: List.generate(6, (i) => Container(
+          width: 6, height: 6,
+          margin: const EdgeInsets.symmetric(horizontal: 2),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: i <= _stepIndex ? cs.primary : Colors.grey[300],
+          ),
+        )),
+      ),
+    );
+  }
+}
+
+// ── Summary Card ─────────────────────────────────────────────────
+
+class _SummaryCard extends StatelessWidget {
+  final String text;
+  const _SummaryCard({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final lines = text.split('\n');
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: cs.primaryContainer.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: cs.primary.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.checklist, size: 16, color: cs.primary),
+              const SizedBox(width: 6),
+              Text('Your Trip Details',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: cs.primary)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ...lines.map((line) {
+            final parts = line.split(': ');
+            if (parts.length >= 2) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Row(
+                  children: [
+                    Icon(_iconForLabel(parts[0]), size: 14, color: Colors.grey[600]),
+                    const SizedBox(width: 8),
+                    Text(parts[0], style: TextStyle(fontSize: 12, color: Colors.grey[600], fontWeight: FontWeight.w600)),
+                    const SizedBox(width: 6),
+                    Expanded(child: Text(parts.sublist(1).join(': '), style: const TextStyle(fontSize: 12))),
+                  ],
+                ),
+              );
+            }
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 1),
+              child: Text(line, style: const TextStyle(fontSize: 12)),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  IconData _iconForLabel(String label) {
+    switch (label.toLowerCase()) {
+      case 'location': return Icons.place;
+      case 'date': return Icons.calendar_today;
+      case 'start': return Icons.access_time;
+      case 'duration': return Icons.timer;
+      case 'stops': return Icons.pin_drop;
+      case 'time per stop': return Icons.hourglass_bottom;
+      case 'preferences': return Icons.wine_bar;
+      default: return Icons.info_outline;
+    }
   }
 }
 
@@ -987,7 +1206,6 @@ class _TripPreviewCard extends StatelessWidget {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Arrival time column — match 28px icon height for alignment
                       SizedBox(
                         width: 52,
                         height: 28,
@@ -1006,7 +1224,6 @@ class _TripPreviewCard extends StatelessWidget {
                                   style: TextStyle(fontSize: 10, color: Colors.grey[500])),
                         ),
                       ),
-                      // Timeline dot + line
                       Column(
                         children: [
                           Container(
@@ -1188,177 +1405,6 @@ class _ChatBubble extends StatelessWidget {
   }
 }
 
-class _WelcomeCard extends StatelessWidget {
-  final void Function(String) onUseExample;
-  final String userCity;
-  const _WelcomeCard({required this.onUseExample, this.userCity = ''});
-
-  String get _examplePrompt {
-    final region = userCity.isNotEmpty ? 'near me' : 'near I-77 in northern NC';
-    return "My wife and I want to visit 3 wineries today for about 4 hours, "
-        "60 min at each stop, starting around noon $region. "
-        "We like both red and white wines and enjoy live music.";
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Sippy greeting bubble
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width * 0.78,
-            ),
-            decoration: BoxDecoration(
-              color: cs.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Text(
-              "Hey, I'm Sippy! Tell me about the trip you're dreaming up — "
-              "the more detail you give me upfront, the faster we'll get rolling!",
-            ),
-          ),
-        ),
-
-        // What I need card — compact 2-column layout
-        Container(
-          margin: const EdgeInsets.only(bottom: 8, right: 32),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: cs.primaryContainer.withValues(alpha: 0.4),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: cs.primary.withValues(alpha: 0.2)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.checklist, size: 14, color: cs.primary),
-                  const SizedBox(width: 6),
-                  Text("What I need to know",
-                      style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: cs.primary)),
-                ],
-              ),
-              const SizedBox(height: 6),
-              // Required items — bold with star
-              Row(
-                children: [
-                  Expanded(child: _CheckItem(icon: Icons.place, text: 'Where *', required_: true)),
-                  Expanded(child: _CheckItem(icon: Icons.calendar_today, text: 'Date *', required_: true)),
-                ],
-              ),
-              Row(
-                children: [
-                  Expanded(child: _CheckItem(icon: Icons.timer, text: 'Trip duration *', required_: true)),
-                  Expanded(child: _CheckItem(icon: Icons.access_time, text: 'Start time *', required_: true)),
-                ],
-              ),
-              Row(
-                children: [
-                  Expanded(child: _CheckItem(icon: Icons.pin_drop, text: '# of stops *', required_: true)),
-                  Expanded(child: _CheckItem(icon: Icons.hourglass_bottom, text: 'Time per stop *', required_: true)),
-                ],
-              ),
-              const SizedBox(height: 2),
-              // Optional items
-              Row(
-                children: [
-                  Expanded(child: _CheckItem(icon: Icons.wine_bar, text: 'Preferences')),
-                  Expanded(child: _CheckItem(icon: Icons.music_note, text: 'Events')),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text('* Required — include these for the best results!',
-                  style: TextStyle(fontSize: 9, color: cs.primary.withValues(alpha: 0.6), fontStyle: FontStyle.italic)),
-            ],
-          ),
-        ),
-
-        // Example prompt card
-        Container(
-          margin: const EdgeInsets.only(bottom: 8, right: 32),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: cs.secondaryContainer.withValues(alpha: 0.4),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: cs.secondary.withValues(alpha: 0.2)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.lightbulb_outline, size: 14, color: cs.secondary),
-                  const SizedBox(width: 6),
-                  Text('Example prompt',
-                      style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: cs.secondary)),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(_examplePrompt,
-                  style: TextStyle(fontSize: 11, color: Colors.grey[700], fontStyle: FontStyle.italic)),
-              const SizedBox(height: 8),
-              SizedBox(
-                height: 30,
-                child: OutlinedButton.icon(
-                  onPressed: () => onUseExample(_examplePrompt),
-                  icon: const Icon(Icons.edit, size: 13),
-                  label: const Text('Use as template', style: TextStyle(fontSize: 11)),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    side: BorderSide(color: cs.secondary),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _CheckItem extends StatelessWidget {
-  final IconData icon;
-  final String text;
-  final bool required_;
-  const _CheckItem({required this.icon, required this.text, this.required_ = false});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 1.5),
-      child: Row(
-        children: [
-          Icon(icon, size: 12,
-              color: required_ ? cs.primary : Colors.grey[500]),
-          const SizedBox(width: 5),
-          Text(text,
-              style: TextStyle(
-                  fontSize: 11,
-                  color: required_ ? cs.primary : Colors.grey[600],
-                  fontWeight: required_ ? FontWeight.w600 : FontWeight.normal)),
-        ],
-      ),
-    );
-  }
-}
-
 class _PreviewRouteMap extends StatefulWidget {
   final List stops;
   const _PreviewRouteMap({required this.stops});
@@ -1433,7 +1479,7 @@ class _PreviewRouteMapState extends State<_PreviewRouteMap> {
         southwest: LatLng(minLat, minLng),
         northeast: LatLng(maxLat, maxLng),
       ),
-      40, // padding
+      40,
     ));
   }
 
@@ -1449,7 +1495,6 @@ class _PreviewRouteMapState extends State<_PreviewRouteMap> {
       ),
       onMapCreated: (controller) {
         _controller = controller;
-        // Delay to let the map render before fitting bounds
         Future.delayed(const Duration(milliseconds: 300), _fitBounds);
       },
       markers: _markers,
