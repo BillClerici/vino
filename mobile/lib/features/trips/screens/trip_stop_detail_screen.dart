@@ -746,12 +746,8 @@ class _StopViewState extends State<_StopView> {
                     onSelectItem: (checkedIn && visitId != null)
                         ? (item) => drinksSectionKey.currentState?.addFromMenu(item)
                         : null,
-                    showAiTools: checkedIn && visitId != null,
-                    tripId: checkedIn ? tripId : null,
-                    visitId: checkedIn ? visitId : null,
-                    existingVisitData: existingVisitData,
+                    showAiTools: false,
                   ),
-
 
                   // ── My Drinks (only after check-in during live trip) ──
                   if (checkedIn && visitId != null) ...[
@@ -763,6 +759,32 @@ class _StopViewState extends State<_StopView> {
                       place: place,
                       placeType: place.placeType,
                       existingWines: (existingVisitData?['wines_tasted'] as List<dynamic>?) ?? [],
+                    ),
+                  ],
+
+                  // ── AI Tools (after drinks) ──
+                  if (checkedIn && visitId != null) ...[
+                    const SizedBox(height: 12),
+                    _SmartRecommendationsCard(
+                      place: place,
+                      onAddDrink: (item) => drinksSectionKey.currentState?.addFromMenu(item),
+                      tripId: tripId,
+                      visitId: visitId,
+                      existingVisitData: existingVisitData,
+                    ),
+                    const SizedBox(height: 8),
+                    _PairingsCard(
+                      place: place,
+                      tripId: tripId,
+                      visitId: visitId,
+                      existingVisitData: existingVisitData,
+                    ),
+                    const SizedBox(height: 8),
+                    FlightBuilderButton(
+                      place: place,
+                      tripId: tripId,
+                      visitId: visitId,
+                      existingVisitData: existingVisitData,
                     ),
                   ],
 
@@ -2419,31 +2441,6 @@ class _DrinkMenuSectionState extends ConsumerState<_DrinkMenuSection> {
             ),
           ),
 
-          // AI Tools (only when menu has items)
-          if (widget.showAiTools) ...[
-            const SizedBox(height: 8),
-            _SmartRecommendationsCard(
-              place: widget.place,
-              onAddDrink: widget.onSelectItem,
-              tripId: widget.tripId,
-              visitId: widget.visitId,
-              existingVisitData: widget.existingVisitData,
-            ),
-            const SizedBox(height: 8),
-            _PairingsCard(
-              place: widget.place,
-              tripId: widget.tripId,
-              visitId: widget.visitId,
-              existingVisitData: widget.existingVisitData,
-            ),
-            const SizedBox(height: 8),
-            FlightBuilderButton(
-              place: widget.place,
-              tripId: widget.tripId,
-              visitId: widget.visitId,
-              existingVisitData: widget.existingVisitData,
-            ),
-          ],
         ],
       ],
     );
@@ -3673,7 +3670,7 @@ class _SmartRecommendationsCardState
 
   @override
   Widget build(BuildContext context) {
-    if (_dismissed) return const SizedBox.shrink();
+    // Removed _dismissed — closing clears data and shows button again
     final colorScheme = Theme.of(context).colorScheme;
 
     // Show button if no recommendations yet
@@ -3717,15 +3714,10 @@ class _SmartRecommendationsCardState
                     style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: colorScheme.secondary)),
                 const Spacer(),
                 IconButton(
-                  onPressed: _fetch,
-                  icon: const Icon(Icons.refresh, size: 16),
-                  constraints: const BoxConstraints(),
-                  padding: EdgeInsets.zero,
-                  tooltip: 'Refresh',
-                ),
-                const SizedBox(width: 4),
-                IconButton(
-                  onPressed: () => setState(() => _dismissed = true),
+                  onPressed: () {
+                    setState(() => _recommendations = null);
+                    _save([]);
+                  },
                   icon: const Icon(Icons.close, size: 16),
                   constraints: const BoxConstraints(),
                   padding: EdgeInsets.zero,
@@ -3812,7 +3804,10 @@ class _PairingsCardState extends ConsumerState<_PairingsCard> {
   void _loadSaved() {
     final meta = widget.existingVisitData?['metadata'] as Map<String, dynamic>?;
     if (meta != null && meta['pairings'] is Map) {
-      setState(() { _data = meta['pairings'] as Map<String, dynamic>; });
+      final saved = meta['pairings'] as Map<String, dynamic>;
+      if (saved.isNotEmpty && (saved['pairings'] as List?)?.isNotEmpty == true) {
+        setState(() => _data = saved);
+      }
     }
   }
 
@@ -3850,7 +3845,7 @@ class _PairingsCardState extends ConsumerState<_PairingsCard> {
 
   @override
   Widget build(BuildContext context) {
-    if (_dismissed) return const SizedBox.shrink();
+    // Removed _dismissed — closing clears data and shows button again
     final colorScheme = Theme.of(context).colorScheme;
     final isWinery = widget.place.placeType == 'winery' || widget.place.placeType == 'brewery';
     final label = isWinery ? 'Food Pairings' : 'Wine Pairings';
@@ -3898,7 +3893,10 @@ class _PairingsCardState extends ConsumerState<_PairingsCard> {
                     style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: colorScheme.tertiary)),
                 const Spacer(),
                 IconButton(
-                  onPressed: () => setState(() => _dismissed = true),
+                  onPressed: () {
+                    setState(() => _data = null);
+                    _save({});
+                  },
                   icon: const Icon(Icons.close, size: 16),
                   constraints: const BoxConstraints(),
                   padding: EdgeInsets.zero,

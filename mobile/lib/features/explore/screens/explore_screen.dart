@@ -287,38 +287,12 @@ class _NearbyTabState extends ConsumerState<_NearbyTab> {
   }
 
   Future<void> _startTripFromNearby(BuildContext context, Map<String, dynamic> place) async {
-    try {
-      final api = ref.read(apiClientProvider);
-      // Create or find the place in our DB
-      final createResp = await api.post(ApiPaths.places, data: {
-        'name': place['name'],
-        'place_type': place['place_type'] ?? 'winery',
-        'address': place['address'] ?? '',
-        'latitude': place['latitude'],
-        'longitude': place['longitude'],
-        'website': place['website'] ?? '',
-        'phone': place['phone'] ?? '',
-        'description': place['description'] ?? '',
-        'image_url': place['image_url'] ?? '',
-      });
-      final placeData = createResp.data['data'] as Map<String, dynamic>;
-      final placeId = placeData['id'] as String;
-
-      if (context.mounted) {
-        startTripFromPlace(
-          context: context,
-          ref: ref,
-          placeId: placeId,
-          placeName: place['name'] as String? ?? '',
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
-      }
-    }
+    await startTripFromGooglePlace(
+      context: context,
+      ref: ref,
+      place: place,
+      placeType: place['place_type'] as String? ?? 'winery',
+    );
   }
 }
 

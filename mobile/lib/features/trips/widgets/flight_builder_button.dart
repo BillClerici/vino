@@ -92,7 +92,7 @@ class _FlightBuilderButtonState extends ConsumerState<FlightBuilderButton> {
 
   @override
   Widget build(BuildContext context) {
-    if (_dismissed) return const SizedBox.shrink();
+    // Removed _dismissed — closing clears data and shows button again
     final colorScheme = Theme.of(context).colorScheme;
 
     if (_flight == null) {
@@ -138,16 +138,8 @@ class _FlightBuilderButtonState extends ConsumerState<FlightBuilderButton> {
                       style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: colorScheme.primary)),
                 ),
                 IconButton(
-                  onPressed: _fetch,
-                  icon: const Icon(Icons.refresh, size: 16),
-                  constraints: const BoxConstraints(),
-                  padding: EdgeInsets.zero,
-                  tooltip: 'Build Another',
-                ),
-                const SizedBox(width: 4),
-                IconButton(
                   onPressed: () {
-                    setState(() { _flight = null; _dismissed = true; });
+                    setState(() => _flight = null);
                     _save(null);
                   },
                   icon: const Icon(Icons.close, size: 16),
