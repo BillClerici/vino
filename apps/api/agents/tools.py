@@ -13,13 +13,15 @@ logger = logging.getLogger(__name__)
 
 
 @tool
-def search_places(query: str, region: str = "", place_type: str = "winery") -> list[dict]:
+def search_places(query: str, region: str = "", place_type: str = "winery", latitude: float = 0.0, longitude: float = 0.0) -> list[dict]:  # noqa: E501
     """Search for wineries, breweries, or restaurants by name or region.
 
     Args:
         query: Search query (e.g. "Pinot Noir wineries", "craft breweries")
         region: City, state, or region to search in (e.g. "Napa Valley, CA")
         place_type: Type of place — "winery", "brewery", or "restaurant"
+        latitude: Optional center latitude for "near me" searches (GPS coordinate)
+        longitude: Optional center longitude for "near me" searches (GPS coordinate)
 
     Returns:
         List of places with name, address, city, state, lat, lng, description, etc.
@@ -35,7 +37,14 @@ def search_places(query: str, region: str = "", place_type: str = "winery") -> l
     db_qs = Place.objects.filter(is_active=True)
     if place_type:
         db_qs = db_qs.filter(place_type=place_type)
-    if region:
+    if latitude and longitude:
+        # Location-based search: filter places within ~30 miles (~0.45 degrees)
+        db_qs = db_qs.filter(
+            latitude__isnull=False, longitude__isnull=False,
+            latitude__gte=latitude - 0.45, latitude__lte=latitude + 0.45,
+            longitude__gte=longitude - 0.55, longitude__lte=longitude + 0.55,
+        )
+    elif region:
         # Try city or state match
         parts = [p.strip() for p in region.split(",")]
         if len(parts) >= 2:
@@ -77,6 +86,21 @@ def search_places(query: str, region: str = "", place_type: str = "winery") -> l
                     search_query += f" {place_type}"
 
                 with httpx.Client(timeout=10) as client:
+                    request_body: dict = {
+                        "textQuery": search_query,
+                        "maxResultCount": 5,
+                    }
+                    # Add location bias when GPS coordinates are provided
+                    if latitude and longitude:
+                        request_body["locationBias"] = {
+                            "circle": {
+                                "center": {
+                                    "latitude": latitude,
+                                    "longitude": longitude,
+                                },
+                                "radius": 48280.0,  # 30 miles in meters
+                            }
+                        }
                     resp = client.post(
                         "https://places.googleapis.com/v1/places:searchText",
                         headers={
@@ -88,7 +112,7 @@ def search_places(query: str, region: str = "", place_type: str = "winery") -> l
                                 "places.editorialSummary,places.photos,places.location"
                             ),
                         },
-                        json={"textQuery": search_query, "maxResultCount": 5},
+                        json=request_body,
                     )
                     resp.raise_for_status()
                     data = resp.json()

@@ -83,7 +83,11 @@ DATE AND TIME RULES:
 - The LAST stop must finish within the total trip duration. For example, if the trip starts at 11 AM and is 4 hours long, the last stop must end by 3 PM. Plan accordingly — reduce number of stops or duration at each if needed.
 
 ## REVISING
-If the user wants changes after seeing the preview, adjust the plan and propose again with updated <trip_plan> tags.
+The app has a two-step revision flow:
+1. The user discusses changes conversationally (swapping stops, changing times, etc.). During this phase, do NOT include <trip_plan> tags — just discuss the changes naturally.
+2. When the user (or the app) explicitly asks you to "show the updated trip" or "produce the updated plan", THEN include the COMPLETE <trip_plan> JSON block with ALL stops reflecting every change discussed.
+
+In other words: during revision conversations, talk about changes without generating a new plan. Only generate <trip_plan> when explicitly asked to finalize.
 
 ## RULES
 - Be warm, enthusiastic, and knowledgeable
@@ -94,7 +98,6 @@ If the user wants changes after seeing the preview, adjust the plan and propose 
 - NEVER say you are creating or building the trip — you can only PROPOSE plans via <trip_plan> tags
 - The user must click a button in the app to approve — you cannot approve on their behalf
 - If the user says "looks good", "yes", "go ahead" etc., respond with "Great! Click the 'Looks Good!' button below the preview to create your trip!" and include the SAME <trip_plan> block again
-- IMPORTANT: Whenever you suggest ANY change to the trip plan (swapping a stop, changing times, etc.), you MUST include the COMPLETE updated <trip_plan> JSON block with ALL stops. Never describe changes without including the full updated plan in <trip_plan> tags. The app can ONLY display previews from <trip_plan> tags — if you don't include them, the user will see the old plan.
 """
 
 
@@ -111,6 +114,17 @@ def planner_conversation(state: dict) -> dict:
     # Build system prompt with today's date
     today_str = date.today().isoformat()
     system_content = PLANNER_SYSTEM_PROMPT.format(today=today_str)
+
+    # Add user location context if available
+    user_lat = state.get("user_lat")
+    user_lng = state.get("user_lng")
+    if user_lat and user_lng:
+        system_content += (
+            f"\n\nUSER'S CURRENT GPS LOCATION: {user_lat}, {user_lng}\n"
+            "When the user says 'near me' or similar, use these coordinates as the search center. "
+            "Pass these coordinates to the search_places tool via the latitude and longitude parameters "
+            "to find places near the user's actual location."
+        )
 
     # Add palate context if available
     user_id = state.get("user_id")

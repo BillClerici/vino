@@ -148,6 +148,7 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
   _GatherStep _currentStep = _GatherStep.location;
   final Map<_GatherStep, String> _answers = {};
   bool _gatheringComplete = false;
+  bool _revising = false; // true when user is discussing changes to a proposed trip
 
   @override
   void initState() {
@@ -353,6 +354,17 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
     return parts.join('\n');
   }
 
+  /// Get the user's GPS coordinates, or null if unavailable.
+  Future<Map<String, double>?> _getUserCoords() async {
+    try {
+      final loc = await ref.read(userLocationProvider.future);
+      if (loc != defaultLocation) {
+        return {'lat': loc.latitude, 'lng': loc.longitude};
+      }
+    } catch (_) {}
+    return null;
+  }
+
   /// User wants to add a preference during the ready phase.
   void _handlePreference(String text) {
     final existing = _answers[_GatherStep.preferences] ?? '';
@@ -400,19 +412,51 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
       });
       _scrollToBottom();
 
-      // Now send structured data to the LLM
-      _sendToLLM(message: _buildPlannerPrompt());
+      // Now send structured data to the LLM (bubble already shown above)
+      _sendToLLM(message: _buildPlannerPrompt(), showBubble: false);
     });
+  }
+
+  /// Enter revision mode — hide preview, show conversation chips.
+  void _startRevision(String message) {
+    setState(() => _revising = true);
+    _sendToLLM(message: message);
+  }
+
+  /// User is done revising — ask LLM to produce the updated trip plan.
+  void _finishRevision() {
+    setState(() {
+      _messages.add({'role': 'user', 'content': "That's everything — show me the updated trip!"});
+    });
+    _scrollToBottom();
+    _sendToLLM(
+      message: 'The user is done requesting changes. Now produce the COMPLETE updated trip plan '
+          'with a <trip_plan> JSON block reflecting ALL the changes discussed. '
+          'Include every stop, even unchanged ones.',
+      showBubble: false,
+    );
   }
 
   /// Build suggestion chips based on the current gathering step.
   List<Widget> _buildSuggestionChips() {
-    // During LLM phase (proposing, modifying), show revision chips
+    // Revising mode — user is discussing changes, show go chip to finalize
+    if (_revising) {
+      return [
+        _GoChip("Update My Trip!", onTap: _finishRevision),
+        _SuggestionChip('Swap a stop', onTap: (_) => _startRevision('Can you swap one of the stops for a different option?')),
+        _SuggestionChip('Change times', onTap: (_) => _startRevision('Can you adjust the timing?')),
+        _SuggestionChip('Add a food stop', onTap: (_) => _startRevision('Can you add a restaurant stop?')),
+        _SuggestionChip('Remove a stop', onTap: (_) => _startRevision('Can you remove one of the stops?')),
+      ];
+    }
+
+    // Proposing phase (preview visible) — show revision chips that enter revision mode
     if (_phase == 'proposing') {
       return [
-        _SuggestionChip('Swap a stop', onTap: (t) { _controller.text = 'Can you swap one of the stops for a different option?'; _sendToLLM(); }),
-        _SuggestionChip('Change times', onTap: (t) { _controller.text = 'Can you adjust the timing?'; _sendToLLM(); }),
-        _SuggestionChip('Add a food stop', onTap: (t) { _controller.text = 'Can you add a restaurant stop?'; _sendToLLM(); }),
+        _SuggestionChip('Swap a stop', onTap: (_) => _startRevision('Can you swap one of the stops for a different option?')),
+        _SuggestionChip('Change times', onTap: (_) => _startRevision('Can you adjust the timing?')),
+        _SuggestionChip('Add a food stop', onTap: (_) => _startRevision('Can you add a restaurant stop?')),
+        _SuggestionChip('Remove a stop', onTap: (_) => _startRevision('Can you remove one of the stops?')),
       ];
     }
 
@@ -461,21 +505,25 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
           _messages.add({'role': 'user', 'content': text});
         });
         _scrollToBottom();
-        _sendToLLM(message: 'Context: I\'m planning a trip with these details:\n${_buildPlannerPrompt()}\n\nUser question: $text\n\nAnswer the question conversationally as a friendly trip guide. Do NOT search for places or propose a trip plan yet — just answer the question.');
+        _sendToLLM(message: 'Context: I\'m planning a trip with these details:\n${_buildPlannerPrompt()}\n\nUser question: $text\n\nAnswer the question conversationally as a friendly trip guide. Do NOT search for places or propose a trip plan yet — just answer the question.', showBubble: false);
       } else {
         _handlePreference(text);
       }
     } else if (!_gatheringComplete) {
       // Still in gathering phase — accept typed answer for current step
       _handleGatherAnswer(text);
+    } else if (_phase == 'proposing' && !_revising) {
+      // User is requesting changes to the proposed trip — enter revision mode
+      _startRevision(text);
     } else {
-      // LLM phase — send as chat message
+      // LLM phase (revising or other) — send as chat message
       _sendToLLM(message: text);
     }
   }
 
   /// Send a message to the backend LLM (planning/revision phase only).
-  Future<void> _sendToLLM({String? message, String? action}) async {
+  /// Set [showBubble] to false if the caller already added the user message.
+  Future<void> _sendToLLM({String? message, String? action, bool showBubble = true}) async {
     final text = message ?? _controller.text.trim();
     if (text.isEmpty && action == null) return;
     if (_sending) return;
@@ -484,8 +532,7 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
         ? 'Creating your trip...'
         : 'Sippy is searching for spots...';
 
-    if (text.isNotEmpty && message == null) {
-      // Only add user bubble if it wasn't already added by caller
+    if (text.isNotEmpty && showBubble) {
       setState(() {
         _messages.add({'role': 'user', 'content': text});
         _sending = true;
@@ -535,6 +582,13 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
           .where((m) => m['role'] == 'user' || m['role'] == 'assistant')
           .toList();
 
+      // Include GPS coordinates so the backend can do location-based search
+      final coords = await _getUserCoords();
+      if (coords != null) {
+        body['user_lat'] = coords['lat'];
+        body['user_lng'] = coords['lng'];
+      }
+
       final resp = await api.dio.post(
         ApiPaths.tripPlan,
         data: body,
@@ -560,7 +614,12 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
           _phase = phase;
           if (phase == 'gathering' || phase == 'rejected') {
             _proposedTrip = null;
+            _revising = false;
           } else {
+            // If a new trip plan came back, exit revision mode to show the preview
+            if (proposedTrip != null) {
+              _revising = false;
+            }
             _proposedTrip = proposedTrip ?? _proposedTrip;
           }
           _createdTripId = tripId;
@@ -750,7 +809,7 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
                 padding: const EdgeInsets.all(16),
                 itemCount: _messages.length +
                     (_sending ? 1 : 0) +
-                    (_proposedTrip != null && _phase == 'proposing' ? 1 : 0) +
+                    (_proposedTrip != null && _phase == 'proposing' && !_revising ? 1 : 0) +
                     (_createdTripId != null ? 1 : 0),
                 itemBuilder: (_, i) {
                   if (i < _messages.length) {
@@ -784,14 +843,13 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
                     );
                   }
 
-                  // Trip preview card
+                  // Trip preview card (hidden during revision mode)
                   final previewIdx = _messages.length;
-                  if (_proposedTrip != null &&
-                      _phase == 'proposing' &&
-                      i == previewIdx) {
+                  final showPreview = _proposedTrip != null && _phase == 'proposing' && !_revising;
+                  if (showPreview && i == previewIdx) {
                     return _TripPreviewCard(
                       trip: _proposedTrip!,
-                      onApprove: () => _sendToLLM(message: 'Looks good! Create it.', action: 'approve'),
+                      onApprove: () => _sendToLLM(message: 'Looks good! Create it.', action: 'approve', showBubble: false),
                       onReject: () async {
                         final confirmed = await showDialog<bool>(
                           context: context,
@@ -815,13 +873,13 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
                           _proposedTrip = null;
                           _phase = 'gathering';
                         });
-                        _sendToLLM(message: 'Let\'s start over with a different plan.', action: 'reject');
+                        _sendToLLM(message: 'Let\'s start over with a different plan.', action: 'reject', showBubble: false);
                       },
                     );
                   }
 
                   // Created trip card
-                  if (_createdTripId != null && i == previewIdx + (_proposedTrip != null && _phase == 'proposing' ? 1 : 0)) {
+                  if (_createdTripId != null && i == previewIdx + (showPreview ? 1 : 0)) {
                     return _CreatedTripCard(
                       tripId: _createdTripId!,
                       tripName: _proposedTrip?['name'] as String? ?? 'Your Trip',
@@ -889,11 +947,15 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
                         minLines: 1,
                         maxLines: 4,
                         decoration: InputDecoration(
-                          hintText: _gatheringComplete && _phase != 'gathering'
-                              ? 'Request changes or approve...'
-                              : _gatheringComplete
-                                  ? 'Add preferences or type "let\'s go"...'
-                                  : _hintForStep(_currentStep),
+                          hintText: _revising
+                              ? 'Tell Sippy what to change...'
+                              : _phase == 'proposing'
+                                  ? 'Request changes to your trip...'
+                                  : _gatheringComplete && _phase == 'gathering'
+                                      ? 'Add details or tap Let\'s Go...'
+                                      : !_gatheringComplete
+                                          ? _hintForStep(_currentStep)
+                                          : 'Chat with Sippy...',
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(16),
                           ),
@@ -927,7 +989,7 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
       case _GatherStep.numStops: return '1-5 stops...';
       case _GatherStep.stopDuration: return '30 min, 1 hour, 90 min...';
       case _GatherStep.preferences: return 'Wine, beer, food preferences...';
-      case _GatherStep.ready: return 'Add preferences or type "let\'s go"...';
+      case _GatherStep.ready: return 'Add details or tap Let\'s Go...';
     }
   }
 }

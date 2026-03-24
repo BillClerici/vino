@@ -878,6 +878,8 @@ Keep responses conversational, warm, and concise (2-4 sentences unless more deta
         action_type = request.data.get("action")  # approve | reject | None
         session_id = request.data.get("session_id", "")
         conversation_id = request.data.get("conversation_id", "")
+        user_lat = request.data.get("user_lat")
+        user_lng = request.data.get("user_lng")
 
         if not user_message and not action_type:
             return Response(
@@ -995,6 +997,9 @@ Keep responses conversational, warm, and concise (2-4 sentences unless more deta
                 "messages": history_msgs + [HM(content=user_message)],
                 "user_id": str(request.user.id),
             }
+            if user_lat is not None and user_lng is not None:
+                input_state["user_lat"] = float(user_lat)
+                input_state["user_lng"] = float(user_lng)
 
             result = graph.invoke(input_state, config)
 
