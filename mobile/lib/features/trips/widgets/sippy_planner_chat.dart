@@ -149,6 +149,7 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
   final Map<_GatherStep, String> _answers = {};
   bool _gatheringComplete = false;
   bool _revising = false; // true when user is discussing changes to a proposed trip
+  bool _expectingUpdatedPlan = false; // true only after "Update My Trip!" is tapped
 
   @override
   void initState() {
@@ -426,6 +427,7 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
   /// User is done revising — ask LLM to produce the updated trip plan.
   void _finishRevision() {
     setState(() {
+      _expectingUpdatedPlan = true;
       _messages.add({'role': 'user', 'content': "That's everything — show me the updated trip!"});
     });
     _scrollToBottom();
@@ -615,10 +617,12 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
           if (phase == 'gathering' || phase == 'rejected') {
             _proposedTrip = null;
             _revising = false;
+            _expectingUpdatedPlan = false;
           } else {
-            // If a new trip plan came back, exit revision mode to show the preview
-            if (proposedTrip != null) {
+            // Only exit revision mode when we explicitly requested the updated plan
+            if (proposedTrip != null && _expectingUpdatedPlan) {
               _revising = false;
+              _expectingUpdatedPlan = false;
             }
             _proposedTrip = proposedTrip ?? _proposedTrip;
           }
