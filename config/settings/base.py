@@ -238,9 +238,9 @@ CELERY_BEAT_SCHEDULE = {
 
 # Firebase Cloud Messaging (v1 API)
 FIREBASE_PROJECT_ID = env('FIREBASE_PROJECT_ID', default='trip-me-7c9dc')
-# Auth: uses Application Default Credentials (gcloud for dev) or
-# FCM_SERVICE_ACCOUNT_JSON env var (JSON string for production).
-FCM_SERVICE_ACCOUNT_JSON = env('FCM_SERVICE_ACCOUNT_JSON', default='')
+# Auth: GOOGLE_APPLICATION_CREDENTIALS_JSON (JSON string — service account or
+# authorized user) for production, or Application Default Credentials for local dev.
+GOOGLE_APPLICATION_CREDENTIALS_JSON = env('GOOGLE_APPLICATION_CREDENTIALS_JSON', default='')
 
 # Email
 EMAIL_BACKEND = env('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')

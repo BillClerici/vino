@@ -37,21 +37,34 @@ def _get_credentials():
         _credentials.refresh(Request())
         return _credentials
 
-    # Option 1: Service account JSON from env var (base64 or file path)
-    sa_json = getattr(settings, "FCM_SERVICE_ACCOUNT_JSON", "")
-    if sa_json:
+    # Option 1: Google credentials JSON from env var (service account or authorized user)
+    creds_json = getattr(settings, "GOOGLE_APPLICATION_CREDENTIALS_JSON", "")
+    if creds_json:
         try:
-            info = json.loads(sa_json)
-            _credentials = service_account.Credentials.from_service_account_info(
-                info, scopes=FCM_SCOPES
-            )
+            info = json.loads(creds_json)
+            cred_type = info.get("type", "")
+
+            if cred_type == "service_account":
+                _credentials = service_account.Credentials.from_service_account_info(
+                    info, scopes=FCM_SCOPES
+                )
+            elif cred_type == "authorized_user":
+                from google.oauth2 import credentials as user_credentials
+
+                _credentials = user_credentials.Credentials.from_authorized_user_info(
+                    info, scopes=FCM_SCOPES
+                )
+            else:
+                logger.error("Unknown credential type in GOOGLE_APPLICATION_CREDENTIALS_JSON: %s", cred_type)
+                return None
+
             _credentials.refresh(Request())
             return _credentials
         except Exception:
-            logger.exception("Failed to load FCM service account from JSON")
+            logger.exception("Failed to load Google credentials from JSON env var")
             return None
 
-    # Option 2: Application Default Credentials (gcloud auth / GOOGLE_APPLICATION_CREDENTIALS)
+    # Option 2: Application Default Credentials (gcloud auth / GOOGLE_APPLICATION_CREDENTIALS file)
     try:
         import google.auth
 
