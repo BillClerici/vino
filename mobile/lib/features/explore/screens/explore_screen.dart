@@ -146,9 +146,9 @@ class _NearbyTabState extends ConsumerState<_NearbyTab> {
   List<Map<String, dynamic>>? _places;
   bool _loading = true;
   String? _error;
-  int _radiusMiles = 25;
+  int _radiusMiles = 10;
 
-  static const _radiusOptions = [25, 50, 100];
+  static const _radiusOptions = [10, 20, 30];
 
   // Convert miles to meters
   int get _radiusMeters => (_radiusMiles * 1609.34).round();
