@@ -8,11 +8,13 @@ from ..places.serializers import PlaceListSerializer
 class VisitWineSerializer(serializers.ModelSerializer):
     display_name = serializers.CharField(read_only=True)
     menu_item_name = serializers.SerializerMethodField()
+    menu_item_image_url = serializers.SerializerMethodField()
 
     class Meta:
         model = VisitWine
         fields = [
-            "id", "menu_item", "menu_item_name", "wine_name", "wine_type",
+            "id", "menu_item", "menu_item_name", "menu_item_image_url",
+            "wine_name", "wine_type",
             "wine_vintage", "serving_type", "quantity", "is_favorite",
             "tasting_notes", "rating", "rating_comments", "photo",
             "purchased", "purchased_quantity", "purchased_price",
@@ -23,6 +25,11 @@ class VisitWineSerializer(serializers.ModelSerializer):
     def get_menu_item_name(self, obj):
         if obj.menu_item:
             return obj.menu_item.name
+        return None
+
+    def get_menu_item_image_url(self, obj):
+        if obj.menu_item and obj.menu_item.image_url:
+            return obj.menu_item.image_url
         return None
 
 

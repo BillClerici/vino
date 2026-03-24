@@ -1028,12 +1028,25 @@ class _DrinksSectionState extends ConsumerState<_DrinksSection> {
   late List<Map<String, dynamic>> _addedDrinks;
 
   List<Map<String, dynamic>> _parseWines(List<dynamic> wines) {
+    // Build a lookup from menu item id → image_url for local fallback
+    final menuImageMap = <String, String>{};
+    for (final mi in (widget.place.menuItems ?? [])) {
+      if (mi.imageUrl.isNotEmpty) menuImageMap[mi.id] = mi.imageUrl;
+    }
+
     return wines.map((w) {
       final wine = w as Map<String, dynamic>;
+      // Try API-provided image, then local menu item match
+      final menuItemId = wine['menu_item'] as String? ?? '';
+      final apiMenuImage = wine['menu_item_image_url'] as String? ?? '';
+      final localMenuImage = menuImageMap[menuItemId] ?? '';
+      final menuImage = apiMenuImage.isNotEmpty ? apiMenuImage : localMenuImage;
+
       return <String, dynamic>{
         'id': wine['id'] ?? '',
         'wine_name': wine['display_name'] ?? wine['wine_name'] ?? '',
         'wine_type': wine['wine_type'] ?? '',
+        'wine_vintage': wine['wine_vintage'],
         'serving_type': wine['serving_type'] ?? '',
         'rating': wine['rating'],
         'tasting_notes': wine['tasting_notes'] ?? '',
@@ -1043,6 +1056,8 @@ class _DrinksSectionState extends ConsumerState<_DrinksSection> {
         'purchased_price': wine['purchased_price'],
         'purchased_quantity': wine['purchased_quantity'],
         'photo': wine['photo'] ?? '',
+        'menu_item_image': menuImage,
+        'quantity': wine['quantity'] ?? 1,
       };
     }).toList();
   }
@@ -1267,6 +1282,7 @@ class _DrinksSectionState extends ConsumerState<_DrinksSection> {
           ...result,
           'id': drinkId,
           if (photoUrl != null && photoUrl.isNotEmpty) 'photo': photoUrl,
+          'menu_item_image': menuItem['image_url'] ?? '',
         });
       });
       if (mounted) {
@@ -2529,8 +2545,48 @@ class _DrinkCard extends StatefulWidget {
   State<_DrinkCard> createState() => _DrinkCardState();
 }
 
-class _DrinkCardState extends State<_DrinkCard> {
+class _DrinkCardState extends State<_DrinkCard>
+    with SingleTickerProviderStateMixin {
   bool _expanded = false;
+  late final AnimationController _animController;
+  late final Animation<double> _expandAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _animController = AnimationController(
+      duration: const Duration(milliseconds: 250),
+      vsync: this,
+    );
+    _expandAnim = CurvedAnimation(
+      parent: _animController,
+      curve: Curves.easeInOut,
+    );
+  }
+
+  @override
+  void dispose() {
+    _animController.dispose();
+    super.dispose();
+  }
+
+  void _toggleExpand() {
+    setState(() => _expanded = !_expanded);
+    if (_expanded) {
+      _animController.forward();
+    } else {
+      _animController.reverse();
+    }
+  }
+
+  String _resolveImageUrl(String url) {
+    if (url.isEmpty) return url;
+    if (!kIsWeb) return url;
+    if (url.contains('vinoshipper') || url.contains('s3.amazonaws')) {
+      return '${EnvConfig.apiBaseUrl}/api/v1/image-proxy/?url=${Uri.encodeComponent(url)}';
+    }
+    return url;
+  }
 
   void _showFullImage(String imageUrl) {
     showDialog(
@@ -2545,7 +2601,7 @@ class _DrinkCardState extends State<_DrinkCard> {
               maxScale: 4.0,
               child: Center(
                 child: Image.network(
-                  imageUrl,
+                  _resolveImageUrl(imageUrl),
                   fit: BoxFit.contain,
                   errorBuilder: (_, __, ___) => const Icon(
                     Icons.broken_image,
@@ -2572,8 +2628,10 @@ class _DrinkCardState extends State<_DrinkCard> {
   @override
   Widget build(BuildContext context) {
     final d = widget.drink;
+    final cs = Theme.of(context).colorScheme;
     final name = d['wine_name'] as String? ?? '';
     final type = d['wine_type'] as String? ?? '';
+    final vintage = d['wine_vintage'];
     final serving = d['serving_type'] as String? ?? '';
     final rating = d['rating'] as int?;
     final notes = d['tasting_notes'] as String? ?? '';
@@ -2582,223 +2640,477 @@ class _DrinkCardState extends State<_DrinkCard> {
     final purchased = d['purchased'] as bool? ?? false;
     final price = d['purchased_price'];
     final qty = d['purchased_quantity'];
-    final labelStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: Colors.grey[600],
-        );
+    final quantity = (d['quantity'] as int?) ?? 1;
 
-    // Try to get image from photo field or menu_item image
+    // Resolve drink image: user photo > menu item image
     final photo = d['photo'] as String? ?? '';
     final menuItemImage = d['menu_item_image'] as String? ?? '';
     final drinkImage = photo.isNotEmpty ? photo : menuItemImage;
     final hasImage = drinkImage.isNotEmpty;
+    final resolvedImage = hasImage ? _resolveImageUrl(drinkImage) : '';
 
     return Card(
-      child: InkWell(
-        onTap: () => setState(() => _expanded = !_expanded),
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ── Collapsed header ──
-              Row(
-                children: [
-                  hasImage
-                      ? GestureDetector(
-                          onTap: () => _showFullImage(drinkImage),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.network(
-                              kIsWeb && (drinkImage.contains('vinoshipper') ||
-                                      drinkImage.contains('s3.amazonaws'))
-                                  ? '${EnvConfig.apiBaseUrl}/api/v1/image-proxy/?url=${Uri.encodeComponent(drinkImage)}'
-                                  : drinkImage,
-                              width: 36,
-                              height: 36,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => CircleAvatar(
-                                backgroundColor:
-                                    Theme.of(context).colorScheme.primaryContainer,
-                                radius: 18,
-                                child: const Icon(Icons.local_drink, size: 18),
-                              ),
-                            ),
-                          ),
+      clipBehavior: Clip.antiAlias,
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: _expanded ? 3 : 1,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Hero image or gradient header ──
+          GestureDetector(
+            onTap: hasImage ? () => _showFullImage(drinkImage) : _toggleExpand,
+            child: Stack(
+              children: [
+                // Image / gradient background
+                SizedBox(
+                  height: hasImage ? 140 : 72,
+                  width: double.infinity,
+                  child: hasImage
+                      ? Image.network(
+                          resolvedImage,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => _gradientHeader(cs),
                         )
-                      : CircleAvatar(
-                          backgroundColor:
-                              Theme.of(context).colorScheme.primaryContainer,
-                          radius: 18,
-                          child: const Icon(Icons.local_drink, size: 18),
+                      : _gradientHeader(cs),
+                ),
+                // Dark gradient overlay for readability
+                if (hasImage)
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withValues(alpha: 0.7),
+                          ],
+                          stops: const [0.3, 1.0],
                         ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(name,
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w600)),
-                        Text(
-                          [type, serving, if (rating != null) '$rating/5']
-                              .where((s) => s.isNotEmpty)
-                              .join(' · '),
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
+                      ),
                     ),
                   ),
-                  if (isFavorite)
-                    const Icon(Icons.favorite,
-                        color: Colors.red, size: 16),
-                  if (purchased)
-                    const Padding(
-                      padding: EdgeInsets.only(left: 4),
-                      child: Icon(Icons.shopping_bag,
-                          color: Colors.green, size: 16),
+                // Badge row: favorite + purchased
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (isFavorite)
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.9),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.15),
+                                blurRadius: 4,
+                              ),
+                            ],
+                          ),
+                          child: const Icon(Icons.favorite,
+                              color: Colors.redAccent, size: 16),
+                        ),
+                      if (isFavorite && purchased) const SizedBox(width: 6),
+                      if (purchased)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade600,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.15),
+                                blurRadius: 4,
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.shopping_bag,
+                                  color: Colors.white, size: 12),
+                              const SizedBox(width: 4),
+                              Text(
+                                [
+                                  if (qty != null) '${qty}x',
+                                  if (price != null) '\$$price',
+                                  if (qty == null && price == null) 'Bought',
+                                ].join(' '),
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                // Quantity badge top-left
+                if (quantity > 1)
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: cs.primary,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.2),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                      child: Text('x$quantity',
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold)),
                     ),
-                  const SizedBox(width: 8),
-                  Icon(
-                    _expanded ? Icons.expand_less : Icons.expand_more,
-                    color: Colors.grey,
+                  ),
+                // Wine name + type overlay at bottom
+                Positioned(
+                  left: 12,
+                  right: 60,
+                  bottom: 10,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: hasImage ? Colors.white : cs.onPrimaryContainer,
+                          shadows: hasImage
+                              ? [
+                                  Shadow(
+                                    color: Colors.black.withValues(alpha: 0.5),
+                                    blurRadius: 4,
+                                  )
+                                ]
+                              : null,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        [type, if (vintage != null) '$vintage', serving]
+                            .where((s) => s.isNotEmpty)
+                            .join(' · '),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: hasImage
+                              ? Colors.white70
+                              : cs.onPrimaryContainer.withValues(alpha: 0.7),
+                          shadows: hasImage
+                              ? [
+                                  Shadow(
+                                    color: Colors.black.withValues(alpha: 0.5),
+                                    blurRadius: 4,
+                                  )
+                                ]
+                              : null,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Rating badge bottom-right
+                if (rating != null)
+                  Positioned(
+                    right: 10,
+                    bottom: 10,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _ratingColor(rating),
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.2),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.star_rounded,
+                              color: Colors.white, size: 14),
+                          const SizedBox(width: 2),
+                          Text(
+                            '$rating',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+          // ── Info strip with expand toggle ──
+          InkWell(
+            onTap: _toggleExpand,
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                children: [
+                  // Quick-info chips
+                  if (notes.isNotEmpty)
+                    _infoChip(Icons.notes, 'Notes', cs),
+                  if (notes.isNotEmpty && ratingComments.isNotEmpty)
+                    const SizedBox(width: 6),
+                  if (ratingComments.isNotEmpty)
+                    _infoChip(Icons.rate_review_outlined, 'Review', cs),
+                  const Spacer(),
+                  // Edit / Delete quick-actions
+                  _iconAction(Icons.edit_outlined, cs.primary, widget.onEdit),
+                  const SizedBox(width: 4),
+                  _iconAction(Icons.delete_outline, cs.error, widget.onDelete),
+                  const SizedBox(width: 4),
+                  AnimatedRotation(
+                    turns: _expanded ? 0.5 : 0.0,
+                    duration: const Duration(milliseconds: 250),
+                    child: Icon(Icons.expand_more,
+                        color: Colors.grey.shade500, size: 22),
                   ),
                 ],
               ),
-
-              // ── Expanded detail view ──
-              if (_expanded) ...[
-                const Divider(height: 16),
-
-                // Type & Serving
-                Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('TYPE', style: labelStyle),
-                          const SizedBox(height: 2),
-                          Text(type.isNotEmpty ? type : '-'),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('SERVING', style: labelStyle),
-                          const SizedBox(height: 2),
-                          Text(serving.isNotEmpty ? serving : '-'),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                // Tasting notes
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('TASTING NOTES', style: labelStyle),
-                    const SizedBox(height: 4),
-                    Text(notes.isNotEmpty ? notes : 'No notes',
-                        style: TextStyle(
-                            color:
-                                notes.isEmpty ? Colors.grey : null)),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                // Rating comments
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('RATING COMMENTS', style: labelStyle),
-                    const SizedBox(height: 4),
-                    Text(
-                        ratingComments.isNotEmpty
-                            ? ratingComments
-                            : 'No comments',
-                        style: TextStyle(
-                            color: ratingComments.isEmpty
-                                ? Colors.grey
-                                : null)),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                // Rating & Favorite
-                Row(
-                  children: [
-                    rating != null
-                        ? RatingStars(rating: rating, size: 20)
-                        : const Text('Not rated',
-                            style: TextStyle(color: Colors.grey)),
-                    const Spacer(),
-                    Icon(
-                      isFavorite ? Icons.favorite : Icons.favorite_border,
-                      size: 18,
-                      color: isFavorite ? Colors.red : Colors.grey,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(isFavorite ? 'Favorited' : 'Not a favorite',
-                        style: TextStyle(
-                            color: isFavorite ? Colors.red : Colors.grey)),
-                  ],
-                ),
-                const SizedBox(height: 8),
-
-                // Purchased
-                Row(
-                  children: [
-                    Icon(
-                      purchased ? Icons.shopping_bag : Icons.shopping_bag_outlined,
-                      size: 18,
-                      color: purchased ? Colors.green : Colors.grey,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      purchased
-                          ? [
-                              'Purchased',
-                              if (qty != null) '($qty)',
-                              if (price != null) '— \$$price',
-                            ].join(' ')
-                          : 'Not purchased',
-                      style: TextStyle(
-                          color: purchased ? Colors.green : Colors.grey),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 12),
-                // Action buttons
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton.icon(
-                      onPressed: widget.onEdit,
-                      icon: const Icon(Icons.edit, size: 16),
-                      label: const Text('Edit'),
-                    ),
-                    const SizedBox(width: 8),
-                    TextButton.icon(
-                      onPressed: widget.onDelete,
-                      icon: const Icon(Icons.delete_outline,
-                          color: Colors.red, size: 16),
-                      label: const Text('Remove',
-                          style: TextStyle(color: Colors.red)),
-                    ),
-                  ],
-                ),
-              ],
-            ],
+            ),
           ),
-        ),
+
+          // ── Expandable detail section ──
+          SizeTransition(
+            sizeFactor: _expandAnim,
+            axisAlignment: -1.0,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Divider(height: 1),
+                  const SizedBox(height: 12),
+
+                  // Rating stars full display
+                  if (rating != null) ...[
+                    Row(
+                      children: [
+                        RatingStars(rating: rating, size: 22),
+                        const SizedBox(width: 8),
+                        Text('$rating / 5',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: _ratingColor(rating))),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+
+                  // Tasting notes
+                  if (notes.isNotEmpty) ...[
+                    Row(
+                      children: [
+                        Icon(Icons.notes, size: 14, color: cs.primary),
+                        const SizedBox(width: 6),
+                        Text('Tasting Notes',
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: cs.primary)),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(notes,
+                          style: const TextStyle(
+                              fontSize: 13, height: 1.4)),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+
+                  // Rating comments
+                  if (ratingComments.isNotEmpty) ...[
+                    Row(
+                      children: [
+                        Icon(Icons.rate_review_outlined,
+                            size: 14, color: cs.secondary),
+                        const SizedBox(width: 6),
+                        Text('Review',
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: cs.secondary)),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: cs.secondaryContainer.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(ratingComments,
+                          style: const TextStyle(
+                              fontSize: 13, height: 1.4)),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+
+                  // Favorite & Purchase detail row
+                  Row(
+                    children: [
+                      _detailBadge(
+                        icon: isFavorite
+                            ? Icons.favorite
+                            : Icons.favorite_border,
+                        label: isFavorite ? 'Favorited' : 'Not favorited',
+                        color: isFavorite ? Colors.redAccent : Colors.grey,
+                        filled: isFavorite,
+                      ),
+                      const SizedBox(width: 8),
+                      _detailBadge(
+                        icon: purchased
+                            ? Icons.shopping_bag
+                            : Icons.shopping_bag_outlined,
+                        label: purchased
+                            ? [
+                                'Purchased',
+                                if (qty != null) '(${qty}x)',
+                                if (price != null) '\$$price',
+                              ].join(' ')
+                            : 'Not purchased',
+                        color: purchased
+                            ? Colors.green.shade600
+                            : Colors.grey,
+                        filled: purchased,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
+  }
+
+  // Gradient header when there's no image
+  Widget _gradientHeader(ColorScheme cs) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            cs.primaryContainer,
+            cs.secondaryContainer,
+          ],
+        ),
+      ),
+      child: Center(
+        child: Icon(Icons.wine_bar_rounded,
+            size: 32, color: cs.onPrimaryContainer.withValues(alpha: 0.4)),
+      ),
+    );
+  }
+
+  Widget _infoChip(IconData icon, String label, ColorScheme cs) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: cs.onSurface.withValues(alpha: 0.6)),
+          const SizedBox(width: 4),
+          Text(label,
+              style: TextStyle(
+                  fontSize: 11,
+                  color: cs.onSurface.withValues(alpha: 0.6))),
+        ],
+      ),
+    );
+  }
+
+  Widget _iconAction(IconData icon, Color color, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.all(6),
+        child: Icon(icon, size: 18, color: color.withValues(alpha: 0.7)),
+      ),
+    );
+  }
+
+  Widget _detailBadge({
+    required IconData icon,
+    required String label,
+    required Color color,
+    bool filled = false,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: filled ? color.withValues(alpha: 0.1) : Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+            color: color.withValues(alpha: filled ? 0.3 : 0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(label,
+                style: TextStyle(
+                    fontSize: 11,
+                    color: color,
+                    fontWeight:
+                        filled ? FontWeight.w600 : FontWeight.normal),
+                overflow: TextOverflow.ellipsis),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _ratingColor(int rating) {
+    if (rating >= 5) return const Color(0xFF27AE60);
+    if (rating >= 4) return const Color(0xFF2ECC71);
+    if (rating >= 3) return const Color(0xFFF39C12);
+    if (rating >= 2) return const Color(0xFFE67E22);
+    return const Color(0xFFE74C3C);
   }
 }
 

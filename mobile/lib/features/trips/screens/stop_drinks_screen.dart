@@ -43,12 +43,24 @@ class _StopDrinksScreenState extends ConsumerState<StopDrinksScreen> {
   @override
   void initState() {
     super.initState();
+    // Build a lookup from menu item id → image_url for local fallback
+    final menuImageMap = <String, String>{};
+    for (final mi in (widget.place.menuItems ?? [])) {
+      if (mi.imageUrl.isNotEmpty) menuImageMap[mi.id] = mi.imageUrl;
+    }
+
     _drinks = widget.existingWines.map((w) {
       final wine = w as Map<String, dynamic>;
+      final menuItemId = wine['menu_item'] as String? ?? '';
+      final apiMenuImage = wine['menu_item_image_url'] as String? ?? '';
+      final localMenuImage = menuImageMap[menuItemId] ?? '';
+      final menuImage = apiMenuImage.isNotEmpty ? apiMenuImage : localMenuImage;
+
       return <String, dynamic>{
         'id': wine['id'] ?? '',
         'wine_name': wine['display_name'] ?? wine['wine_name'] ?? '',
         'wine_type': wine['wine_type'] ?? '',
+        'wine_vintage': wine['wine_vintage'],
         'serving_type': wine['serving_type'] ?? '',
         'rating': wine['rating'],
         'tasting_notes': wine['tasting_notes'] ?? '',
@@ -58,6 +70,7 @@ class _StopDrinksScreenState extends ConsumerState<StopDrinksScreen> {
         'purchased_price': wine['purchased_price'],
         'purchased_quantity': wine['purchased_quantity'],
         'photo': wine['photo'] ?? '',
+        'menu_item_image': menuImage,
         'quantity': wine['quantity'] ?? 1,
         'menu_item': wine['menu_item'],
       };
@@ -207,6 +220,7 @@ class _StopDrinksScreenState extends ConsumerState<StopDrinksScreen> {
         photoUrl = await _uploadPhoto(drinkId, pickedPhoto);
       }
 
+      final menuItemImage = prefill?['_menu_item_image'] as String? ?? '';
       setState(() {
         _drinks.add({
           ...result,
@@ -214,6 +228,7 @@ class _StopDrinksScreenState extends ConsumerState<StopDrinksScreen> {
           'quantity': 1,
           if (menuItemId != null) 'menu_item': menuItemId,
           if (photoUrl != null && photoUrl.isNotEmpty) 'photo': photoUrl,
+          'menu_item_image': menuItemImage,
         });
       });
       if (mounted) {
@@ -234,6 +249,7 @@ class _StopDrinksScreenState extends ConsumerState<StopDrinksScreen> {
       'wine_type': menuItem['varietal'] ?? '',
       'tasting_notes': menuItem['description'] ?? '',
       'menu_item': menuItem['id'],
+      '_menu_item_image': menuItem['image_url'] ?? '',
     };
     await _addDrink(prefill: prefill);
   }
@@ -295,6 +311,7 @@ class _StopDrinksScreenState extends ConsumerState<StopDrinksScreen> {
               'quantity': drink['quantity'] ?? 1,
               if (drink['menu_item'] != null) 'menu_item': drink['menu_item'],
               if (photoUrl != null && photoUrl.isNotEmpty) 'photo': photoUrl,
+              'menu_item_image': drink['menu_item_image'] ?? '',
             });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -531,6 +548,15 @@ class _DetailedDrinkCard extends StatelessWidget {
     required this.onQuantityChanged,
   });
 
+  String _resolveImageUrl(String url) {
+    if (url.isEmpty) return url;
+    if (!kIsWeb) return url;
+    if (url.contains('vinoshipper') || url.contains('s3.amazonaws')) {
+      return '${EnvConfig.apiBaseUrl}/api/v1/image-proxy/?url=${Uri.encodeComponent(url)}';
+    }
+    return url;
+  }
+
   void _showFullImage(BuildContext context, String imageUrl) {
     showDialog(
       context: context,
@@ -543,12 +569,20 @@ class _DetailedDrinkCard extends StatelessWidget {
               minScale: 0.5,
               maxScale: 4.0,
               child: Center(
-                child: Image.network(imageUrl, fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, color: Colors.white54, size: 64)),
+                child: Image.network(
+                  _resolveImageUrl(imageUrl),
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const Icon(
+                    Icons.broken_image,
+                    color: Colors.white54,
+                    size: 64,
+                  ),
+                ),
               ),
             ),
             Positioned(
-              top: 16, right: 16,
+              top: 16,
+              right: 16,
               child: IconButton(
                 icon: const Icon(Icons.close, color: Colors.white, size: 28),
                 onPressed: () => Navigator.of(ctx).pop(),
@@ -560,11 +594,20 @@ class _DetailedDrinkCard extends StatelessWidget {
     );
   }
 
+  Color _ratingColor(int rating) {
+    if (rating >= 5) return const Color(0xFF27AE60);
+    if (rating >= 4) return const Color(0xFF2ECC71);
+    if (rating >= 3) return const Color(0xFFF39C12);
+    if (rating >= 2) return const Color(0xFFE67E22);
+    return const Color(0xFFE74C3C);
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final name = drink['wine_name'] as String? ?? '';
     final type = drink['wine_type'] as String? ?? '';
+    final vintage = drink['wine_vintage'];
     final serving = drink['serving_type'] as String? ?? '';
     final rating = drink['rating'] as int?;
     final notes = drink['tasting_notes'] as String? ?? '';
@@ -574,152 +617,311 @@ class _DetailedDrinkCard extends StatelessWidget {
     final price = drink['purchased_price'];
     final qty = drink['purchased_quantity'];
     final quantity = (drink['quantity'] as int?) ?? 1;
-    final photo = drink['photo'] as String? ?? '';
-    final hasImage = photo.isNotEmpty;
 
-    String displayImage = photo;
-    if (kIsWeb && hasImage && (photo.contains('vinoshipper') || photo.contains('s3.amazonaws'))) {
-      displayImage = '${EnvConfig.apiBaseUrl}/api/v1/image-proxy/?url=${Uri.encodeComponent(photo)}';
-    }
+    // Resolve drink image: user photo > menu item image
+    final photo = drink['photo'] as String? ?? '';
+    final menuItemImage = drink['menu_item_image'] as String? ?? '';
+    final drinkImage = photo.isNotEmpty ? photo : menuItemImage;
+    final hasImage = drinkImage.isNotEmpty;
+    final resolvedImage = hasImage ? _resolveImageUrl(drinkImage) : '';
 
     return Card(
+      clipBehavior: Clip.antiAlias,
+      margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Header with image ──
-          if (hasImage)
-            GestureDetector(
-              onTap: () => _showFullImage(context, displayImage),
-              child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                child: Image.network(
-                  displayImage,
-                  height: 140,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    height: 80,
-                    color: cs.primaryContainer.withValues(alpha: 0.3),
-                    child: Center(child: Icon(Icons.local_drink, size: 32, color: cs.primary.withValues(alpha: 0.4))),
-                  ),
-                ),
-              ),
-            ),
-
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          // ── Hero image or gradient header ──
+          GestureDetector(
+            onTap: hasImage ? () => _showFullImage(context, drinkImage) : null,
+            child: Stack(
               children: [
-                // ── Name + Badges row ──
-                Row(
-                  children: [
-                    if (!hasImage) ...[
-                      CircleAvatar(
-                        backgroundColor: cs.primaryContainer,
-                        radius: 20,
-                        child: Icon(
-                          placeType == 'brewery' ? Icons.sports_bar : Icons.wine_bar,
-                          size: 20,
-                          color: cs.primary,
+                SizedBox(
+                  height: hasImage ? 160 : 80,
+                  width: double.infinity,
+                  child: hasImage
+                      ? Image.network(
+                          resolvedImage,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => _gradientHeader(cs),
+                        )
+                      : _gradientHeader(cs),
+                ),
+                // Dark gradient overlay for readability
+                if (hasImage)
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withValues(alpha: 0.7),
+                          ],
+                          stops: const [0.3, 1.0],
                         ),
                       ),
-                      const SizedBox(width: 12),
-                    ],
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Flexible(child: Text(name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
-                              if (quantity > 1) ...[
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: cs.primary,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text('x$quantity',
-                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
-                                ),
-                              ],
+                    ),
+                  ),
+                // Top-right badges: favorite + purchased
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (isFavorite)
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.9),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.15),
+                                blurRadius: 4,
+                              ),
                             ],
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            [type, serving].where((s) => s.isNotEmpty).join(' · '),
-                            style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                          child: const Icon(Icons.favorite,
+                              color: Colors.redAccent, size: 16),
+                        ),
+                      if (isFavorite && purchased) const SizedBox(width: 6),
+                      if (purchased)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade600,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.15),
+                                blurRadius: 4,
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.shopping_bag,
+                                  color: Colors.white, size: 12),
+                              const SizedBox(width: 4),
+                              Text(
+                                [
+                                  if (qty != null) '${qty}x',
+                                  if (price != null) '\$$price',
+                                  if (qty == null && price == null) 'Bought',
+                                ].join(' '),
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                // Quantity badge top-left
+                if (quantity > 1)
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: cs.primary,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.2),
+                            blurRadius: 4,
                           ),
                         ],
                       ),
+                      child: Text('x$quantity',
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold)),
                     ),
-                    if (isFavorite)
-                      const Padding(
-                        padding: EdgeInsets.only(right: 4),
-                        child: Icon(Icons.favorite, color: Colors.red, size: 20),
-                      ),
-                    if (purchased)
-                      const Icon(Icons.shopping_bag, color: Colors.green, size: 20),
-                  ],
-                ),
-
-                const SizedBox(height: 12),
-
-                // ── Rating ──
-                if (rating != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: RatingStars(rating: rating, size: 22),
                   ),
+                // Name + type overlay at bottom
+                Positioned(
+                  left: 12,
+                  right: 60,
+                  bottom: 10,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                          color: hasImage
+                              ? Colors.white
+                              : cs.onPrimaryContainer,
+                          shadows: hasImage
+                              ? [
+                                  Shadow(
+                                    color:
+                                        Colors.black.withValues(alpha: 0.5),
+                                    blurRadius: 4,
+                                  )
+                                ]
+                              : null,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        [type, if (vintage != null) '$vintage', serving]
+                            .where((s) => s.isNotEmpty)
+                            .join(' · '),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: hasImage
+                              ? Colors.white70
+                              : cs.onPrimaryContainer
+                                  .withValues(alpha: 0.7),
+                          shadows: hasImage
+                              ? [
+                                  Shadow(
+                                    color:
+                                        Colors.black.withValues(alpha: 0.5),
+                                    blurRadius: 4,
+                                  )
+                                ]
+                              : null,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Rating badge bottom-right
+                if (rating != null)
+                  Positioned(
+                    right: 10,
+                    bottom: 10,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _ratingColor(rating),
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.2),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.star_rounded,
+                              color: Colors.white, size: 14),
+                          const SizedBox(width: 2),
+                          Text('$rating',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13)),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
 
-                // ── Tasting notes ──
+          // ── Body content ──
+          Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Rating stars full display
+                if (rating != null) ...[
+                  Row(
+                    children: [
+                      RatingStars(rating: rating, size: 22),
+                      const SizedBox(width: 8),
+                      Text('$rating / 5',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: _ratingColor(rating))),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                ],
+
+                // Tasting notes
                 if (notes.isNotEmpty) ...[
-                  Text('Tasting Notes',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.grey[500])),
-                  const SizedBox(height: 2),
-                  Text(notes, style: const TextStyle(fontSize: 13)),
-                  const SizedBox(height: 8),
-                ],
-
-                // ── Rating comments ──
-                if (ratingComments.isNotEmpty) ...[
-                  Text('Comments',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.grey[500])),
-                  const SizedBox(height: 2),
-                  Text(ratingComments, style: const TextStyle(fontSize: 13)),
-                  const SizedBox(height: 8),
-                ],
-
-                // ── Purchase info ──
-                if (purchased)
+                  Row(
+                    children: [
+                      Icon(Icons.notes, size: 14, color: cs.primary),
+                      const SizedBox(width: 6),
+                      Text('Tasting Notes',
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: cs.primary)),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Colors.green.withValues(alpha: 0.1),
+                      color: cs.surfaceContainerHighest
+                          .withValues(alpha: 0.5),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.shopping_bag, size: 14, color: Colors.green),
-                        const SizedBox(width: 6),
-                        Text(
-                          [
-                            'Purchased',
-                            if (qty != null) '($qty)',
-                            if (price != null) '— \$$price',
-                          ].join(' '),
-                          style: const TextStyle(fontSize: 12, color: Colors.green, fontWeight: FontWeight.w600),
-                        ),
-                      ],
-                    ),
+                    child: Text(notes,
+                        style: const TextStyle(fontSize: 13, height: 1.4)),
                   ),
+                  const SizedBox(height: 12),
+                ],
 
-                const Divider(height: 20),
+                // Rating comments
+                if (ratingComments.isNotEmpty) ...[
+                  Row(
+                    children: [
+                      Icon(Icons.rate_review_outlined,
+                          size: 14, color: cs.secondary),
+                      const SizedBox(width: 6),
+                      Text('Review',
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: cs.secondary)),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color:
+                          cs.secondaryContainer.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(ratingComments,
+                        style: const TextStyle(fontSize: 13, height: 1.4)),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+
+                const Divider(height: 1),
+                const SizedBox(height: 10),
 
                 // ── Quantity stepper + actions ──
                 Row(
@@ -727,29 +929,37 @@ class _DetailedDrinkCard extends StatelessWidget {
                     // Quantity stepper
                     Container(
                       decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey[300]!),
+                        border: Border.all(color: cs.outlineVariant),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           IconButton(
-                            onPressed: quantity > 1 ? () => onQuantityChanged(quantity - 1) : null,
+                            onPressed: quantity > 1
+                                ? () => onQuantityChanged(quantity - 1)
+                                : null,
                             icon: const Icon(Icons.remove, size: 18),
-                            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                            constraints: const BoxConstraints(
+                                minWidth: 36, minHeight: 36),
                             padding: EdgeInsets.zero,
                             tooltip: 'Decrease',
                           ),
                           Container(
-                            constraints: const BoxConstraints(minWidth: 32),
+                            constraints:
+                                const BoxConstraints(minWidth: 32),
                             alignment: Alignment.center,
                             child: Text('$quantity',
-                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold)),
                           ),
                           IconButton(
-                            onPressed: () => onQuantityChanged(quantity + 1),
+                            onPressed: () =>
+                                onQuantityChanged(quantity + 1),
                             icon: const Icon(Icons.add, size: 18),
-                            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                            constraints: const BoxConstraints(
+                                minWidth: 36, minHeight: 36),
                             padding: EdgeInsets.zero,
                             tooltip: 'Have another',
                           ),
@@ -760,22 +970,28 @@ class _DetailedDrinkCard extends StatelessWidget {
                     // Edit button
                     IconButton(
                       onPressed: onEdit,
-                      icon: Icon(Icons.edit_outlined, size: 20, color: cs.primary),
+                      icon: Icon(Icons.edit_outlined,
+                          size: 20, color: cs.primary),
                       tooltip: 'Edit',
                       style: IconButton.styleFrom(
-                        backgroundColor: cs.primaryContainer.withValues(alpha: 0.3),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        backgroundColor:
+                            cs.primaryContainer.withValues(alpha: 0.3),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
                       ),
                     ),
                     const SizedBox(width: 4),
                     // Delete button
                     IconButton(
                       onPressed: onDelete,
-                      icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                      icon: const Icon(Icons.delete_outline,
+                          size: 20, color: Colors.red),
                       tooltip: 'Remove',
                       style: IconButton.styleFrom(
-                        backgroundColor: Colors.red.withValues(alpha: 0.08),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        backgroundColor:
+                            Colors.red.withValues(alpha: 0.08),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
                       ),
                     ),
                   ],
@@ -784,6 +1000,28 @@ class _DetailedDrinkCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _gradientHeader(ColorScheme cs) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            cs.primaryContainer,
+            cs.secondaryContainer,
+          ],
+        ),
+      ),
+      child: Center(
+        child: Icon(
+          placeType == 'brewery' ? Icons.sports_bar : Icons.wine_bar_rounded,
+          size: 36,
+          color: cs.onPrimaryContainer.withValues(alpha: 0.4),
+        ),
       ),
     );
   }
