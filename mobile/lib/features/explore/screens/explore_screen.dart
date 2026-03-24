@@ -501,6 +501,203 @@ class _NearbyPlaceCard extends StatelessWidget {
   }
 }
 
+class _FavoritePlaceCard extends StatelessWidget {
+  final Place place;
+  final VoidCallback onTap;
+  final VoidCallback onUnfavorite;
+  final VoidCallback onStartTrip;
+  const _FavoritePlaceCard({
+    required this.place, required this.onTap,
+    required this.onUnfavorite, required this.onStartTrip,
+  });
+
+  Color _typeColor(String? type) {
+    switch (type) {
+      case 'winery': return const Color(0xFF8E44AD);
+      case 'brewery': return Colors.orange;
+      case 'restaurant': return Colors.green;
+      default: return Colors.blueGrey;
+    }
+  }
+
+  IconData _typeIcon(String? type) {
+    switch (type) {
+      case 'winery': return Icons.wine_bar;
+      case 'brewery': return Icons.sports_bar;
+      case 'restaurant': return Icons.restaurant;
+      default: return Icons.place;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final typeColor = _typeColor(place.placeType);
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: Colors.grey[200]!),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Image header
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+              child: SizedBox(
+                height: 140,
+                width: double.infinity,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (place.imageUrl.isNotEmpty)
+                      Image.network(place.imageUrl, fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            color: typeColor.withValues(alpha: 0.1),
+                            child: Center(child: Icon(_typeIcon(place.placeType), size: 40, color: typeColor)),
+                          ))
+                    else
+                      Container(
+                        color: typeColor.withValues(alpha: 0.1),
+                        child: Center(child: Icon(_typeIcon(place.placeType), size: 40, color: typeColor)),
+                      ),
+                    // Favorite badge
+                    Positioned(
+                      top: 8, right: 8,
+                      child: GestureDetector(
+                        onTap: onUnfavorite,
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.favorite, size: 18, color: Colors.red),
+                        ),
+                      ),
+                    ),
+                    // Type badge
+                    Positioned(
+                      top: 8, left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: typeColor,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(_typeIcon(place.placeType), size: 12, color: Colors.white),
+                            const SizedBox(width: 4),
+                            Text(
+                              place.placeType.isNotEmpty
+                                  ? place.placeType[0].toUpperCase() + place.placeType.substring(1)
+                                  : 'Place',
+                              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Content
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Name + rating
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(place.name,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                            maxLines: 1, overflow: TextOverflow.ellipsis),
+                      ),
+                      if (place.avgRating != null) ...[
+                        const Icon(Icons.star, size: 16, color: Colors.amber),
+                        const SizedBox(width: 2),
+                        Text('${place.avgRating!.toStringAsFixed(1)}',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+
+                  // Location
+                  if (place.location.isNotEmpty)
+                    Row(
+                      children: [
+                        Icon(Icons.place, size: 14, color: Colors.grey[500]),
+                        const SizedBox(width: 4),
+                        Expanded(child: Text(place.location,
+                            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                            maxLines: 1, overflow: TextOverflow.ellipsis)),
+                      ],
+                    ),
+
+                  // Visit count
+                  if (place.visitCount > 0) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.check_circle, size: 14, color: Colors.green[400]),
+                        const SizedBox(width: 4),
+                        Text('Visited ${place.visitCount} time${place.visitCount != 1 ? 's' : ''}',
+                            style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                      ],
+                    ),
+                  ],
+
+                  // Website
+                  if (place.website.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.language, size: 14, color: Colors.grey[500]),
+                        const SizedBox(width: 4),
+                        Expanded(child: Text(
+                          place.website.replaceAll('https://', '').replaceAll('http://', '').replaceAll(RegExp(r'/$'), ''),
+                          style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.primary),
+                          maxLines: 1, overflow: TextOverflow.ellipsis,
+                        )),
+                      ],
+                    ),
+                  ],
+
+                  // Actions
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      _ActionChip(icon: Icons.directions_car, label: 'Start Trip', onTap: onStartTrip),
+                      if (place.website.isNotEmpty)
+                        _ActionChip(icon: Icons.language, label: 'Website',
+                            onTap: () => launchUrl(Uri.parse(place.website))),
+                      if (place.phone.isNotEmpty)
+                        _ActionChip(icon: Icons.phone, label: 'Call',
+                            onTap: () => launchUrl(Uri.parse('tel:${place.phone}'))),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ActionChip extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -1050,88 +1247,19 @@ class _FavoritesTab extends ConsumerWidget {
             itemCount: favorites.length,
             itemBuilder: (_, i) {
               final place = favorites[i];
-              return Card(
-                clipBehavior: Clip.antiAlias,
-                child: InkWell(
-                  onTap: () => context.push('/explore/${place.id}'),
-                  child: Row(
-                    children: [
-                      // Image
-                      SizedBox(
-                        width: 100,
-                        height: 80,
-                        child: place.imageUrl.isNotEmpty
-                            ? Image.network(place.imageUrl,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Container(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .primaryContainer,
-                                      child: const Icon(Icons.storefront),
-                                    ))
-                            : Container(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .primaryContainer,
-                                child: const Icon(Icons.storefront),
-                              ),
-                      ),
-                      // Details
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(place.name,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.w600),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis),
-                              const SizedBox(height: 2),
-                              Text(place.location,
-                                  style: Theme.of(context).textTheme.bodySmall),
-                              const SizedBox(height: 4),
-                              Text(
-                                  place.placeType.toUpperCase(),
-                                  style: TextStyle(
-                                      fontSize: 10,
-                                      color: Colors.grey[600])),
-                            ],
-                          ),
-                        ),
-                      ),
-                      // Actions
-                      Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.favorite,
-                                color: Colors.red, size: 20),
-                            tooltip: 'Remove Favorite',
-                            onPressed: () async {
-                              final api = ref.read(apiClientProvider);
-                              await api.post(
-                                  '${ApiPaths.places}${place.id}/favorite/');
-                              ref.invalidate(favoritesProvider);
-                            },
-                          ),
-                          IconButton(
-                            icon: Icon(Icons.map,
-                                size: 20,
-                                color: Theme.of(context).colorScheme.primary),
-                            tooltip: 'Start Trip',
-                            onPressed: () => startTripFromPlace(
-                              context: context,
-                              ref: ref,
-                              placeId: place.id,
-                              placeName: place.name,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+              return _FavoritePlaceCard(
+                place: place,
+                onTap: () => context.push('/explore/${place.id}'),
+                onUnfavorite: () async {
+                  final api = ref.read(apiClientProvider);
+                  await api.post('${ApiPaths.places}${place.id}/favorite/');
+                  ref.invalidate(favoritesProvider);
+                },
+                onStartTrip: () => startTripFromPlace(
+                  context: context,
+                  ref: ref,
+                  placeId: place.id,
+                  placeName: place.name,
                 ),
               );
             },
