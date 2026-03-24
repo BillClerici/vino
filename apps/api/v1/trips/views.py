@@ -261,12 +261,14 @@ class TripViewSet(ModelViewSet):
         except TripStop.DoesNotExist:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
-        # Create a visit for this stop
+        # Create a visit for this stop and link it
         visit = VisitLog.objects.create(
             user=request.user,
             place=stop.place,
             visited_at=timezone.now(),
         )
+        stop.visit = visit
+        stop.save(update_fields=["visit"])
 
         # Check for wishlist matches at this place
         from apps.wineries.models import MenuItem, WineWishlist

@@ -158,6 +158,10 @@ class TripStop(BaseModel):
     place = models.ForeignKey(
         "wineries.Place", on_delete=models.CASCADE, related_name="trip_stops"
     )
+    visit = models.ForeignKey(
+        "visits.VisitLog", on_delete=models.SET_NULL, related_name="trip_stop",
+        null=True, blank=True,
+    )
     order = models.PositiveIntegerField(default=0)
     arrival_time = models.DateTimeField(null=True, blank=True)
     duration_minutes = models.PositiveIntegerField(null=True, blank=True)

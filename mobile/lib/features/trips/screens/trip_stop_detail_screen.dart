@@ -94,7 +94,8 @@ class _TripStopDetailScreenState extends ConsumerState<TripStopDetailScreen> {
     if (trip == null) return;
     final stops = trip.tripStops ?? [];
     if (widget.stopIndex >= stops.length) return;
-    final place = stops[widget.stopIndex].place;
+    final stop = stops[widget.stopIndex];
+    final place = stop.place;
     final placeId = place?.id;
     if (placeId == null) return;
 
@@ -110,19 +111,15 @@ class _TripStopDetailScreenState extends ConsumerState<TripStopDetailScreen> {
         }
       } catch (_) {}
 
-      final resp = await api.get(
-        ApiPaths.visits,
-        queryParameters: {'place': placeId, 'page_size': '1'},
-      );
-      final data = resp.data['data'] as List<dynamic>?;
-      if (data != null && data.isNotEmpty) {
-        final visit = data.first as Map<String, dynamic>;
-        // Fetch full visit detail to get wines and ratings
-        final detailResp = await api.get('${ApiPaths.visits}${visit['id']}/');
+      // Use the stop's linked visit (trip+stop scoped) instead of
+      // querying by place which would return visits from other trips.
+      final visitId = stop.visit;
+      if (visitId != null && visitId.isNotEmpty) {
+        final detailResp = await api.get('${ApiPaths.visits}$visitId/');
         final visitDetail = detailResp.data['data'] as Map<String, dynamic>;
         if (mounted) {
           setState(() {
-            _visitId = visit['id'] as String;
+            _visitId = visitId;
             _checkedIn = true;
             _checkedExisting = true;
             _existingVisitData = visitDetail;
@@ -212,6 +209,9 @@ class _TripStopDetailScreenState extends ConsumerState<TripStopDetailScreen> {
         _checkingIn = false;
       });
 
+      // Refresh trip data so the stop's visit FK is up to date
+      ref.invalidate(tripDetailProvider(widget.tripId));
+
       // Show wishlist matches notification
       final wishlistMatches = (data['wishlist_matches'] as List?)?.cast<String>() ?? [];
       if (wishlistMatches.isNotEmpty && mounted) {
@@ -250,6 +250,8 @@ class _TripStopDetailScreenState extends ConsumerState<TripStopDetailScreen> {
         _existingVisitData = null;
       });
       _drinksSectionKey = GlobalKey<_DrinksSectionState>();
+      // Refresh trip data so stop's visit FK is cleared
+      ref.invalidate(tripDetailProvider(widget.tripId));
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

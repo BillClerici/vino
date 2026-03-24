@@ -94,6 +94,8 @@ class VisitLogViewSet(ModelViewSet):
         return VisitLogListSerializer
 
     def perform_destroy(self, instance):
+        # Clear any TripStop FK pointing to this visit
+        instance.trip_stop.filter(is_active=True).update(visit=None)
         instance.is_active = False
         instance.save(update_fields=["is_active", "updated_at"])
 

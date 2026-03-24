@@ -12,11 +12,11 @@ class TripStopSerializer(serializers.ModelSerializer):
     class Meta:
         model = TripStop
         fields = [
-            "id", "place", "order", "arrival_time", "duration_minutes",
+            "id", "place", "visit", "order", "arrival_time", "duration_minutes",
             "travel_minutes", "travel_miles", "description", "notes",
             "meeting_details", "travel_details", "created_at",
         ]
-        read_only_fields = ["id", "created_at"]
+        read_only_fields = ["id", "visit", "created_at"]
 
 
 class TripStopWriteSerializer(serializers.ModelSerializer):

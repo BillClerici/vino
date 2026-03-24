@@ -75,6 +75,7 @@ class Trip {
 class TripStop {
   final String id;
   final Place? place;
+  final String? visit;
   final int order;
   final String? arrivalTime;
   final int? durationMinutes;
@@ -86,6 +87,7 @@ class TripStop {
   const TripStop({
     required this.id,
     this.place,
+    this.visit,
     this.order = 0,
     this.arrivalTime,
     this.durationMinutes,
@@ -101,6 +103,7 @@ class TripStop {
       place: json['place'] != null
           ? Place.fromJson(json['place'] as Map<String, dynamic>)
           : null,
+      visit: json['visit'] as String?,
       order: json['order'] as int? ?? 0,
       arrivalTime: json['arrival_time'] as String?,
       durationMinutes: json['duration_minutes'] as int?,

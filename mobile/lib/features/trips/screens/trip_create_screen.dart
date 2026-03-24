@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 
 import '../../../config/constants.dart';
 import '../../../core/api/api_client.dart';
+import '../../../core/services/trip_service.dart';
 
 class TripCreateScreen extends ConsumerStatefulWidget {
   const TripCreateScreen({super.key});
@@ -14,109 +14,59 @@ class TripCreateScreen extends ConsumerStatefulWidget {
 }
 
 class _TripCreateScreenState extends ConsumerState<TripCreateScreen> {
-  final _nameController = TextEditingController();
-  final _descController = TextEditingController();
-  DateTime _scheduledDate = DateTime.now();
-  DateTime? _endDate;
-  bool _submitting = false;
+  bool _sheetShown = false;
 
   @override
-  void dispose() {
-    _nameController.dispose();
-    _descController.dispose();
-    super.dispose();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_sheetShown) {
+      _sheetShown = true;
+      // Show the bottom sheet after the frame renders
+      WidgetsBinding.instance.addPostFrameCallback((_) => _showSheet());
+    }
   }
 
-  Future<void> _submit() async {
-    if (_nameController.text.isEmpty) return;
-    setState(() => _submitting = true);
+  Future<void> _showSheet() async {
+    final input = await showStartTripSheet(context);
 
+    if (!mounted) return;
+
+    if (input == null) {
+      // User cancelled — go back to trips list
+      context.pop();
+      return;
+    }
+
+    // Create the trip
     try {
       final api = ref.read(apiClientProvider);
-      final resp = await api.post(ApiPaths.trips, data: {
-        'name': _nameController.text,
-        'description': _descController.text,
-        'scheduled_date': DateFormat('yyyy-MM-dd').format(_scheduledDate),
-        if (_endDate != null)
-          'end_date': DateFormat('yyyy-MM-dd').format(_endDate!),
+      final tripResp = await api.post(ApiPaths.trips, data: {
+        'name': input.tripName,
+        'status': 'draft',
+        'scheduled_date': input.scheduledDate,
+        'end_date': input.endDate,
+        'meeting_time': input.meetingTime,
       });
       if (mounted) {
-        final tripId = (resp.data['data'] as Map<String, dynamic>)['id'];
+        final tripId =
+            (tripResp.data['data'] as Map<String, dynamic>)['id'] as String;
         context.go('/trips/$tripId');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+        context.pop();
       }
-    } finally {
-      if (mounted) setState(() => _submitting = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Transparent scaffold — the bottom sheet is the UI
     return Scaffold(
       appBar: AppBar(title: const Text('Plan a Trip')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          TextField(
-            controller: _nameController,
-            decoration: const InputDecoration(labelText: 'Trip Name'),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _descController,
-            maxLines: 3,
-            decoration: const InputDecoration(labelText: 'Description'),
-          ),
-          const SizedBox(height: 16),
-          ListTile(
-            leading: const Icon(Icons.calendar_today),
-            title: const Text('Start Date'),
-            subtitle:
-                Text(DateFormat('MMM d, yyyy').format(_scheduledDate)),
-            onTap: () async {
-              final date = await showDatePicker(
-                context: context,
-                initialDate: _scheduledDate,
-                firstDate: DateTime.now(),
-                lastDate: DateTime.now().add(const Duration(days: 365)),
-              );
-              if (date != null) setState(() => _scheduledDate = date);
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.calendar_today),
-            title: const Text('End Date (optional)'),
-            subtitle: Text(_endDate != null
-                ? DateFormat('MMM d, yyyy').format(_endDate!)
-                : 'Not set'),
-            onTap: () async {
-              final date = await showDatePicker(
-                context: context,
-                initialDate: _endDate ?? _scheduledDate,
-                firstDate: _scheduledDate,
-                lastDate: _scheduledDate.add(const Duration(days: 30)),
-              );
-              if (date != null) setState(() => _endDate = date);
-            },
-          ),
-          const SizedBox(height: 24),
-          FilledButton(
-            onPressed: _submitting ? null : _submit,
-            child: _submitting
-                ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Text('Create Trip'),
-          ),
-        ],
-      ),
+      body: const Center(child: CircularProgressIndicator()),
     );
   }
 }
