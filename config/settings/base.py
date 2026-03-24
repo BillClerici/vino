@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'apps.trips',
     'apps.palate',
     'apps.partners',
+    'apps.notifications',
 ]
 
 MIDDLEWARE = [
@@ -228,6 +229,18 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'UTC'
 CELERY_TASK_TRACK_STARTED = True
+CELERY_BEAT_SCHEDULE = {
+    'send-trip-reminders': {
+        'task': 'apps.notifications.tasks.send_trip_reminders',
+        'schedule': 60 * 60 * 24,  # daily (configure crontab in prod)
+    },
+}
+
+# Firebase Cloud Messaging (v1 API)
+FIREBASE_PROJECT_ID = env('FIREBASE_PROJECT_ID', default='trip-me-7c9dc')
+# Auth: uses Application Default Credentials (gcloud for dev) or
+# FCM_SERVICE_ACCOUNT_JSON env var (JSON string for production).
+FCM_SERVICE_ACCOUNT_JSON = env('FCM_SERVICE_ACCOUNT_JSON', default='')
 
 # Email
 EMAIL_BACKEND = env('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')

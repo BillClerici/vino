@@ -78,6 +78,14 @@ class ApiPaths {
   static String wishlistCheck(String placeId) =>
       '/api/v1/wishlist/check/$placeId/';
 
+  /// Notifications
+  static const deviceTokenRegister = '/api/v1/notifications/device/register/';
+  static const deviceTokenUnregister = '/api/v1/notifications/device/unregister/';
+  static const notifications = '/api/v1/notifications/';
+  static String notificationDetail(String id) => '/api/v1/notifications/$id/';
+  static const notificationMarkAllRead = '/api/v1/notifications/mark-all-read/';
+  static const notificationPreferences = '/api/v1/notifications/preferences/';
+
   /// Sippy conversations
   static const conversations = '/api/v1/conversations/';
   static String conversationDetail(String id) => '/api/v1/conversations/$id/';

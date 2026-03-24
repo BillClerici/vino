@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import include, path
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -144,7 +144,7 @@ def config_view(request):
             "live_trip": True,
             "ai_palate": True,
             "label_scanner": True,
-            "push_notifications": False,
+            "push_notifications": True,
         },
         "maintenance_mode": False,
         "google_maps_api_key": settings.GOOGLE_MAPS_API_KEY,
@@ -198,6 +198,9 @@ urlpatterns = [
 
     # Wine label scanner (Gemini Vision)
     path("scan-label/", ScanLabelView.as_view(), name="scan_label"),
+
+    # Notifications
+    path("notifications/", include("apps.api.v1.notifications.urls")),
 
     # Config / feature flags
     path("config/", config_view, name="app_config"),

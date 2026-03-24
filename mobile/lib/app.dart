@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
+
 import 'config/theme.dart';
 import 'core/auth/auth_provider.dart';
+import 'core/providers/notification_provider.dart';
+import 'core/services/notification_service.dart';
 import 'core/widgets/vino_scaffold.dart';
 import 'features/auth/screens/login_screen.dart';
 import 'features/dashboard/screens/dashboard_screen.dart';
@@ -23,6 +27,7 @@ import 'features/trips/screens/wishlist_screen.dart';
 import 'features/trips/screens/trip_stop_detail_screen.dart';
 import 'features/trips/screens/trips_screen.dart';
 import 'features/help/screens/getting_started_screen.dart';
+import 'features/notifications/screens/notifications_screen.dart';
 import 'features/help/screens/help_article_screen.dart';
 import 'features/help/screens/help_index_screen.dart';
 import 'features/visits/screens/checkin_screen.dart';
@@ -142,6 +147,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             ],
           ),
           GoRoute(
+            path: '/notifications',
+            builder: (_, __) => const NotificationsScreen(),
+          ),
+          GoRoute(
             path: '/profile',
             builder: (_, __) => const ProfileScreen(),
             routes: [
@@ -228,12 +237,29 @@ class _ShellWithNav extends StatelessWidget {
   }
 }
 
-class VinoApp extends ConsumerWidget {
+class VinoApp extends ConsumerStatefulWidget {
   const VinoApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<VinoApp> createState() => _VinoAppState();
+}
+
+class _VinoAppState extends ConsumerState<VinoApp> {
+  bool _notificationsSetup = false;
+
+  @override
+  Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
+
+    // Initialize notification provider (registers FCM token on login)
+    ref.watch(notificationSetupProvider);
+
+    // Set up notification tap handlers once the router is available (mobile only)
+    if (!_notificationsSetup && !kIsWeb) {
+      _notificationsSetup = true;
+      NotificationService().setupMessageHandlers(router);
+    }
+
     return MaterialApp.router(
       title: 'Trip Me',
       theme: VinoTheme.light,
