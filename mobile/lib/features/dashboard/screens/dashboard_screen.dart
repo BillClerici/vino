@@ -8,7 +8,7 @@ import '../../../core/auth/auth_provider.dart';
 import '../../../core/services/location_service.dart';
 import '../../../core/widgets/app_drawer.dart';
 import '../../help/help_launcher.dart';
-import '../../notifications/providers/notifications_provider.dart';
+import '../../../core/widgets/notification_bell.dart';
 import '../../onboarding/onboarding_tour.dart';
 
 import '../../../core/models/place.dart';
@@ -72,7 +72,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       appBar: AppBar(
         title: const Text('Trip Me'),
         actions: [
-          _NotificationBell(),
+          const NotificationBell(),
           helpButton(context, routePrefix: '/dashboard'),
         ],
       ),
@@ -607,36 +607,6 @@ class _PageDots extends StatelessWidget {
           );
         }),
       ),
-    );
-  }
-}
-
-class _NotificationBell extends ConsumerStatefulWidget {
-  @override
-  ConsumerState<_NotificationBell> createState() => _NotificationBellState();
-}
-
-class _NotificationBellState extends ConsumerState<_NotificationBell> {
-  @override
-  void initState() {
-    super.initState();
-    // Fetch notifications on first build
-    Future.microtask(() => ref.read(notificationsProvider.notifier).fetch());
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final state = ref.watch(notificationsProvider);
-    final unread = state.unreadCount;
-
-    return IconButton(
-      onPressed: () => context.go('/notifications'),
-      icon: Badge(
-        isLabelVisible: unread > 0,
-        label: Text('$unread', style: const TextStyle(fontSize: 10)),
-        child: const Icon(Icons.notifications_outlined),
-      ),
-      tooltip: 'Notifications',
     );
   }
 }

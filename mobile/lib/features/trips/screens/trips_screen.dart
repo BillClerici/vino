@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/widgets/app_drawer.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/notification_bell.dart';
 import '../../help/help_launcher.dart';
 import '../../../core/widgets/search_bar.dart';
 import '../providers/trips_provider.dart';
@@ -28,7 +29,7 @@ class _TripsScreenState extends ConsumerState<TripsScreen> {
       drawer: const AppDrawer(),
       appBar: AppBar(
         title: const Text('My Trips'),
-        actions: [helpButton(context, routePrefix: '/trips')],
+        actions: [const NotificationBell(), helpButton(context, routePrefix: '/trips')],
       ),
       body: Column(
         children: [

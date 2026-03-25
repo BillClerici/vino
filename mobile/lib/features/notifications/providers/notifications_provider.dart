@@ -108,6 +108,19 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
       );
     } catch (_) {}
   }
+
+  Future<void> dismiss(String id) async {
+    try {
+      await _api.delete('${ApiPaths.notificationDetail(id)}dismiss/');
+      final wasUnread = state.items.any((i) => i.id == id && !i.isRead);
+      state = state.copyWith(
+        items: state.items.where((i) => i.id != id).toList(),
+        unreadCount: wasUnread
+            ? (state.unreadCount - 1).clamp(0, 9999)
+            : state.unreadCount,
+      );
+    } catch (_) {}
+  }
 }
 
 final notificationsProvider =

@@ -8,6 +8,7 @@ import '../../../config/env.dart';
 import '../../../core/models/visit.dart';
 import '../../../core/widgets/app_drawer.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/notification_bell.dart';
 import '../../../core/widgets/rating_stars.dart';
 import '../../../core/widgets/search_bar.dart';
 import '../../help/help_launcher.dart';
@@ -49,7 +50,7 @@ class _VisitsScreenState extends ConsumerState<VisitsScreen> {
       drawer: const AppDrawer(),
       appBar: AppBar(
         title: const Text('My Visits'),
-        actions: [helpButton(context, routePrefix: '/visits')],
+        actions: [const NotificationBell(), helpButton(context, routePrefix: '/visits')],
       ),
       body: Column(
         children: [

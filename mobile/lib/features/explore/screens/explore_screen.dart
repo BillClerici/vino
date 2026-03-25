@@ -7,6 +7,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/services/location_service.dart';
+import '../../../core/widgets/notification_bell.dart';
 
 import '../../../config/constants.dart';
 import '../../../config/env.dart';
@@ -50,7 +51,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen>
       drawer: const AppDrawer(),
       appBar: AppBar(
         title: const Text('Explore'),
-        actions: [helpButton(context, routePrefix: '/explore')],
+        actions: [const NotificationBell(), helpButton(context, routePrefix: '/explore')],
         bottom: TabBar(
           controller: _tabController,
           tabs: const [

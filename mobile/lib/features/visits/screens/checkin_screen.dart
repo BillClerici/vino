@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../config/constants.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/widgets/rating_stars.dart';
+import '../../../core/widgets/notification_bell.dart';
 import '../../help/help_launcher.dart';
 
 class CheckinScreen extends ConsumerStatefulWidget {
@@ -68,7 +69,7 @@ class _CheckinScreenState extends ConsumerState<CheckinScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Check In'),
-        actions: [helpButton(context, routePrefix: '/visits')],
+        actions: [const NotificationBell(), helpButton(context, routePrefix: '/visits')],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),

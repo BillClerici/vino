@@ -126,6 +126,13 @@ class NotificationViewSet(ReadOnlyModelViewSet):
         )
         return Response({"success": True, "count": count})
 
+    @action(detail=True, methods=["delete"], url_path="dismiss")
+    def dismiss(self, request, pk=None):
+        notif = self.get_object()
+        notif.is_active = False
+        notif.save(update_fields=["is_active", "updated_at"])
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 # ── Notification Preferences ─────────────────────────────────────
 

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/auth/auth_provider.dart';
 import '../../../core/widgets/app_drawer.dart';
+import '../../../core/widgets/notification_bell.dart';
 import '../../help/help_launcher.dart';
 import '../providers/profile_provider.dart';
 
@@ -19,7 +20,7 @@ class ProfileScreen extends ConsumerWidget {
       drawer: const AppDrawer(),
       appBar: AppBar(
         title: const Text('Profile'),
-        actions: [helpButton(context, routePrefix: '/profile')],
+        actions: [const NotificationBell(), helpButton(context, routePrefix: '/profile')],
       ),
       body: authState.when(
         loading: () => const Center(child: CircularProgressIndicator()),
