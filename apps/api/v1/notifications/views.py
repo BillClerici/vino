@@ -9,7 +9,6 @@ from rest_framework.viewsets import ReadOnlyModelViewSet
 from apps.notifications.fcm import send_fcm_message
 from apps.notifications.models import DeviceToken, Notification, NotificationPreference
 
-
 # ── Serializers ──────────────────────────────────────────────────
 
 class DeviceTokenSerializer(serializers.Serializer):
