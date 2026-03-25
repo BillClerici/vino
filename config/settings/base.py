@@ -238,8 +238,10 @@ CELERY_BEAT_SCHEDULE = {
 
 # Firebase Cloud Messaging (v1 API)
 FIREBASE_PROJECT_ID = env('FIREBASE_PROJECT_ID', default='trip-me-7c9dc')
-# Auth: GOOGLE_APPLICATION_CREDENTIALS_JSON (JSON string — service account or
-# authorized user) for production, or Application Default Credentials for local dev.
+# Auth: GOOGLE_REFRESH_TOKEN (simplest — just the refresh token string) or
+# GOOGLE_APPLICATION_CREDENTIALS_JSON (full JSON) for production.
+# Local dev uses Application Default Credentials via gcloud.
+GOOGLE_REFRESH_TOKEN = env('GOOGLE_REFRESH_TOKEN', default='')
 GOOGLE_APPLICATION_CREDENTIALS_JSON = env('GOOGLE_APPLICATION_CREDENTIALS_JSON', default='')
 
 # Email

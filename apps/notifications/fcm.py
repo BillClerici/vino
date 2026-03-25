@@ -41,11 +41,30 @@ def _get_credentials():
             logger.warning("Failed to refresh cached credentials — re-acquiring")
             _credentials = None
 
-    # Option 1: Google credentials JSON from env var (service account or authorized user)
+    # Option 1: Refresh token from env var (simplest — uses gcloud's public OAuth client)
+    refresh_token = getattr(settings, "GOOGLE_REFRESH_TOKEN", "")
+    if refresh_token:
+        try:
+            from google.oauth2 import credentials as user_credentials
+
+            _credentials = user_credentials.Credentials(
+                token=None,
+                refresh_token=refresh_token,
+                token_uri="https://oauth2.googleapis.com/token",
+                # Google's public gcloud CLI OAuth client (well-known, not secret)
+                client_id="764086051850-6qr4p6gpi6hn506pt8ejuq83di341hur.apps.googleusercontent.com",
+                client_secret="d-FL95Q19q7MQmFpd7hHD0Ty",
+                scopes=FCM_SCOPES,
+            )
+            _credentials.refresh(Request())
+            return _credentials
+        except Exception:
+            logger.exception("Failed to refresh Google credentials from GOOGLE_REFRESH_TOKEN")
+            return None
+
+    # Option 2: Full JSON credentials (service account or authorized user)
     creds_json = getattr(settings, "GOOGLE_APPLICATION_CREDENTIALS_JSON", "")
     if creds_json:
-        logger.info("FCM creds JSON starts with: %s... ends with: ...%s (len=%d)",
-                     creds_json[:30], creds_json[-20:], len(creds_json))
         try:
             info = json.loads(creds_json)
             cred_type = info.get("type", "")
@@ -61,7 +80,7 @@ def _get_credentials():
                     info, scopes=FCM_SCOPES
                 )
             else:
-                logger.error("Unknown credential type in GOOGLE_APPLICATION_CREDENTIALS_JSON: %s", cred_type)
+                logger.error("Unknown credential type: %s", cred_type)
                 return None
 
             _credentials.refresh(Request())
