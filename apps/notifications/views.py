@@ -50,23 +50,29 @@ class SendNotificationView(UserPassesTestMixin, TemplateView):
         sent, failed = 0, 0
         notified_users = set()
         for dt in tokens:
-            ok = send_fcm_message(
-                token=dt.token,
-                title=title,
-                body=body,
-                data={"type": "general", "route": "/notifications"},
-            )
+            try:
+                ok = send_fcm_message(
+                    token=dt.token,
+                    title=title,
+                    body=body,
+                    data={"type": "general", "route": "/notifications"},
+                )
+            except Exception:
+                ok = False
             if ok:
                 sent += 1
-                if dt.user_id not in notified_users:
-                    Notification.objects.create(
-                        user=dt.user,
-                        notification_type="general",
-                        title=title,
-                        body=body,
-                        data={"type": "general", "route": "/notifications"},
-                    )
-                    notified_users.add(dt.user_id)
+            else:
+                failed += 1
+            # Always create in-app notification regardless of push result
+            if dt.user_id not in notified_users:
+                Notification.objects.create(
+                    user=dt.user,
+                    notification_type="general",
+                    title=title,
+                    body=body,
+                    data={"type": "general", "route": "/notifications"},
+                )
+                notified_users.add(dt.user_id)
             else:
                 failed += 1
 

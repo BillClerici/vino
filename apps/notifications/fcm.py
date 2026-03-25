@@ -34,8 +34,12 @@ def _get_credentials():
         return _credentials
 
     if _credentials is not None and _credentials.expired:
-        _credentials.refresh(Request())
-        return _credentials
+        try:
+            _credentials.refresh(Request())
+            return _credentials
+        except Exception:
+            logger.warning("Failed to refresh cached credentials — re-acquiring")
+            _credentials = None
 
     # Option 1: Google credentials JSON from env var (service account or authorized user)
     creds_json = getattr(settings, "GOOGLE_APPLICATION_CREDENTIALS_JSON", "")
