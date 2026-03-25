@@ -16,13 +16,11 @@ class SendNotificationView(UserPassesTestMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx["users_with_devices"] = (
-            User.objects.filter(
-                id__in=DeviceToken.objects.filter(is_active=True)
-                .values_list("user_id", flat=True)
-                .distinct()
-            )
-            .order_by("email")
+        ctx["users"] = User.objects.filter(is_active=True).order_by("email")
+        ctx["users_with_devices"] = set(
+            DeviceToken.objects.filter(is_active=True)
+            .values_list("user_id", flat=True)
+            .distinct()
         )
         ctx["recent_notifications"] = Notification.objects.select_related(
             "user"

@@ -24,8 +24,8 @@
                             <div class="input-field col s12">
                                 <select name="user_id" id="user_id">
                                     <option value="" selected>-- Select a user --</option>
-                                    {% for u in users_with_devices %}
-                                    <option value="{{ u.id }}">{{ u.email }}{% if u.first_name %} ({{ u.first_name }} {{ u.last_name }}){% endif %}</option>
+                                    {% for u in users %}
+                                    <option value="{{ u.id }}">{{ u.email }}{% if u.first_name %} ({{ u.first_name }} {{ u.last_name }}){% endif %}{% if u.id in users_with_devices %} &#x1F4F1;{% endif %}</option>
                                     {% endfor %}
                                 </select>
                                 <label for="user_id">Recipient</label>
