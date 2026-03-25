@@ -62,7 +62,8 @@ apk:
 		--build-number=$(NEXT_BUILD) \
 		--build-name=1.0.$(NEXT_BUILD) \
 		--dart-define=API_BASE_URL=https://vino-production.up.railway.app \
-		--dart-define=GOOGLE_CLIENT_ID=520560916664-27j152ocl7l7ksq3madpf4eb45uplpn7.apps.googleusercontent.com
+		--dart-define=GOOGLE_CLIENT_ID=520560916664-27j152ocl7l7ksq3madpf4eb45uplpn7.apps.googleusercontent.com \
+		--dart-define=BUILD_NUMBER=$(NEXT_BUILD)
 	@echo "APK built: mobile/build/app/outputs/flutter-apk/app-release.apk"
 
 ECR_BASE ?= {account}.dkr.ecr.us-east-1.amazonaws.com/vino
