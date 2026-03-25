@@ -162,7 +162,9 @@ class _NearbyTabState extends ConsumerState<_NearbyTab> {
   Future<void> _loadNearby() async {
     setState(() { _loading = true; _error = null; });
     try {
-      final loc = await ref.read(userLocationProvider.future);
+      // Always get a fresh GPS position instead of using cached provider
+      final position = await getUserLocation();
+      final loc = LatLng(position.latitude, position.longitude);
       final api = ref.read(apiClientProvider);
       final resp = await api.get(ApiPaths.nearbyPlaces, queryParameters: {
         'lat': '${loc.latitude}',
@@ -746,6 +748,18 @@ class _PlaceMapTabState extends ConsumerState<_PlaceMapTab>
   void initState() {
     super.initState();
     _search(fitMap: false);
+    _centerOnUserLocation();
+  }
+
+  Future<void> _centerOnUserLocation() async {
+    try {
+      final position = await getUserLocation();
+      _mapController?.animateCamera(CameraUpdate.newLatLng(
+        LatLng(position.latitude, position.longitude),
+      ));
+    } catch (_) {
+      // Fall back to default if GPS unavailable
+    }
   }
 
   @override
