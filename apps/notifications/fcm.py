@@ -18,7 +18,7 @@ from google.oauth2 import service_account
 
 logger = logging.getLogger(__name__)
 
-FCM_SCOPES = ["https://www.googleapis.com/auth/firebase.messaging"]
+FCM_SCOPES = ["https://www.googleapis.com/auth/cloud-platform"]
 
 # Module-level cached credentials — refreshed automatically when expired.
 _credentials = None
