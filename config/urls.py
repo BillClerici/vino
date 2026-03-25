@@ -19,6 +19,7 @@ from apps.core.feature_views import (
     WishlistView,
 )
 from apps.core.views import AppSettingsView, LandingPageView, SetTimezoneView
+from apps.notifications.views import SendNotificationView
 from apps.partners.urls import admin_patterns as partner_admin_patterns
 from apps.partners.urls import partner_portal_patterns
 from apps.rbac.views import (
@@ -122,6 +123,8 @@ urlpatterns = [
     path('manage/places/create/', PlaceAdminCreateView.as_view(), name='admin_places_create'),
     path('manage/places/<uuid:pk>/edit/', PlaceAdminEditView.as_view(), name='admin_places_edit'),
     path('manage/places/<uuid:pk>/delete/', PlaceAdminDeleteView.as_view(), name='admin_places_delete'),
+    # Notifications admin
+    path('manage/notifications/', SendNotificationView.as_view(), name='admin_send_notification'),
     # Partner admin
     path('manage/', include(partner_admin_patterns)),
     path('auth/', include('social_django.urls', namespace='social')),

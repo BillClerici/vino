@@ -323,12 +323,12 @@
         <!-- Sys Admin section -->
         <li class="no-padding">
             <ul class="collapsible collapsible-accordion">
-                <li class="admin-collapsible {% if 'admin_users' in request.resolver_match.url_name or 'admin_roles' in request.resolver_match.url_name or 'admin_controlpoints' in request.resolver_match.url_name or 'admin_cpgroups' in request.resolver_match.url_name or 'admin_lookups' in request.resolver_match.url_name or request.resolver_match.url_name == 'app_settings' %}active{% endif %}">
+                <li class="admin-collapsible {% if 'admin_users' in request.resolver_match.url_name or 'admin_roles' in request.resolver_match.url_name or 'admin_controlpoints' in request.resolver_match.url_name or 'admin_cpgroups' in request.resolver_match.url_name or 'admin_lookups' in request.resolver_match.url_name or request.resolver_match.url_name == 'app_settings' or request.resolver_match.url_name == 'admin_send_notification' %}active{% endif %}">
                     <a class="collapsible-header">
                         <i class="material-icons">admin_panel_settings</i>Sys Admin
                         <i class="material-icons right" style="margin-left:auto;">expand_more</i>
                     </a>
-                    <div class="collapsible-body" {% if 'admin_users' in request.resolver_match.url_name or 'admin_roles' in request.resolver_match.url_name or 'admin_controlpoints' in request.resolver_match.url_name or 'admin_cpgroups' in request.resolver_match.url_name or 'admin_lookups' in request.resolver_match.url_name or request.resolver_match.url_name == 'app_settings' %}style="display: block;"{% endif %}>
+                    <div class="collapsible-body" {% if 'admin_users' in request.resolver_match.url_name or 'admin_roles' in request.resolver_match.url_name or 'admin_controlpoints' in request.resolver_match.url_name or 'admin_cpgroups' in request.resolver_match.url_name or 'admin_lookups' in request.resolver_match.url_name or request.resolver_match.url_name == 'app_settings' or request.resolver_match.url_name == 'admin_send_notification' %}style="display: block;"{% endif %}>
                         <ul>
                             <li class="{% if request.resolver_match.url_name == 'app_settings' %}active{% endif %}">
                                 <a href="{% url 'app_settings' %}"><i class="material-icons">settings</i>App Settings</a>
@@ -347,6 +347,9 @@
                             </li>
                             <li class="{% if request.resolver_match.url_name == 'admin_lookups_list' %}active{% endif %}">
                                 <a href="{% url 'admin_lookups_list' %}"><i class="material-icons">list</i>Lookup Items</a>
+                            </li>
+                            <li class="{% if request.resolver_match.url_name == 'admin_send_notification' %}active{% endif %}">
+                                <a href="{% url 'admin_send_notification' %}"><i class="material-icons">notifications_active</i>Send Notification</a>
                             </li>
                         </ul>
                     </div>
