@@ -44,6 +44,8 @@ def _get_credentials():
     # Option 1: Google credentials JSON from env var (service account or authorized user)
     creds_json = getattr(settings, "GOOGLE_APPLICATION_CREDENTIALS_JSON", "")
     if creds_json:
+        logger.info("FCM creds JSON starts with: %s... ends with: ...%s (len=%d)",
+                     creds_json[:30], creds_json[-20:], len(creds_json))
         try:
             info = json.loads(creds_json)
             cred_type = info.get("type", "")
