@@ -1,11 +1,12 @@
 from django.utils import timezone
 from rest_framework import serializers, status
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
+from apps.notifications.fcm import send_fcm_message
 from apps.notifications.models import DeviceToken, Notification, NotificationPreference
 
 
@@ -142,3 +143,38 @@ class NotificationPreferenceView(APIView):
         ser.is_valid(raise_exception=True)
         ser.save()
         return Response(ser.data)
+
+
+# ── Test Push (superuser only) ──────────────────────────────────
+
+class TestPushView(APIView):
+    permission_classes = [IsAdminUser]
+
+    def post(self, request):
+        """Send a test push notification to the requesting user's devices."""
+        tokens = DeviceToken.objects.filter(user=request.user, is_active=True)
+        if not tokens.exists():
+            return Response(
+                {"detail": "No registered device tokens"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        results = []
+        for dt in tokens:
+            ok = send_fcm_message(
+                token=dt.token,
+                title="Vino Test",
+                body="Push notifications are working!",
+                data={"type": "general", "route": "/notifications"},
+            )
+            results.append({"device_type": dt.device_type, "success": ok})
+
+        Notification.objects.create(
+            user=request.user,
+            notification_type="general",
+            title="Vino Test",
+            body="Push notifications are working!",
+            data={"type": "general", "route": "/notifications"},
+        )
+
+        return Response({"results": results})
