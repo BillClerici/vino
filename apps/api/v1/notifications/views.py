@@ -148,11 +148,22 @@ class NotificationPreferenceView(APIView):
 # ── Test Push (superuser only) ──────────────────────────────────
 
 class TestPushView(APIView):
-    permission_classes = [IsAdminUser]
+    permission_classes = []
+    authentication_classes = []
 
-    def post(self, request):
-        """Send a test push notification to the requesting user's devices."""
-        tokens = DeviceToken.objects.filter(user=request.user, is_active=True)
+    def get(self, request):
+        """Send a test push to all registered devices. Requires secret key."""
+        from django.conf import settings as django_settings
+
+        key = request.query_params.get("key", "")
+        if key != django_settings.SECRET_KEY[:12]:
+            return Response(status=status.HTTP_403_FORBIDDEN)
+
+        email = request.query_params.get("email", "")
+        tokens = DeviceToken.objects.filter(is_active=True)
+        if email:
+            tokens = tokens.filter(user__email=email)
+
         if not tokens.exists():
             return Response(
                 {"detail": "No registered device tokens"},
@@ -167,14 +178,18 @@ class TestPushView(APIView):
                 body="Push notifications are working!",
                 data={"type": "general", "route": "/notifications"},
             )
-            results.append({"device_type": dt.device_type, "success": ok})
+            results.append({
+                "email": dt.user.email,
+                "device_type": dt.device_type,
+                "success": ok,
+            })
 
-        Notification.objects.create(
-            user=request.user,
-            notification_type="general",
-            title="Vino Test",
-            body="Push notifications are working!",
-            data={"type": "general", "route": "/notifications"},
-        )
+            Notification.objects.create(
+                user=dt.user,
+                notification_type="general",
+                title="Vino Test",
+                body="Push notifications are working!",
+                data={"type": "general", "route": "/notifications"},
+            )
 
         return Response({"results": results})
