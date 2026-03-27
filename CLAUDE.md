@@ -95,7 +95,7 @@ OAuth2 only (Google + Microsoft) — normal users have `set_unusable_password()`
 
 ## AI / LangGraph Architecture
 
-- **Multi-LLM**: `apps/api/ai_utils.py` — `get_claude()` (Claude Sonnet for reasoning) and `get_gemini()` (Gemini 1.5 Pro for vision)
+- **Multi-LLM**: `apps/api/ai_utils.py` — `get_claude()` (Claude Sonnet for reasoning), `get_claude_fast()` (Claude Haiku for trip planning tool-calling), and `get_gemini()` (Gemini 1.5 Pro for vision)
 - **LangGraph**: `apps/api/agents/graph.py` — `VinoState` TypedDict tracks palate profile, trip context, messages, and working data. Two graphs: `palate` (analyze → search) and `trip` (aggregate → search → itinerary)
 - **State persistence**: `langgraph-checkpoint-postgres` writes `VinoState` as JSONB after each node. Thread ID = user UUID or trip UUID. Django models are durable business records; graph state is agent working memory
 - **Env vars**: `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY` (Gemini), `PINECONE_API_KEY`, `PINECONE_INDEX_NAME`
@@ -104,4 +104,5 @@ OAuth2 only (Google + Microsoft) — normal users have `set_unusable_password()`
 
 - **NEVER** modify, blank out, or replace values in `.env`, `.env.docker`, or `.env.example` — these contain pre-configured working credentials
 - **ALWAYS** use `LookupValue` (parent-child hierarchy in `apps.lookup`) for dropdown/select lists instead of hardcoded `TextChoices` on models. This allows admins to manage list values through the Lookup Items admin UI without code changes. Use FK to `LookupValue` on the model, and filter by `parent__code` in forms. Status/workflow fields that drive code logic (e.g., `pending`/`approved`) are the exception — those stay as `TextChoices`.
+- **ALL dates displayed in the UI** must use **MM/DD/YYYY** format. This applies everywhere: Trip Preview cards, list views, detail pages, chat messages, and both Flutter (mobile) and HTML (web) templates. In Flutter use `DateFormat('MM/dd/yyyy')` from `intl`; in Django templates use `{{ date|date:"m/d/Y" }}`; in JavaScript use `toLocaleDateString('en-US')` or equivalent.
 - CI runs on every push: ruff check → mypy → pytest (see `.github/workflows/ci.yml`)

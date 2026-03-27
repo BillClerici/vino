@@ -1,6 +1,6 @@
 import 'dart:async' show Timer;
 
-import 'dart:ui' show PointerDeviceKind;
+import 'dart:ui' show FontFeature, PointerDeviceKind;
 
 import 'package:dio/dio.dart' show DioException, Options;
 import 'package:flutter/material.dart';
@@ -136,6 +136,7 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
   bool _sending = false;
   bool _loadingHistory = false;
   String _thinkingText = 'Sippy is thinking...';
+  int _elapsedSeconds = 0;
   String? _sessionId;
   String? _conversationId;
   String _phase = 'gathering';
@@ -358,7 +359,8 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
   /// Get the user's GPS coordinates, or null if unavailable.
   Future<Map<String, double>?> _getUserCoords() async {
     try {
-      final loc = await ref.read(userLocationProvider.future);
+      final loc = await ref.read(userLocationProvider.future)
+          .timeout(const Duration(seconds: 5));
       if (loc != defaultLocation) {
         return {'lat': loc.latitude, 'lng': loc.longitude};
       }
@@ -549,7 +551,7 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
     }
     _scrollToBottom();
 
-    // Cycle thinking messages
+    // Cycle thinking messages + elapsed timer
     final isApproving = action == 'approve';
     final thinkingMessages = isApproving
         ? [
@@ -566,7 +568,13 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
             'Almost there...',
           ];
     int thinkingIdx = 0;
-    final thinkingTimer = Timer.periodic(const Duration(seconds: 6), (_) {
+    setState(() => _elapsedSeconds = 0);
+    final elapsedTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted && _sending) {
+        setState(() => _elapsedSeconds++);
+      }
+    });
+    final thinkingTimer = Timer.periodic(const Duration(seconds: 3), (_) {
       if (mounted && _sending) {
         thinkingIdx = (thinkingIdx + 1) % thinkingMessages.length;
         setState(() => _thinkingText = thinkingMessages[thinkingIdx]);
@@ -607,6 +615,7 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
       final convId = data['conversation_id'] as String?;
 
       thinkingTimer.cancel();
+      elapsedTimer.cancel();
       if (mounted) {
         setState(() {
           if (reply.isNotEmpty) {
@@ -639,6 +648,7 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
       }
     } catch (e) {
       thinkingTimer.cancel();
+      elapsedTimer.cancel();
 
       if (e is DioException && e.response?.data is Map) {
         final errData = e.response!.data as Map;
@@ -894,7 +904,10 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
                     );
                   }
 
-                  // Typing indicator
+                  // Typing indicator with stopwatch
+                  final mins = _elapsedSeconds ~/ 60;
+                  final secs = _elapsedSeconds % 60;
+                  final elapsed = '$mins:${secs.toString().padLeft(2, '0')}';
                   return Align(
                     alignment: Alignment.centerLeft,
                     child: Padding(
@@ -909,6 +922,13 @@ class _SippyPlannerChatState extends ConsumerState<_SippyPlannerChat> {
                           const SizedBox(width: 8),
                           Text(_thinkingText,
                               style: const TextStyle(color: Colors.grey)),
+                          const SizedBox(width: 8),
+                          Text(elapsed,
+                              style: TextStyle(
+                                color: Colors.grey.shade400,
+                                fontSize: 12,
+                                fontFeatures: const [FontFeature.tabularFigures()],
+                              )),
                         ],
                       ),
                     ),
@@ -1151,9 +1171,7 @@ class _TripPreviewCard extends StatelessWidget {
   String _formatDate(String isoDate) {
     try {
       final dt = DateTime.parse(isoDate);
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      return '${days[dt.weekday - 1]}, ${months[dt.month - 1]} ${dt.day}, ${dt.year}';
+      return DateFormat('MM/dd/yyyy').format(dt);
     } catch (_) {
       return isoDate;
     }
@@ -1174,86 +1192,146 @@ class _TripPreviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final stops = (trip['stops'] as List?) ?? [];
     final name = trip['name'] as String? ?? 'Trip';
+    final description = trip['description'] as String? ?? '';
     final scheduledDate = trip['scheduled_date'] as String? ?? '';
     final endDate = trip['end_date'] as String? ?? '';
     final isSameDay = endDate.isEmpty || endDate == scheduledDate;
 
+    // Collect first place image for hero banner
+    String? heroImage;
+    for (final s in stops) {
+      final place = (s as Map<String, dynamic>)['place'] as Map<String, dynamic>? ?? {};
+      final img = place['image_url'] as String? ?? '';
+      if (img.isNotEmpty) { heroImage = img; break; }
+    }
+
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
-      elevation: 3,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 4,
+      shadowColor: Colors.black26,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: colorScheme.primaryContainer,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Row(
-                  children: [
-                    Icon(Icons.auto_awesome, size: 18),
-                    SizedBox(width: 8),
-                    Text('TRIP PREVIEW',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                  ],
+          // Hero header with gradient overlay
+          Stack(
+            children: [
+              Container(
+                width: double.infinity,
+                height: heroImage != null ? 140 : 100,
+                decoration: BoxDecoration(
+                  gradient: heroImage == null
+                      ? const LinearGradient(
+                          colors: [Color(0xFF6C3483), Color(0xFF2980B9)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        )
+                      : null,
                 ),
-                const SizedBox(height: 8),
-                Text(name, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 4),
-                if (scheduledDate.isNotEmpty)
-                  Row(
-                    children: [
-                      Icon(Icons.calendar_today, size: 14, color: Colors.grey[700]),
-                      const SizedBox(width: 6),
-                      Text(
-                        isSameDay
-                            ? _formatDate(scheduledDate)
-                            : '${_formatDate(scheduledDate)} — ${_formatDate(endDate)}',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.grey[700]),
-                      ),
-                    ],
+                child: heroImage != null
+                    ? Image.network(heroImage, fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [Color(0xFF6C3483), Color(0xFF2980B9)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                          ),
+                        ))
+                    : null,
+              ),
+              // Dark scrim for text readability
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.black.withValues(alpha: 0.15), Colors.black.withValues(alpha: 0.7)],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
                   ),
-                if (stops.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      Icon(Icons.place, size: 14, color: Colors.grey[600]),
-                      const SizedBox(width: 6),
-                      Text(
-                        '${stops.length} stops',
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                      ),
-                      if (stops.first is Map &&
-                          (stops.first as Map)['arrival_time'] != null &&
-                          ((stops.first as Map)['arrival_time'] as String).isNotEmpty) ...[
-                        Text(' · ', style: TextStyle(color: Colors.grey[400])),
-                        Icon(Icons.access_time, size: 14, color: Colors.grey[600]),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Starts ${_formatTime((stops.first as Map)['arrival_time'] as String)}',
-                          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+              ),
+              // Header content
+              Positioned(
+                left: 16, right: 16, bottom: 12,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.withValues(alpha: 0.9),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.auto_awesome, size: 12, color: Colors.black87),
+                              SizedBox(width: 4),
+                              Text('TRIP PREVIEW',
+                                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800,
+                                      letterSpacing: 1.2, color: Colors.black87)),
+                            ],
+                          ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(name,
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold,
+                            color: Colors.white, height: 1.2)),
+                    if (description.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(description,
+                          style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.85)),
+                          maxLines: 2, overflow: TextOverflow.ellipsis),
                     ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          // Date + stats chips row
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                if (scheduledDate.isNotEmpty)
+                  _InfoChip(
+                    icon: Icons.calendar_today,
+                    label: isSameDay
+                        ? _formatDate(scheduledDate)
+                        : '${_formatDate(scheduledDate)} — ${_formatDate(endDate)}',
                   ),
-                ],
+                if (stops.isNotEmpty)
+                  _InfoChip(icon: Icons.place, label: '${stops.length} stops'),
+                if (stops.isNotEmpty &&
+                    stops.first is Map &&
+                    (stops.first as Map)['arrival_time'] != null &&
+                    ((stops.first as Map)['arrival_time'] as String).isNotEmpty)
+                  _InfoChip(
+                    icon: Icons.access_time,
+                    label: 'Starts ${_formatTime((stops.first as Map)['arrival_time'] as String)}',
+                  ),
               ],
             ),
           ),
 
-          // Stops
+          const Divider(height: 20, indent: 16, endIndent: 16),
+
+          // Stops timeline
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
             child: Column(
               children: List.generate(stops.length, (i) {
                 final stop = stops[i] as Map<String, dynamic>;
@@ -1266,76 +1344,117 @@ class _TripPreviewCard extends StatelessWidget {
                 final notes = stop['notes'] as String? ?? '';
                 final arrivalTime = stop['arrival_time'] as String? ?? '';
                 final location = [city, state].where((s) => s.isNotEmpty).join(', ');
+                final placeImage = place['image_url'] as String? ?? '';
+                final typeColor = _placeTypeColor(placeType);
 
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.only(bottom: 4),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Time + timeline dot
                       SizedBox(
                         width: 52,
-                        height: 28,
-                        child: Align(
-                          alignment: Alignment.center,
-                          child: arrivalTime.isNotEmpty
-                              ? Text(
-                                  _formatTime(arrivalTime),
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: colorScheme.primary,
-                                  ),
-                                )
-                              : Text('Stop ${i + 1}',
-                                  style: TextStyle(fontSize: 10, color: Colors.grey[500])),
+                        child: Column(
+                          children: [
+                            const SizedBox(height: 2),
+                            arrivalTime.isNotEmpty
+                                ? Text(
+                                    _formatTime(arrivalTime),
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: typeColor,
+                                    ),
+                                  )
+                                : Text('Stop ${i + 1}',
+                                    style: TextStyle(fontSize: 10, color: Colors.grey[500])),
+                          ],
                         ),
                       ),
+                      // Timeline rail
                       Column(
                         children: [
                           Container(
-                            width: 28, height: 28,
+                            width: 30, height: 30,
                             decoration: BoxDecoration(
-                              color: _placeTypeColor(placeType).withValues(alpha: 0.15),
+                              color: typeColor.withValues(alpha: 0.12),
                               shape: BoxShape.circle,
+                              border: Border.all(color: typeColor.withValues(alpha: 0.4), width: 1.5),
                             ),
                             child: Center(
                               child: Icon(_placeTypeIcon(placeType),
-                                  size: 14, color: _placeTypeColor(placeType)),
+                                  size: 14, color: typeColor),
                             ),
                           ),
                           if (i < stops.length - 1)
                             Container(
-                              width: 2, height: 24,
-                              color: Colors.grey[300],
+                              width: 2, height: 28,
+                              margin: const EdgeInsets.symmetric(vertical: 2),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [typeColor.withValues(alpha: 0.4), Colors.grey.shade300],
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                ),
+                              ),
                             ),
                         ],
                       ),
                       const SizedBox(width: 10),
+                      // Stop details + thumbnail
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(placeName,
-                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                            if (location.isNotEmpty)
-                              Text(location,
-                                  style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-                            Row(
-                              children: [
-                                Icon(Icons.timer_outlined, size: 12, color: Colors.grey[500]),
-                                const SizedBox(width: 4),
-                                Text('~$duration min',
-                                    style: TextStyle(fontSize: 11, color: Colors.grey[500])),
-                              ],
-                            ),
-                            if (notes.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 2),
-                                child: Text(notes,
-                                    style: TextStyle(fontSize: 11, color: Colors.grey[600], fontStyle: FontStyle.italic),
-                                    maxLines: 2, overflow: TextOverflow.ellipsis),
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 6),
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey.shade200),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(placeName,
+                                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                                    if (location.isNotEmpty)
+                                      Text(location,
+                                          style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                                    const SizedBox(height: 3),
+                                    Row(
+                                      children: [
+                                        Icon(Icons.timer_outlined, size: 12, color: Colors.grey[500]),
+                                        const SizedBox(width: 4),
+                                        Text('~$duration min',
+                                            style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+                                      ],
+                                    ),
+                                    if (notes.isNotEmpty)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 3),
+                                        child: Text(notes,
+                                            style: TextStyle(fontSize: 11, color: Colors.grey[600],
+                                                fontStyle: FontStyle.italic),
+                                            maxLines: 2, overflow: TextOverflow.ellipsis),
+                                      ),
+                                  ],
+                                ),
                               ),
-                          ],
+                              if (placeImage.isNotEmpty) ...[
+                                const SizedBox(width: 8),
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.network(placeImage,
+                                      width: 56, height: 56, fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+                                ),
+                              ],
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -1350,7 +1469,7 @@ class _TripPreviewCard extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
                 child: SizedBox(
                   height: 150,
                   child: _PreviewRouteMap(stops: stops),
@@ -1360,24 +1479,25 @@ class _TripPreviewCard extends StatelessWidget {
 
           // Hint + action buttons
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+            padding: const EdgeInsets.fromLTRB(14, 4, 14, 4),
             child: Text(
               'Type below to request changes, or approve:',
               style: TextStyle(fontSize: 11, color: Colors.grey[500]),
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
             child: Row(
               children: [
                 Expanded(
                   child: FilledButton.icon(
                     onPressed: onApprove,
-                    icon: const Icon(Icons.check, size: 18),
+                    icon: const Icon(Icons.check_circle_outline, size: 18),
                     label: const Text('Looks Good!'),
                     style: FilledButton.styleFrom(
-                      backgroundColor: Colors.green[700],
-                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      backgroundColor: const Color(0xFF27AE60),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                   ),
                 ),
@@ -1391,6 +1511,34 @@ class _TripPreviewCard extends StatelessWidget {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Small info chip for date/stops/time in the preview header.
+class _InfoChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  const _InfoChip({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(icon, size: 14, color: Colors.grey[700]),
+          const SizedBox(width: 5),
+          Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.grey[700])),
         ],
       ),
     );

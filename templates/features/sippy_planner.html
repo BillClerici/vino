@@ -69,31 +69,130 @@
     }
     .trip-preview {
         background: #fff;
-        border: 2px solid #2c3e50;
-        border-radius: 12px;
-        padding: 16px;
+        border-radius: 16px;
         margin: 8px 0;
+        overflow: hidden;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.12);
     }
-    .trip-preview h6 { margin: 0 0 8px; }
+    .trip-preview-header {
+        background: linear-gradient(135deg, #6C3483, #2980B9);
+        padding: 20px 16px 16px;
+        color: #fff;
+        position: relative;
+    }
+    .trip-preview-header .preview-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        background: rgba(255,193,7,0.9);
+        color: #333;
+        font-size: 0.65rem;
+        font-weight: 800;
+        letter-spacing: 1.2px;
+        padding: 3px 8px;
+        border-radius: 6px;
+        margin-bottom: 8px;
+    }
+    .trip-preview-header h6 {
+        margin: 0;
+        color: #fff;
+        font-size: 1.2rem;
+        font-weight: 700;
+    }
+    .trip-preview-header .preview-desc {
+        font-size: 0.8rem;
+        color: rgba(255,255,255,0.85);
+        margin: 4px 0 0;
+    }
+    .trip-preview .info-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 12px 16px 4px;
+    }
+    .trip-preview .info-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        background: #f5f5f5;
+        border: 1px solid #e0e0e0;
+        border-radius: 20px;
+        padding: 4px 10px;
+        font-size: 0.8rem;
+        color: #555;
+    }
+    .trip-preview .info-chip i { font-size: 14px; color: #666; }
+    .trip-preview-header.has-hero {
+        background: none;
+        padding: 0;
+        min-height: 140px;
+        position: relative;
+        overflow: hidden;
+    }
+    .trip-preview-header.has-hero .hero-img {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    .trip-preview-header.has-hero .hero-scrim {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.7));
+    }
+    .trip-preview-header.has-hero .hero-content {
+        position: relative;
+        padding: 20px 16px 16px;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        min-height: 140px;
+    }
     .trip-preview .stop-row {
         display: flex;
         align-items: start;
         gap: 10px;
-        padding: 6px 0;
+        padding: 6px 16px;
     }
     .trip-preview .stop-time {
-        min-width: 60px;
-        font-size: 0.8rem;
-        font-weight: 600;
-        color: #2c3e50;
+        min-width: 56px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        padding-top: 6px;
     }
-    .trip-preview .stop-dot {
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-        background: #8e44ad;
-        margin-top: 4px;
+    .trip-preview .stop-timeline {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
         flex-shrink: 0;
+    }
+    .trip-preview .stop-icon {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+    .trip-preview .stop-icon i { font-size: 14px; }
+    .trip-preview .stop-connector {
+        width: 2px;
+        height: 28px;
+        margin: 2px 0;
+    }
+    .trip-preview .stop-card {
+        flex: 1;
+        background: #fafafa;
+        border: 1px solid #eee;
+        border-radius: 12px;
+        padding: 10px;
+        margin-bottom: 4px;
+    }
+    .trip-preview .stop-card strong { font-size: 0.9rem; }
+    .trip-preview .preview-actions {
+        padding: 8px 16px 16px;
     }
     .suggestions {
         display: flex;
@@ -223,50 +322,167 @@ function addMessage(role, text) {
     scrollToBottom();
 }
 
-function showThinking(text) {
+let thinkingTimers = [];
+function showThinking(text, isApproving) {
     const el = document.getElementById('chat-messages');
     const div = document.createElement('div');
     div.id = 'thinking';
     div.className = 'thinking';
-    div.innerHTML = `<div class="preloader-wrapper spinner active"><div class="spinner-layer spinner-blue-only"><div class="circle-clipper left"><div class="circle"></div></div></div></div> ${text}`;
+    div.innerHTML = `<div class="preloader-wrapper spinner active"><div class="spinner-layer spinner-blue-only"><div class="circle-clipper left"><div class="circle"></div></div></div></div> <span id="thinking-text">${text}</span> <span id="thinking-elapsed" style="color:#bbb;font-size:0.8rem;font-variant-numeric:tabular-nums;margin-left:6px;">0:00</span>`;
     el.appendChild(div);
     scrollToBottom();
+
+    const messages = isApproving
+        ? ['Creating your trip...', 'Setting up your stops...', 'Calculating drive times...', 'Adding the finishing touches...']
+        : ['Sippy is searching for spots...', 'Checking menus and reviews...', 'Building your itinerary...', 'Mapping out the best route...', 'Almost there...'];
+    let msgIdx = 0;
+    let elapsed = 0;
+
+    thinkingTimers.push(setInterval(() => {
+        elapsed++;
+        const m = Math.floor(elapsed / 60);
+        const s = (elapsed % 60).toString().padStart(2, '0');
+        const elEl = document.getElementById('thinking-elapsed');
+        if (elEl) elEl.textContent = `${m}:${s}`;
+    }, 1000));
+
+    thinkingTimers.push(setInterval(() => {
+        msgIdx = (msgIdx + 1) % messages.length;
+        const txtEl = document.getElementById('thinking-text');
+        if (txtEl) txtEl.textContent = messages[msgIdx];
+    }, 3000));
 }
 
 function hideThinking() {
     const el = document.getElementById('thinking');
     if (el) el.remove();
+    thinkingTimers.forEach(t => clearInterval(t));
+    thinkingTimers = [];
+}
+
+function formatDateMMDDYYYY(isoDate) {
+    if (!isoDate) return '';
+    const parts = isoDate.split('-');
+    if (parts.length !== 3) return isoDate;
+    return `${parts[1]}/${parts[2]}/${parts[0]}`;
+}
+
+function formatTime12h(hhmm) {
+    if (!hhmm) return '';
+    const parts = hhmm.split(':');
+    let hour = parseInt(parts[0], 10);
+    const min = parts[1] || '00';
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    hour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
+    return `${hour}:${min} ${ampm}`;
+}
+
+function placeTypeIcon(type) {
+    switch (type) {
+        case 'winery': return 'wine_bar';
+        case 'brewery': return 'sports_bar';
+        case 'restaurant': return 'restaurant';
+        default: return 'place';
+    }
+}
+
+function placeTypeColor(type) {
+    switch (type) {
+        case 'winery': return '#8E44AD';
+        case 'brewery': return '#FF9800';
+        case 'restaurant': return '#4CAF50';
+        default: return '#607D8B';
+    }
 }
 
 function showPreview(trip) {
     const el = document.getElementById('chat-messages');
     const stops = trip.stops || [];
+    const dateStr = trip.scheduled_date ? formatDateMMDDYYYY(trip.scheduled_date) : '';
+    const endDateStr = trip.end_date && trip.end_date !== trip.scheduled_date ? formatDateMMDDYYYY(trip.end_date) : '';
+    const dateLabel = endDateStr ? `${dateStr} — ${endDateStr}` : dateStr;
+    const firstTime = stops.length && stops[0].arrival_time ? formatTime12h(stops[0].arrival_time) : '';
+
+    // Find first stop with an image for the hero banner
+    let heroImage = '';
+    for (const s of stops) {
+        const img = (s.place || {}).image_url || '';
+        if (img) { heroImage = img; break; }
+    }
+
     let stopsHtml = stops.map((s, i) => {
         const p = s.place || {};
-        const time = s.arrival_time || '';
+        const time = s.arrival_time ? formatTime12h(s.arrival_time) : `Stop ${i + 1}`;
         const loc = [p.city, p.state].filter(Boolean).join(', ');
+        const pType = p.place_type || 'winery';
+        const color = placeTypeColor(pType);
+        const icon = placeTypeIcon(pType);
+        const imgHtml = p.image_url ? `<img src="${p.image_url}" style="width:52px;height:52px;border-radius:8px;object-fit:cover;margin-left:8px;flex-shrink:0;" onerror="this.style.display='none'">` : '';
+        const notes = s.notes ? `<div style="font-size:0.75rem;color:#666;font-style:italic;margin-top:3px;">${s.notes}</div>` : '';
+        const connector = i < stops.length - 1
+            ? `<div class="stop-connector" style="background:linear-gradient(to bottom, ${color}66, #e0e0e0);"></div>`
+            : '';
         return `<div class="stop-row">
-            <span class="stop-time">${time}</span>
-            <span class="stop-dot"></span>
-            <div><strong>${p.name || 'Stop ' + (i+1)}</strong>${loc ? '<br><small style="color:#999;">' + loc + '</small>' : ''}<br><small style="color:#666;">~${s.duration_minutes || 60} min</small></div>
+            <span class="stop-time" style="color:${color};">${time}</span>
+            <div class="stop-timeline">
+                <div class="stop-icon" style="background:${color}1F;border:1.5px solid ${color}66;">
+                    <i class="material-icons" style="color:${color};">${icon}</i>
+                </div>
+                ${connector}
+            </div>
+            <div class="stop-card" style="display:flex;align-items:start;">
+                <div style="flex:1;">
+                    <strong>${p.name || 'Stop ' + (i+1)}</strong>
+                    ${loc ? '<br><small style="color:#999;">' + loc + '</small>' : ''}
+                    <div style="margin-top:3px;"><small style="color:#666;"><i class="material-icons" style="font-size:12px;vertical-align:middle;">timer</i> ~${s.duration_minutes || 60} min</small></div>
+                    ${notes}
+                </div>
+                ${imgHtml}
+            </div>
         </div>`;
     }).join('');
+
+    let chipsHtml = '';
+    if (dateLabel) chipsHtml += `<span class="info-chip"><i class="material-icons">calendar_today</i> ${dateLabel}</span>`;
+    if (stops.length) chipsHtml += `<span class="info-chip"><i class="material-icons">place</i> ${stops.length} stops</span>`;
+    if (firstTime) chipsHtml += `<span class="info-chip"><i class="material-icons">access_time</i> Starts ${firstTime}</span>`;
+
+    const desc = trip.description ? `<p class="preview-desc">${trip.description}</p>` : '';
+
+    // Build header — hero image with scrim if available, else gradient
+    let headerHtml;
+    if (heroImage) {
+        headerHtml = `<div class="trip-preview-header has-hero">
+            <img class="hero-img" src="${heroImage}" onerror="this.style.display='none'">
+            <div class="hero-scrim"></div>
+            <div class="hero-content">
+                <span class="preview-badge"><i class="material-icons" style="font-size:12px;">auto_awesome</i> TRIP PREVIEW</span>
+                <h6>${trip.name || 'Trip'}</h6>
+                ${desc}
+            </div>
+        </div>`;
+    } else {
+        headerHtml = `<div class="trip-preview-header">
+            <span class="preview-badge"><i class="material-icons" style="font-size:12px;">auto_awesome</i> TRIP PREVIEW</span>
+            <h6>${trip.name || 'Trip'}</h6>
+            ${desc}
+        </div>`;
+    }
 
     const div = document.createElement('div');
     div.innerHTML = `
         <div class="trip-preview">
-            <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
-                <i class="material-icons" style="color:#ffc107;">auto_awesome</i>
-                <small style="font-weight:600;letter-spacing:1px;color:#999;">TRIP PREVIEW</small>
-            </div>
-            <h6>${trip.name || 'Trip'}</h6>
-            ${trip.scheduled_date ? '<p style="font-size:0.85rem;color:#666;"><i class="material-icons tiny">calendar_today</i> ' + trip.scheduled_date + '</p>' : ''}
+            ${headerHtml}
+            ${chipsHtml ? '<div class="info-chips">' + chipsHtml + '</div>' : ''}
+            <hr style="margin:8px 16px;border:none;border-top:1px solid #eee;">
             ${stopsHtml}
-            <div style="display:flex;gap:8px;margin-top:12px;">
-                <button class="btn green" onclick="approveTrip()"><i class="material-icons left">check</i>Looks Good!</button>
-                <button class="btn-flat red-text" onclick="rejectTrip()">Start Over</button>
+            <div class="preview-actions">
+                <p style="font-size:0.8rem;color:#999;margin:0 0 8px;">Type below to request changes, or approve:</p>
+                <div style="display:flex;gap:8px;">
+                    <button class="btn green" style="border-radius:10px;flex:1;" onclick="approveTrip()"><i class="material-icons left">check_circle</i>Looks Good!</button>
+                    <button class="btn-flat red-text" onclick="rejectTrip()"><i class="material-icons">close</i></button>
+                </div>
             </div>
-            <p style="font-size:0.8rem;color:#999;margin-top:8px;">Type below to request changes</p>
         </div>`;
     el.appendChild(div);
     scrollToBottom();
@@ -296,7 +512,7 @@ async function sendMessage(event) {
     addMessage('user', text);
     input.value = '';
     hideWelcome();
-    showThinking('Sippy is planning...');
+    showThinking('Sippy is searching for spots...', false);
 
     try {
         const body = { message: text };
@@ -331,7 +547,7 @@ async function sendMessage(event) {
 }
 
 async function approveTrip() {
-    showThinking('Creating your trip...');
+    showThinking('Creating your trip...', true);
     try {
         const body = { action: 'approve' };
         if (sessionId) body.session_id = sessionId;

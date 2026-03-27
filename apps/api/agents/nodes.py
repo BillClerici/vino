@@ -8,6 +8,7 @@ The planner uses a conversational agent pattern:
 
 import json
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime, time
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -103,11 +104,11 @@ In other words: during revision conversations, talk about changes without genera
 
 def planner_conversation(state: dict) -> dict:
     """Core conversation node — runs Claude with tools and the planner system prompt."""
-    from apps.api.ai_utils import get_claude
+    from apps.api.ai_utils import get_claude_fast
 
     from .tools import get_drive_time, search_places
 
-    llm = get_claude()
+    llm = get_claude_fast()
     tools = [search_places, get_drive_time]
     llm_with_tools = llm.bind_tools(tools)
 
@@ -183,8 +184,9 @@ def planner_conversation(state: dict) -> dict:
         messages[0] = SystemMessage(content=messages[0].content + plan_context)
 
     # Invoke LLM with tools — handle tool calls in a loop
+    # Tools within a round are executed in parallel via ThreadPoolExecutor
     tool_map = {t.name: t for t in tools}
-    max_tool_rounds = 5
+    max_tool_rounds = 3
     for _ in range(max_tool_rounds):
         response = llm_with_tools.invoke(messages)
         messages.append(response)
@@ -192,26 +194,38 @@ def planner_conversation(state: dict) -> dict:
         if not response.tool_calls:
             break
 
-        for tc in response.tool_calls:
+        # Execute all tool calls from this round in parallel
+        def _run_tool(tc):
             tool_fn = tool_map.get(tc["name"])
-            if tool_fn:
-                try:
-                    result = tool_fn.invoke(tc["args"])
-                    tool_msg = ToolMessage(
-                        content=json.dumps(result, default=str),
-                        tool_call_id=tc["id"],
-                    )
-                except Exception as e:
-                    tool_msg = ToolMessage(
-                        content=f"Tool error: {e}",
-                        tool_call_id=tc["id"],
-                    )
-            else:
-                tool_msg = ToolMessage(
+            if not tool_fn:
+                return ToolMessage(
                     content=f"Unknown tool: {tc['name']}",
                     tool_call_id=tc["id"],
                 )
-            messages.append(tool_msg)
+            try:
+                result = tool_fn.invoke(tc["args"])
+                return ToolMessage(
+                    content=json.dumps(result, default=str),
+                    tool_call_id=tc["id"],
+                )
+            except Exception as e:
+                return ToolMessage(
+                    content=f"Tool error: {e}",
+                    tool_call_id=tc["id"],
+                )
+
+        with ThreadPoolExecutor(max_workers=len(response.tool_calls)) as pool:
+            futures = {
+                pool.submit(_run_tool, tc): tc["id"]
+                for tc in response.tool_calls
+            }
+            # Collect results preserving tool_call order for deterministic messages
+            tool_msgs_by_id = {}
+            for future in as_completed(futures):
+                msg = future.result()
+                tool_msgs_by_id[msg.tool_call_id] = msg
+            for tc in response.tool_calls:
+                messages.append(tool_msgs_by_id[tc["id"]])
 
     # Ensure the final message is a text-only AI response
     final_response = messages[-1]
@@ -220,38 +234,9 @@ def planner_conversation(state: dict) -> dict:
         or getattr(final_response, "tool_calls", None)
     )
     if needs_text_response:
-        # Call LLM WITH tools to get a proper continuation after tool results.
-        # The tool results are in the messages, so Claude needs to see them
-        # and respond with text (and possibly more tool calls).
-        continuation = llm_with_tools.invoke(messages)
-        messages.append(continuation)
-
-        # If it STILL wants to call tools, do one final round
-        if getattr(continuation, "tool_calls", None):
-            for tc in continuation.tool_calls:
-                tool_fn = tool_map.get(tc["name"])
-                if tool_fn:
-                    try:
-                        result = tool_fn.invoke(tc["args"])
-                        messages.append(ToolMessage(
-                            content=json.dumps(result, default=str),
-                            tool_call_id=tc["id"],
-                        ))
-                    except Exception as e:
-                        messages.append(ToolMessage(
-                            content=f"Tool error: {e}",
-                            tool_call_id=tc["id"],
-                        ))
-
-            # Now force a text-only response
-            final_response = llm.invoke([
-                m for m in messages
-                if not isinstance(m, ToolMessage)
-                and not (isinstance(m, AIMessage) and getattr(m, "tool_calls", None))
-            ])
-            messages.append(final_response)
-        else:
-            final_response = continuation
+        # Force a text-only response — no more tool calls
+        final_response = llm.invoke(messages)
+        messages.append(final_response)
 
     # Extract text content (handles both string and content block list)
     content = _extract_text(final_response.content)
@@ -428,34 +413,50 @@ def planner_commit(state: dict) -> dict:
             )
             created_stops.append((trip_stop, place))
 
-        # Calculate drive times between consecutive stops
+        # Calculate drive times between consecutive stops (parallel)
         if len(created_stops) > 1:
             from .tools import get_drive_time
+
+            # Build list of (index, args) for valid stop pairs
+            drive_pairs = []
             for i in range(1, len(created_stops)):
                 prev_stop, prev_place = created_stops[i - 1]
                 curr_stop, curr_place = created_stops[i]
-
                 if (prev_place.latitude and prev_place.longitude
                         and curr_place.latitude and curr_place.longitude):
-                    try:
-                        drive_info = get_drive_time.invoke({
-                            "origin_lat": float(prev_place.latitude),
-                            "origin_lng": float(prev_place.longitude),
-                            "dest_lat": float(curr_place.latitude),
-                            "dest_lng": float(curr_place.longitude),
-                        })
-                        if drive_info.get("drive_minutes"):
-                            curr_stop.travel_minutes = drive_info["drive_minutes"]
-                        if drive_info.get("miles"):
-                            curr_stop.travel_miles = drive_info["miles"]
-                        curr_stop.save(update_fields=[
-                            "travel_minutes", "travel_miles", "updated_at",
-                        ])
-                    except Exception:
-                        logger.warning(
-                            "Drive time calc failed for stop %s → %s",
-                            prev_place.name, curr_place.name,
-                        )
+                    drive_pairs.append((i, {
+                        "origin_lat": float(prev_place.latitude),
+                        "origin_lng": float(prev_place.longitude),
+                        "dest_lat": float(curr_place.latitude),
+                        "dest_lng": float(curr_place.longitude),
+                    }))
+
+            def _calc_drive(pair):
+                idx, args = pair
+                try:
+                    return idx, get_drive_time.invoke(args)
+                except Exception:
+                    curr_place = created_stops[idx][1]
+                    prev_place = created_stops[idx - 1][1]
+                    logger.warning(
+                        "Drive time calc failed for stop %s → %s",
+                        prev_place.name, curr_place.name,
+                    )
+                    return idx, {}
+
+            with ThreadPoolExecutor(max_workers=len(drive_pairs)) as pool:
+                results = list(pool.map(_calc_drive, drive_pairs))
+
+            for idx, drive_info in results:
+                curr_stop = created_stops[idx][0]
+                if drive_info.get("drive_minutes"):
+                    curr_stop.travel_minutes = drive_info["drive_minutes"]
+                if drive_info.get("miles"):
+                    curr_stop.travel_miles = drive_info["miles"]
+                if drive_info.get("drive_minutes") or drive_info.get("miles"):
+                    curr_stop.save(update_fields=[
+                        "travel_minutes", "travel_miles", "updated_at",
+                    ])
 
         trip_id = str(trip.id)
         stop_count = trip.trip_stops.count()

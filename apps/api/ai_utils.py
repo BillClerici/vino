@@ -15,7 +15,7 @@ from django.conf import settings
 @lru_cache(maxsize=1)
 def get_claude():
     """
-    Initialize ChatAnthropic with Claude 3.5 Sonnet for general logic tasks.
+    Initialize ChatAnthropic with Claude Sonnet for general logic tasks.
 
     Returns a singleton instance (cached). Thread-safe for Django request handling.
     """
@@ -23,6 +23,24 @@ def get_claude():
 
     return ChatAnthropic(
         model="claude-sonnet-4-20250514",
+        api_key=settings.ANTHROPIC_API_KEY,
+        max_tokens=4096,
+        temperature=0.3,
+    )
+
+
+@lru_cache(maxsize=1)
+def get_claude_fast():
+    """
+    Initialize ChatAnthropic with Claude Haiku for fast tool-calling tasks.
+
+    Used for trip planning where speed matters more than deep reasoning.
+    ~5-8x faster output than Sonnet with strong tool-calling capability.
+    """
+    from langchain_anthropic import ChatAnthropic
+
+    return ChatAnthropic(
+        model="claude-haiku-4-5-20251001",
         api_key=settings.ANTHROPIC_API_KEY,
         max_tokens=4096,
         temperature=0.3,
