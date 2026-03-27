@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../config/constants.dart';
@@ -35,17 +36,27 @@ class AuthService {
     final googleSignIn = GoogleSignIn(
       scopes: ['email', 'profile'],
       serverClientId: clientId,
-      forceCodeForRefreshToken: true,
     );
 
-    final account = await googleSignIn.signIn();
+    debugPrint('[GoogleAuth] Starting sign-in...');
+    final account = await googleSignIn.signIn()
+        .timeout(const Duration(seconds: 15));
     if (account == null) throw Exception('Google sign-in cancelled');
+    debugPrint('[GoogleAuth] Account selected: ${account.email}');
 
-    final auth = await account.authentication;
-    // Try serverAuthCode first, fall back to idToken for Android
-    final authCode = auth.serverAuthCode;
+    debugPrint('[GoogleAuth] Getting authentication tokens...');
+    final auth = await account.authentication
+        .timeout(const Duration(seconds: 10));
+    debugPrint('[GoogleAuth] Got tokens. idToken=${auth.idToken != null}, serverAuthCode=${account.serverAuthCode != null}');
+
+    final authCode = account.serverAuthCode;
     final idToken = auth.idToken;
 
+    if (authCode == null && idToken == null) {
+      throw Exception('No auth credentials received from Google');
+    }
+
+    debugPrint('[GoogleAuth] Posting to backend...');
     final resp = await _api.post(
       '${ApiPaths.auth}/google/',
       data: {
@@ -60,6 +71,7 @@ class AuthService {
       refreshToken: data['refresh_token'] as String,
     );
 
+    debugPrint('[GoogleAuth] Sign-in complete');
     return getProfile();
   }
 

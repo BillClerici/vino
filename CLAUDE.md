@@ -34,17 +34,15 @@ docker-compose exec web pytest -k "test_health" -v
 
 ### Flutter APK Build
 
-The build number is tracked in two places that must stay in sync:
-- `mobile/pubspec.yaml` — `version: 1.0.0+N` (the `+N` is Flutter's internal versionCode)
-- The `--dart-define=BUILD_NUMBER=N` flag (displayed as `v1.0.N` in the app drawer)
+**ALWAYS use `make apk`** to build APKs. Never run `flutter build apk` directly — the Makefile passes critical `--dart-define` flags (`API_BASE_URL`, `GOOGLE_CLIENT_ID`, `BUILD_NUMBER`) without which the app won't connect to the backend or authenticate.
 
-**To build a new APK:**
-1. Read the current build number `N` from `mobile/pubspec.yaml` (the number after the `+`)
-2. Increment to `N+1` in both places: `version: 1.0.<N+1>+<N+1>` (e.g., `version: 1.0.28+28`)
-3. Run: `cd mobile && flutter build apk --release --dart-define=BUILD_NUMBER=<N+1>`
-4. Output: `mobile/build/app/outputs/flutter-apk/app-release.apk`
+The build number is tracked in `mobile/.build_number` and auto-incremented by the Makefile. Do NOT manually edit `mobile/pubspec.yaml` version field.
 
-**Always increment the build number when building a new APK.** Never skip this step.
+```bash
+make apk   # Increments build number, builds APK with all dart-defines
+```
+
+Output: `mobile/build/app/outputs/flutter-apk/app-release.apk`
 
 ## Architecture
 
