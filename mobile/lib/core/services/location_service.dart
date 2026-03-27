@@ -17,6 +17,8 @@ final userLocationProvider = FutureProvider<LatLng>((ref) async {
 
 /// Get the user's current GPS position.
 /// Handles permission requests automatically.
+/// Times out after 10 seconds total to avoid hanging on permission prompts
+/// (especially on Chrome/web where the browser prompt can block indefinitely).
 Future<Position> getUserLocation() async {
   bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
   if (!serviceEnabled) {
@@ -25,7 +27,8 @@ Future<Position> getUserLocation() async {
 
   LocationPermission permission = await Geolocator.checkPermission();
   if (permission == LocationPermission.denied) {
-    permission = await Geolocator.requestPermission();
+    permission = await Geolocator.requestPermission()
+        .timeout(const Duration(seconds: 5));
     if (permission == LocationPermission.denied) {
       throw Exception('Location permission denied');
     }
@@ -38,7 +41,7 @@ Future<Position> getUserLocation() async {
   return await Geolocator.getCurrentPosition(
     locationSettings: const LocationSettings(
       accuracy: LocationAccuracy.medium,
-      timeLimit: Duration(seconds: 10),
+      timeLimit: Duration(seconds: 5),
     ),
   );
 }
