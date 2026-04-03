@@ -11,8 +11,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 # Read .env file
 environ.Env.read_env(os.path.join(BASE_DIR, '.env'), overwrite=False)
 
-# App version — BUILD_NUMBER set by CI or Railway
-BUILD_NUMBER = env('BUILD_NUMBER', default='dev')
+# App version — BUILD_NUMBER set by CI, or fall back to Railway's git commit SHA
+BUILD_NUMBER = env('BUILD_NUMBER', default=env('RAILWAY_GIT_COMMIT_SHA', default='dev')[:7])
 APP_VERSION_FULL = f'v1.0.{BUILD_NUMBER}'
 
 SECRET_KEY = env('DJANGO_SECRET_KEY')
