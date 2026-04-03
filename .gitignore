@@ -26,6 +26,7 @@ staticfiles/
 .env.*
 !.env.example
 !.env.docker.example
+!.env.railway.example
 
 # IDE
 .vscode/
