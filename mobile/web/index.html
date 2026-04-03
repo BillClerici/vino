@@ -32,8 +32,9 @@
   <title>Trip Me</title>
   <link rel="manifest" href="manifest.json">
 
-  <!-- Google Maps -->
-  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAncQUGqg8F5bSEAZm-ePYHDiZKxYkmYWA"></script>
+  <!-- Google Maps — key set via GOOGLE_MAPS_API_KEY env var at build time.
+       Run: GOOGLE_MAPS_API_KEY=your-key flutter build web -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=GOOGLE_MAPS_API_KEY_PLACEHOLDER"></script>
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>

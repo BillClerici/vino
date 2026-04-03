@@ -28,10 +28,10 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
-        <!-- Google Maps API Key -->
+        <!-- Google Maps API Key (injected from local.properties via Gradle) -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyAncQUGqg8F5bSEAZm-ePYHDiZKxYkmYWA" />
+            android:value="${GOOGLE_MAPS_API_KEY}" />
         <!-- FCM default notification channel -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"

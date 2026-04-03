@@ -59,5 +59,9 @@ coverage.xml
 # ruff
 .ruff_cache/
 
+# Mobile secrets
+mobile/android/app/google-services.json
+mobile/android/local.properties
+
 # Node (if frontend added later)
 node_modules/

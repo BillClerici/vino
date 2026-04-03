@@ -39,7 +39,8 @@ docker-compose exec web pytest -k "test_health" -v
 The build number is tracked in `mobile/.build_number` and auto-incremented by the Makefile. Do NOT manually edit `mobile/pubspec.yaml` version field.
 
 ```bash
-make apk   # Increments build number, builds APK with all dart-defines
+# Required env vars: API_BASE_URL, GOOGLE_CLIENT_ID
+API_BASE_URL=https://vino-production.up.railway.app GOOGLE_CLIENT_ID=your-id make apk
 ```
 
 Output: `mobile/build/app/outputs/flutter-apk/app-release.apk`

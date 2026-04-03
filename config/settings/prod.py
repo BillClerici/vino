@@ -46,8 +46,8 @@ DATABASES = {
     }
 }
 
-# Static files — whitenoise for Railway (no S3 needed)
-MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
+# Static files — whitenoise already in base.py MIDDLEWARE
+# Override storage to skip manifest hashing (avoids collectstatic issues on Railway)
 STORAGES = {
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
