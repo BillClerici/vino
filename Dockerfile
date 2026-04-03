@@ -17,11 +17,12 @@ RUN pip install -r requirements/prod.txt
 
 COPY . .
 
-RUN python manage.py collectstatic --no-input 2>/dev/null || true
+RUN mkdir -p /app/staticfiles
 
 EXPOSE ${PORT}
 
-CMD gunicorn config.wsgi:application \
+CMD python manage.py collectstatic --no-input && \
+    gunicorn config.wsgi:application \
     --bind 0.0.0.0:${PORT} \
     --workers 2 \
     --threads 2 \
