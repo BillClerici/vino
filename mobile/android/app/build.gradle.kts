@@ -1,3 +1,6 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -5,6 +8,12 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
     id("com.google.gms.google-services")
 }
+
+// Load Google Maps API key from local.properties
+val localProps = rootProject.file("local.properties")
+val props = Properties()
+if (localProps.exists()) props.load(FileInputStream(localProps))
+val mapsApiKey = props.getProperty("GOOGLE_MAPS_API_KEY", "")
 
 android {
     namespace = "com.vino.vino_mobile"
@@ -34,12 +43,7 @@ android {
 
         versionName = flutter.versionName
 
-        // Inject Google Maps API key from local.properties into AndroidManifest.xml
-        val localProps = project.rootProject.file("local.properties")
-        val props = java.util.Properties()
-        if (localProps.exists()) props.load(localProps.inputStream())
-        val mapsKey = props.getProperty("GOOGLE_MAPS_API_KEY", "")
-        manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = mapsKey
+        manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = mapsApiKey
     }
 
     buildTypes {

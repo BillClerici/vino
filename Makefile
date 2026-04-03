@@ -55,16 +55,17 @@ BUILD_NUMBER_FILE := mobile/.build_number
 BUILD_NUMBER = $(shell cat $(BUILD_NUMBER_FILE) 2>/dev/null || echo 0)
 NEXT_BUILD = $(shell echo $$(($(BUILD_NUMBER) + 1)))
 
+API_BASE_URL ?= https://vino-production.up.railway.app
+GOOGLE_CLIENT_ID ?= 520560916664-27j152ocl7l7ksq3madpf4eb45uplpn7.apps.googleusercontent.com
+
 apk:
 	@echo $(NEXT_BUILD) > $(BUILD_NUMBER_FILE)
 	@echo "Building APK v1.0.$(NEXT_BUILD) (build #$(NEXT_BUILD))..."
-	@test -n "$$API_BASE_URL" || { echo "Error: API_BASE_URL env var required"; exit 1; }
-	@test -n "$$GOOGLE_CLIENT_ID" || { echo "Error: GOOGLE_CLIENT_ID env var required"; exit 1; }
 	cd mobile && flutter build apk --release \
 		--build-number=$(NEXT_BUILD) \
 		--build-name=1.0.$(NEXT_BUILD) \
-		--dart-define=API_BASE_URL=$$API_BASE_URL \
-		--dart-define=GOOGLE_CLIENT_ID=$$GOOGLE_CLIENT_ID \
+		--dart-define=API_BASE_URL=$(API_BASE_URL) \
+		--dart-define=GOOGLE_CLIENT_ID=$(GOOGLE_CLIENT_ID) \
 		--dart-define=BUILD_NUMBER=$(NEXT_BUILD)
 	@echo "APK built: mobile/build/app/outputs/flutter-apk/app-release.apk"
 
